@@ -20,6 +20,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.smarthome.core.items.GenericItem;
 import org.eclipse.smarthome.core.library.CoreItemFactory;
 import org.eclipse.smarthome.core.library.types.OnOffType;
+import org.eclipse.smarthome.core.library.types.OpenClosedType;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.RefreshType;
 import org.eclipse.smarthome.core.types.State;
@@ -39,6 +40,7 @@ public class SwitchItem extends GenericItem {
 
     static {
         acceptedDataTypes.add(OnOffType.class);
+        acceptedDataTypes.add(OpenClosedType.class);
         acceptedDataTypes.add(UnDefType.class);
 
         acceptedCommandTypes.add(OnOffType.class);

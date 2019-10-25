@@ -19,6 +19,7 @@ import java.util.List;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.smarthome.core.items.GenericItem;
 import org.eclipse.smarthome.core.library.CoreItemFactory;
+import org.eclipse.smarthome.core.library.types.OnOffType;
 import org.eclipse.smarthome.core.library.types.OpenClosedType;
 import org.eclipse.smarthome.core.types.Command;
 import org.eclipse.smarthome.core.types.RefreshType;
@@ -39,6 +40,7 @@ public class ContactItem extends GenericItem {
 
     static {
         acceptedDataTypes.add(OpenClosedType.class);
+        acceptedDataTypes.add(OnOffType.class);
         acceptedDataTypes.add(UnDefType.class);
 
         acceptedCommandTypes.add(RefreshType.class);

@@ -48,6 +48,8 @@ public enum OpenClosedType implements PrimitiveType, State, Command {
             return target.cast(this == OPEN ? new DecimalType(1) : DecimalType.ZERO);
         } else if (target == PercentType.class) {
             return target.cast(this == OPEN ? PercentType.HUNDRED : PercentType.ZERO);
+        } else if (target == OnOffType.class) {
+            return target.cast(this == OPEN ? OnOffType.OFF : OnOffType.ON);
         } else {
             return State.super.as(target);
         }

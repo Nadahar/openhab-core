@@ -68,6 +68,8 @@ public enum OnOffType implements PrimitiveType, State, Command {
             return target.cast(this == ON ? PercentType.HUNDRED : PercentType.ZERO);
         } else if (target == HSBType.class) {
             return target.cast(this == ON ? HSBType.WHITE : HSBType.BLACK);
+        } else if (target == OpenClosedType.class) {
+            return target.cast(this == ON ? OpenClosedType.CLOSED : OpenClosedType.OPEN);
         } else {
             return State.super.as(target);
         }
