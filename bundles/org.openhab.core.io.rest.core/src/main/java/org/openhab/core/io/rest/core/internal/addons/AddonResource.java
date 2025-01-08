@@ -50,6 +50,7 @@ import org.openhab.core.addon.AddonInfo;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
+import org.openhab.core.addon.dto.AddonDTO;
 import org.openhab.core.auth.Role;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigDescription;
@@ -151,7 +152,7 @@ public class AddonResource implements RESTResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getAddons", summary = "Get all add-ons.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Addon.class)))),
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonDTO.class)))),
             @ApiResponse(responseCode = "404", description = "Service not found") })
     public Response getAddon(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
@@ -169,8 +170,8 @@ public class AddonResource implements RESTResource {
             if (addonService == null) {
                 return Response.status(HttpStatus.NOT_FOUND_404).build();
             }
-            return Response.ok(new Stream2JSONInputStream(
-                    addonService.getAddons(locale, Boolean.TRUE.equals(installedOnly)).stream())).build();
+            return Response.ok(new Stream2JSONInputStream(addonService
+                    .getAddons(locale, Boolean.TRUE.equals(installedOnly)).stream().map(a -> new AddonDTO(a)))).build();
         }
     }
 
@@ -191,7 +192,7 @@ public class AddonResource implements RESTResource {
     @Path("/suggestions")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getSuggestedAddons", summary = "Get suggested add-ons to be installed.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Addon.class)))), })
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonInfo.class)))), })
     public Response getSuggestions(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language) {
         logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
@@ -230,7 +231,7 @@ public class AddonResource implements RESTResource {
     @Path("/{addonId: [a-zA-Z_0-9-:]+}")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getAddonById", summary = "Get add-on with given ID.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = Addon.class))),
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = AddonDTO.class))),
             @ApiResponse(responseCode = "404", description = "Not found") })
     public Response getById(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
@@ -244,7 +245,7 @@ public class AddonResource implements RESTResource {
         }
         Addon responseObject = addonService.getAddon(addonId, locale);
         if (responseObject != null) {
-            return Response.ok(responseObject).build();
+            return Response.ok(new AddonDTO(responseObject)).build();
         }
 
         return Response.status(HttpStatus.NOT_FOUND_404).build();
@@ -266,7 +267,7 @@ public class AddonResource implements RESTResource {
             try {
                 addonService.install(addonId);
             } catch (Exception e) {
-                logger.error("Exception while installing add-on: {}", e.getMessage());
+                logger.error("An error occurred while installing add-on '{}': {}", addonId, e.getMessage());
                 postFailureEvent(addonId, e.getMessage());
             }
         });
@@ -416,8 +417,9 @@ public class AddonResource implements RESTResource {
                 .findFirst().orElse(addonServices.stream().findFirst().orElse(null));
     }
 
-    private Stream<Addon> getAllAddons(Locale locale, boolean installedOnly) {
-        return addonServices.stream().map(s -> s.getAddons(locale, installedOnly)).flatMap(Collection::stream);
+    private Stream<AddonDTO> getAllAddons(@Nullable Locale locale, boolean installedOnly) {
+        return addonServices.stream().map(s -> s.getAddons(locale, installedOnly)).flatMap(Collection::stream)
+                .map(a -> new AddonDTO(a));
     }
 
     private Set<AddonType> getAllAddonTypes(Locale locale) {
