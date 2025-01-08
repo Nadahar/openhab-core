@@ -29,7 +29,7 @@ public class BundleVersion {
     private static final Pattern VERSION_PATTERN = Pattern.compile(
             "(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<micro>\\d+)(\\.((?<rc>RC)|(?<milestone>M))?(?<qualifier>\\d+))?");
     public static final Pattern RANGE_PATTERN = Pattern.compile(
-            "\\[(?<start>\\d+\\.\\d+(?<startmicro>\\.\\d+(\\.\\w+)?)?);(?<end>\\d+\\.\\d+(?<endmicro>\\.\\d+(\\.\\w+)?)?)(?<endtype>[)\\]])");
+            "\\[(?<start>\\d+\\.\\d+(?<startmicro>\\.\\d+(\\.\\w+)?)?);(?<end>\\d+\\.\\d+(?<endmicro>\\.\\d+(\\.\\w+)?)?)?(?<endtype>[)\\]])");
 
     private final String version;
     private final int major;
@@ -87,7 +87,10 @@ public class BundleVersion {
             return false;
         }
 
-        String endString = matcher.group("endmicro") != null ? matcher.group("end") : matcher.group("stop") + ".0";
+        if (matcher.group("end") == null) {
+            return true;
+        }
+        String endString = matcher.group("endmicro") != null ? matcher.group("end") : matcher.group("end") + ".0";
         boolean inclusive = "]".equals(matcher.group("endtype"));
         BundleVersion endVersion = new BundleVersion(endString);
         int comparison = this.compareTo(endVersion);
