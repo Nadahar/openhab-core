@@ -1,0 +1,229 @@
+package org.openhab.core.addon;
+
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
+import com.google.gson.annotations.SerializedName;
+
+
+@NonNullByDefault
+public class AddonVersion {
+
+    protected final Version versionObj;
+    @SerializedName("version")
+    protected final String versionString; //TODO: (Nad) Needed?
+    protected final @Nullable VersionRange coreRangeObj;
+    @SerializedName("coreRange")
+    protected final @Nullable String coreRangeString;
+    protected final @Nullable String maturity;
+    protected final Set<String> dependsOn;
+    protected final boolean compatible;
+    protected final @Nullable String documentationLink;
+    protected final @Nullable String issuesLink;
+    protected final boolean installed;
+    protected final @Nullable String description;
+    protected final @Nullable String keywords;
+    protected final List<String> countries;
+    protected final Map<String, Object> properties;
+    protected final List<String> loggerPackages;
+
+    protected AddonVersion(Version version, @Nullable VersionRange coreRange,
+        @Nullable String maturity, @Nullable Set<String> dependsOn, boolean compatible, @Nullable String documentationLink,
+        @Nullable String issuesLink, boolean installed, @Nullable String description, @Nullable String keywords,
+        @Nullable List<String> countries, @Nullable Map<String, Object> properties,
+        @Nullable List<String> loggerPackages) {
+        this.versionObj = version;
+        this.versionString = version.toString();
+        this.coreRangeObj = coreRange;
+        this.coreRangeString = coreRange == null ? null : coreRange.toString();
+        this.maturity = maturity;
+        this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
+        this.compatible = compatible;
+        this.documentationLink = documentationLink;
+        this.issuesLink = issuesLink;
+        this.installed = installed;
+        this.description = description;
+        this.keywords = keywords;
+        this.countries = countries == null ? List.of() : List.copyOf(countries);
+        this.properties = properties == null ? Map.of() : Map.copyOf(properties);
+        this.loggerPackages = loggerPackages == null ? List.of() : List.copyOf(loggerPackages);
+    }
+
+    public @Nullable Version getVersion() {
+        return versionObj;
+    }
+
+    public @Nullable VersionRange getCoreRange() {
+        return coreRangeObj;
+    }
+
+    public @Nullable String getMaturity() {
+        return maturity;
+    }
+
+    public Set<String> getDependsOn() {
+        return dependsOn;
+    }
+
+    public boolean isCompatible() {
+        return compatible;
+    }
+
+    public @Nullable String getDocumentationLink() {
+        return documentationLink;
+    }
+
+    public @Nullable String getIssuesLink() {
+        return issuesLink;
+    }
+
+    public boolean isInstalled() {
+        return installed;
+    }
+
+    public @Nullable String getDescription() {
+        return description;
+    }
+
+    public @Nullable String getKeywords() {
+        return keywords;
+    }
+
+    public List<String> getCountries() {
+        return countries;
+    }
+
+    public Map<String, Object> getProperties() {
+        return properties;
+    }
+
+    public List<String> getLoggerPackages() {
+        return loggerPackages;
+    }
+
+    public boolean isStable() {
+        if (Version.EMPTY_VERSION.equals(versionObj)) {
+            return false;
+        }
+
+        if (maturity != null && Addon.CODE_MATURITY_LEVELS.contains(maturity)) {
+            return "stable".equals(maturity) || "mature".equals(maturity);
+        }
+
+        // Deem versions without a qualifier as stable
+        return versionObj.getQualifier().isBlank();
+    }
+
+    public static Builder create() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        protected @Nullable Version version;
+        protected @Nullable VersionRange coreRange;
+        protected @Nullable String maturity;
+        protected @Nullable Set<String> dependsOn;
+        protected boolean compatible;
+        protected @Nullable String documentationLink;
+        protected @Nullable String issuesLink;
+        protected boolean installed;
+        protected @Nullable String description;
+        protected @Nullable String keywords;
+        protected @Nullable List<String> countries;
+        protected @Nullable Map<String, Object> properties;
+        protected @Nullable List<String> loggerPackages;
+
+        public Builder withVersion(@Nullable Version version) {
+            this.version = version;
+            return this;
+        }
+
+        public Builder withCoreRange(@Nullable VersionRange coreRange) {
+            this.coreRange = coreRange;
+            return this;
+        }
+
+        public Builder withMaturity(@Nullable String maturity) {
+            this.maturity = maturity == null ? null : maturity.toLowerCase(Locale.ROOT);
+            return this;
+        }
+
+        public Builder withDependsOn(@Nullable Set<String> dependsOn) {
+            this.dependsOn = dependsOn;
+            return this;
+        }
+
+        public Builder withCompatible(boolean compatible) {
+            this.compatible = compatible;
+            return this;
+        }
+
+        public Builder withDocumentationLink(@Nullable String documentationLink) {
+            this.documentationLink = documentationLink;
+            return this;
+        }
+
+        public Builder withIssuesLink(@Nullable String issuesLink) {
+            this.issuesLink = issuesLink;
+            return this;
+        }
+
+        public Builder withInstalled(boolean installed) {
+            this.installed = installed;
+            return this;
+        }
+
+        public Builder withDescription(@Nullable String description) {
+            this.description = description;
+            return this;
+        }
+
+        public Builder withKeywords(@Nullable String keywords) {
+            this.keywords = keywords;
+            return this;
+        }
+
+        public Builder withCountries(@Nullable List<String> countries) {
+            this.countries = countries;
+            return this;
+        }
+
+        public Builder withProperties(@Nullable Map<String, Object> properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public Builder withLoggerPackages(@Nullable List<String> loggerPackages) {
+            this.loggerPackages = loggerPackages;
+            return this;
+        }
+
+        public boolean isValid(@Nullable Set<String> validResourceTypes) {
+            if (version == null) {
+                return false;
+            }
+            Map<String, Object> p;
+            if (validResourceTypes != null) {
+                if ((p = properties) == null) {
+                    return false;
+                }
+                return p.keySet().stream().anyMatch(prop -> validResourceTypes.contains(prop));
+            }
+            return true;
+        }
+
+        public AddonVersion build() {
+            Version v = version;
+            if (v == null) {
+                v = Version.EMPTY_VERSION;
+            }
+            return new AddonVersion(v, coreRange, maturity, dependsOn, compatible, documentationLink, issuesLink,
+                    installed, description, keywords, countries, properties, loggerPackages);
+        }
+    }
+}
