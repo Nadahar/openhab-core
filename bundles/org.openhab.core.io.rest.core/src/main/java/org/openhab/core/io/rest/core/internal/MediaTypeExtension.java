@@ -30,6 +30,7 @@ import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 
 import org.openhab.core.io.rest.RESTConstants;
+import org.openhab.core.io.rest.core.AnnotationExclusionStrategy;
 import org.openhab.core.library.types.DateTimeType;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.jaxrs.whiteboard.JaxrsWhiteboardConstants;
@@ -62,7 +63,8 @@ public class MediaTypeExtension<T> implements MessageBodyReader<T>, MessageBodyW
      * Constructor.
      */
     public MediaTypeExtension() {
-        final Gson gson = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_JSON_COMPAT).create();
+        final Gson gson = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_JSON_COMPAT)
+                .setExclusionStrategies(new AnnotationExclusionStrategy()).create();
         readers.put(mediaTypeWithoutParams(MediaType.APPLICATION_JSON_TYPE), new GsonMessageBodyReader<>(gson));
         readers.put(mediaTypeWithoutParams(MediaType.TEXT_PLAIN_TYPE), new PlainMessageBodyReader<>());
         writers.put(mediaTypeWithoutParams(MediaType.APPLICATION_JSON_TYPE), new GsonMessageBodyWriter<>(gson));
