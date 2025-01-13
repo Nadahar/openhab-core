@@ -39,6 +39,8 @@ public class Addon {
     private final boolean compatible;
     private final String contentType;
     private final @Nullable String link;
+    private final @Nullable String documentationLink;
+    private final @Nullable String issuesLink;
     private final String author;
     private final boolean verifiedAuthor;
     private boolean installed;
@@ -67,6 +69,8 @@ public class Addon {
      * @param compatible if this add-on is compatible with the current core version
      * @param contentType the content type of the add-on
      * @param link the link to find more information about the add-on (may be null)
+     * @param documentationLink the link to the add-on documentation (may be null)
+     * @param issuesLink the link to the add-on issues tracker (may be null)
      * @param author the author of the add-on
      * @param verifiedAuthor true, if the author is verified
      * @param installed true, if the add-on is installed, false otherwise
@@ -84,12 +88,13 @@ public class Addon {
      * @param loggerPackages a {@link List} containing the package names belonging to this add-on
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
-    private Addon(String uid, String type, String id, String label, String version, @Nullable String maturity,
-            boolean compatible, String contentType, @Nullable String link, String author, boolean verifiedAuthor,
-            boolean installed, @Nullable String description, @Nullable String detailedDescription,
-            String configDescriptionURI, String keywords, List<String> countries, @Nullable String license,
-            String connection, @Nullable String backgroundColor, @Nullable String imageLink,
-            @Nullable Map<String, Object> properties, List<String> loggerPackages) {
+    protected Addon(String uid, String type, String id, String label, String version, @Nullable String maturity,
+            boolean compatible, String contentType, @Nullable String link, @Nullable String documentationLink,
+            @Nullable String issuesLink, String author, boolean verifiedAuthor, boolean installed,
+            @Nullable String description, @Nullable String detailedDescription, String configDescriptionURI,
+            String keywords, List<String> countries, @Nullable String license, String connection,
+            @Nullable String backgroundColor, @Nullable String imageLink, @Nullable Map<String, Object> properties,
+            List<String> loggerPackages) {
         if (uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -118,6 +123,8 @@ public class Addon {
         this.connection = connection;
         this.backgroundColor = backgroundColor;
         this.link = link;
+        this.documentationLink = documentationLink;
+        this.issuesLink = issuesLink;
         this.imageLink = imageLink;
         this.author = author;
         this.verifiedAuthor = verifiedAuthor;
@@ -159,6 +166,20 @@ public class Addon {
      */
     public @Nullable String getLink() {
         return link;
+    }
+
+    /**
+     * The (optional) link to the add-on documentation
+     */
+    public @Nullable String getDocumentationLink() {
+        return documentationLink;
+    }
+
+    /**
+     * The (optional) link to the add-on issues tracker
+     */
+    public @Nullable String getIssuesLink() {
+        return issuesLink;
     }
 
     /**
@@ -313,6 +334,8 @@ public class Addon {
         builder.compatible = addon.compatible;
         builder.contentType = addon.contentType;
         builder.link = addon.link;
+        builder.documentationLink = addon.documentationLink;
+        builder.issuesLink = addon.issuesLink;
         builder.author = addon.author;
         builder.verifiedAuthor = addon.verifiedAuthor;
         builder.installed = addon.installed;
@@ -332,31 +355,33 @@ public class Addon {
     }
 
     public static class Builder {
-        private final String uid;
-        private String id;
-        private String label;
-        private String version = "";
-        private @Nullable String maturity;
-        private boolean compatible = true;
-        private String contentType;
-        private @Nullable String link;
-        private String author = "";
-        private boolean verifiedAuthor = false;
-        private boolean installed = false;
-        private String type;
-        private @Nullable String description;
-        private @Nullable String detailedDescription;
-        private String configDescriptionURI = "";
-        private String keywords = "";
-        private List<String> countries = List.of();
-        private @Nullable String license;
-        private String connection = "";
-        private @Nullable String backgroundColor;
-        private @Nullable String imageLink;
-        private Map<String, Object> properties = new HashMap<>();
-        private List<String> loggerPackages = List.of();
+        protected final String uid;
+        protected String id;
+        protected String label;
+        protected String version = "";
+        protected @Nullable String maturity;
+        protected boolean compatible = true;
+        protected String contentType;
+        protected @Nullable String link;
+        protected @Nullable String documentationLink;
+        protected @Nullable String issuesLink;
+        protected String author = "";
+        protected boolean verifiedAuthor = false;
+        protected boolean installed = false;
+        protected String type;
+        protected @Nullable String description;
+        protected @Nullable String detailedDescription;
+        protected String configDescriptionURI = "";
+        protected String keywords = "";
+        protected List<String> countries = List.of();
+        protected @Nullable String license;
+        protected String connection = "";
+        protected @Nullable String backgroundColor;
+        protected @Nullable String imageLink;
+        protected Map<String, Object> properties = new HashMap<>();
+        protected List<String> loggerPackages = List.of();
 
-        private Builder(String uid) {
+        protected Builder(String uid) {
             this.uid = uid;
         }
 
@@ -397,6 +422,16 @@ public class Addon {
 
         public Builder withLink(String link) {
             this.link = link;
+            return this;
+        }
+
+        public Builder withDocumentationLink(String documentationLink) {
+            this.documentationLink = documentationLink;
+            return this;
+        }
+
+        public Builder withIssuesLink(String issuesLink) {
+            this.issuesLink = issuesLink;
             return this;
         }
 
@@ -477,9 +512,9 @@ public class Addon {
         }
 
         public Addon build() {
-            return new Addon(uid, type, id, label, version, maturity, compatible, contentType, link, author,
-                    verifiedAuthor, installed, description, detailedDescription, configDescriptionURI, keywords,
-                    countries, license, connection, backgroundColor, imageLink,
+            return new Addon(uid, type, id, label, version, maturity, compatible, contentType, link, documentationLink,
+                    issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
+                    configDescriptionURI, keywords, countries, license, connection, backgroundColor, imageLink,
                     properties.isEmpty() ? null : properties, loggerPackages);
         }
     }
