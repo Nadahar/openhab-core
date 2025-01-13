@@ -40,7 +40,9 @@ import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
+import org.openhab.core.addon.marketplace.AddonVersion;
 import org.openhab.core.addon.marketplace.BundleVersion;
+import org.openhab.core.addon.marketplace.MarketplaceAddon;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO.DiscoursePosterInfo;
@@ -95,8 +97,16 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
     private static final String ADDON_ID_PREFIX = SERVICE_ID + ":";
 
     private static final Pattern CODE_MARKUP_PATTERN = Pattern.compile(
-            "<pre(?: data-code-wrap=\"[a-z]+\")?><code class=\"lang-(?<lang>[a-z]+)\">(?<content>.*?)</code></pre>",
+            "<pre(?: data-code-wrap=\"[a-zA-Z]+\")?><code class=\"lang-(?<lang>(?i)(?:yaml|json)(?-i))\">(?<content>.*?)</code></pre>",
             Pattern.DOTALL);
+    private static final Pattern CODE_ADDON_PATTERN = Pattern.compile(
+            "<pre(?: data-code-wrap=\"(?i)(?:addon|add-on)(?-i)\")?><code class=\"lang-(?i)(?:addon|add-on)(?-i)\">(?<content>.*?)</code></pre>",
+            Pattern.DOTALL);
+    private static final Pattern CODE_RESOURCE_PATTERN = Pattern.compile(
+        "<pre(?: data-code-wrap=\"(?i)resource(?-i)\")?><code class=\"lang-(?i)resource(?-i)\">(?<content>.*?)</code></pre>",
+        Pattern.DOTALL);
+    private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
+            "^\\s*(?<key>\\w+)\\s*(?:=|:)\\s*(?<value>.*?)\\s*$", Pattern.MULTILINE);
 
     private static final Integer BUNDLES_CATEGORY = 73;
     private static final Integer RULETEMPLATES_CATEGORY = 74;
@@ -163,7 +173,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         try {
             List<DiscourseCategoryResponseDTO> pages = new ArrayList<>();
 
-            URL url = new URL(COMMUNITY_MARKETPLACE_URL);
+            URL url = new URI(COMMUNITY_MARKETPLACE_URL).toURL();
             int pageNb = 1;
             while (url != null) {
                 URLConnection connection = url.openConnection();
@@ -180,7 +190,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
                     if (parsed.topicList.moreTopicsUrl != null) {
                         // Discourse URL for next page is wrong
-                        url = new URL(COMMUNITY_MARKETPLACE_URL + "?page=" + pageNb++);
+                        url =new URI(COMMUNITY_MARKETPLACE_URL + "?page=" + pageNb++).toURL();
                     } else {
                         url = null;
                     }
@@ -215,7 +225,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         // retrieve from remote
         try {
-            URL url = new URL(String.format("%s%s", COMMUNITY_TOPIC_URL, uid.replace(ADDON_ID_PREFIX, "")));
+            URL url = new URI(String.format("%s%s", COMMUNITY_TOPIC_URL, uid.replace(ADDON_ID_PREFIX, ""))).toURL();
             URLConnection connection = url.openConnection();
             connection.addRequestProperty("Accept", "application/json");
             if (this.apiKey != null) {
@@ -364,8 +374,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
      * @return the unescaped content
      */
     private String unescapeEntities(String content) {
-        return content.replace("&quot;", "\"").replace("&amp;", "&").replace("&apos;", "'").replace("&lt;", "<")
-                .replace("&gt;", ">");
+        return content.replace("&quot;", "\"").replace("&apos;", "'").replace("&lt;", "<")
+                .replace("&gt;", ">").replace("&amp;", "&");
     }
 
     /**
@@ -427,31 +437,162 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             id = topic.id.toString(); // this is a fallback if we couldn't find a better id
         }
 
-        Matcher codeMarkup = CODE_MARKUP_PATTERN.matcher(detailedDescription);
-        if (codeMarkup.find()) {
-            properties.put(codeMarkup.group("lang") + CODE_CONTENT_SUFFIX,
-                    unescapeEntities(codeMarkup.group("content")));
+        MarketplaceAddon.Builder builder = (MarketplaceAddon.Builder) MarketplaceAddon.create(uid)
+            .withType(type).withId(id).withContentType(contentType)
+            .withImageLink(topic.imageUrl).withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
+            .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity);
+
+        Matcher matcher = CODE_ADDON_PATTERN.matcher(detailedDescription);
+        String s;
+        if (matcher.find()) {
+            String addonCode = unescapeEntities(matcher.group("content"));
+            detailedDescription = matcher.replaceFirst("");
+            matcher = KEY_VALUE_PATTERN.matcher(addonCode);
+            while (matcher.find()) {
+                switch (matcher.group("key").toLowerCase(Locale.ROOT)) {
+                    case "version":
+                        builder.withVersion(matcher.group("value"));
+                        break;
+                    case "keywords":
+                        builder.withKeywords(matcher.group("value"));
+                        break;
+                    case "countries":
+                        List<String> countries = Arrays.asList(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
+                        countries = countries.stream().filter(e -> !e.isBlank()).toList();
+                        builder.withCountries(countries);
+                        break;
+                    case "license":
+                        builder.withLicense(matcher.group("value"));
+                        break;
+                    case "connection":
+                        s = matcher.group("value").toLowerCase(Locale.ROOT);
+                        if ("local".equals(s) || "cloud".equals(s) || "hybrid".equals(s)
+                            || "cloudDiscovery".equals(s)) {
+                            builder.withConnection(s);
+                        }
+                        break;
+                    case "loggerpackages":
+                        List<String> loggerPackages = Arrays
+                            .asList(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
+                        loggerPackages = loggerPackages.stream().filter(e -> !e.isBlank()).toList();
+                        builder.withLoggerPackages(loggerPackages);
+                        break;
+                    case "documentation":
+                        builder.withDocumentationLink(matcher.group("value"));
+                        break;
+                    case "issues":
+                        builder.withIssuesLink(matcher.group("value"));
+                        break;
+                    default:
+                        logger.warn("{}: {}", matcher.group("key"), matcher.group("value")); // TODO: (Nad) Temp test
+                        break;
+                }
+            }
+        }
+
+        matcher = CODE_RESOURCE_PATTERN.matcher(detailedDescription);
+        AddonVersion.Builder resourceBuilder = AddonVersion.create();
+        while (matcher.find()) {
+            String resourceCode = unescapeEntities(matcher.group("content"));
+            detailedDescription = matcher.replaceFirst("");
+            BundleVersion version;
+            boolean skip = false;
+            Map<String, Object> resourceProperties = null;
+            matcher = KEY_VALUE_PATTERN.matcher(resourceCode);
+            while (!skip && matcher.find()) {
+                switch (matcher.group("key").toLowerCase(Locale.ROOT)) {
+                    case "version":
+                        try {
+                            version = new BundleVersion(matcher.group("value"));
+                        } catch (IllegalArgumentException e) {
+                            skip = true; // TODO: (Nad) Log?
+                            break;
+                        }
+                        resourceBuilder.withVersion(version);
+                        break;
+                    case "corerange":
+                        // TODO: (Nad) Make
+                        // TODO: (Nad) Set compatible
+                        break;
+                    case "maturity":
+                        s = matcher.group("value").trim().toLowerCase(Locale.ROOT);
+                        if (CODE_MATURITY_LEVELS.contains(s)) {
+                            resourceBuilder.withMaturity(s);
+                        }
+                        break;
+                    case "keywords":
+                        resourceBuilder.withKeywords(matcher.group("value"));
+                        break;
+                    case "countries":
+                        List<String> countries = Arrays.stream(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"))
+                            .filter(e -> !e.isBlank()).toList();
+                        resourceBuilder.withCountries(countries);
+                        break;
+                    case "connection":
+                        s = matcher.group("value").toLowerCase(Locale.ROOT);
+                        if ("local".equals(s) || "cloud".equals(s) || "hybrid".equals(s)
+                            || "cloudDiscovery".equals(s)) {
+                            builder.withConnection(s);
+                        }
+                        break;
+                    case "loggerpackages":
+                        List<String> loggerPackages = Arrays
+                            .asList(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
+                        loggerPackages = loggerPackages.stream().filter(e -> !e.isBlank()).toList();
+                        resourceBuilder.withLoggerPackages(loggerPackages);
+                        break;
+                    case "documentation":
+                        resourceBuilder.withDocumentationLink(matcher.group("value"));
+                        break;
+                    case "issues":
+                        resourceBuilder.withIssuesLink(matcher.group("value"));
+                        break;
+                    case "description":
+                        resourceBuilder.withDescription(matcher.group("value"));
+                        break;
+                    case "url":
+                        if (resourceProperties == null) {
+                            resourceProperties = new HashMap<>();
+                        }
+                        // TODO: (Nad) Handle
+                        break;
+                    default:
+                        logger.warn("{}: {}", matcher.group("key"), matcher.group("value")); // TODO: (Nad) Temp test
+                        break;
+                }
+            }
+            resourceBuilder.withProperties(resourceProperties);
+            // TODO: (Nad) Set uid
+            resourceBuilder.withUID(uid + ":test"); // TODO: (Nad) Temp test
+            // TODO: (Nad) Set installed
+            // TODO: (Nad) Handle URL/content
+            if (resourceBuilder.isValid()) { // TODO: (Nad)
+                builder.withAddonVersion(resourceBuilder.build());
+            }
+        }
+
+        matcher = CODE_MARKUP_PATTERN.matcher(detailedDescription);
+        if (matcher.find()) {
+            properties.put(matcher.group("lang") + CODE_CONTENT_SUFFIX,
+                unescapeEntities(matcher.group("content")));
+            detailedDescription = matcher.replaceFirst("");
         }
 
         // try to use a handler to determine if the add-on is installed
-        boolean installed = addonHandlers.stream()
-                .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid));
+        builder.withInstalled(addonHandlers.stream()
+            .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid)));
 
         String title = topic.title;
         int compatibilityStart = topic.title.lastIndexOf("["); // version range always starts with [
         if (topic.title.lastIndexOf(" ") < compatibilityStart) { // check includes [ not present
             String potentialRange = topic.title.substring(compatibilityStart);
-            Matcher matcher = BundleVersion.RANGE_PATTERN.matcher(potentialRange);
+            matcher = BundleVersion.RANGE_PATTERN.matcher(potentialRange);
             if (matcher.matches()) {
                 title = topic.title.substring(0, compatibilityStart).trim();
             }
         }
 
-        Addon.Builder builder = Addon.create(uid).withType(type).withId(id).withContentType(contentType)
-                .withLabel(title).withImageLink(topic.imageUrl)
-                .withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
-                .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity)
-                .withDetailedDescription(detailedDescription).withInstalled(installed).withProperties(properties);
+        builder.withLabel(title).withDetailedDescription(detailedDescription).withProperties(properties);
 
         return builder.build();
     }
