@@ -13,14 +13,14 @@ import org.openhab.core.addon.Addon;
 
 public class MarketplaceAddon extends Addon {
 
-    protected final SortedMap<BundleVersion, AddonVersion> versions; // TODO: (Nad) Null or not?
+    protected final SortedMap<Version, AddonVersion> versions; // TODO: (Nad) Null or not?
 
     protected MarketplaceAddon(String uid, String type, String id, String label, String version, String maturity,
         boolean compatible, String contentType, String link, String documentationLink, String issuesLink,
         String author, boolean verifiedAuthor, boolean installed,
         String description, String detailedDescription, String configDescriptionURI, String keywords,
         List<String> countries, String license, String connection, String backgroundColor, String imageLink,
-        Map<String, Object> properties, List<String> loggerPackages, @Nullable SortedMap<BundleVersion, AddonVersion> versions) {
+        Map<String, Object> properties, List<String> loggerPackages, @Nullable SortedMap<Version, AddonVersion> versions) {
         super(uid, type, id, label, version, maturity, compatible, contentType, link, documentationLink, issuesLink,
             author, verifiedAuthor, installed, description, detailedDescription, configDescriptionURI, keywords,
             countries, license, connection, backgroundColor, imageLink, properties, loggerPackages);
@@ -38,7 +38,7 @@ public class MarketplaceAddon extends Addon {
     public static class Builder extends Addon.Builder {
 
         @Nullable
-        protected SortedMap<BundleVersion, AddonVersion> versions;
+        protected SortedMap<Version, AddonVersion> versions;
 
         protected Builder(String uid) {
             super(uid);
@@ -48,7 +48,7 @@ public class MarketplaceAddon extends Addon {
             if (addonVersion.getVersion() == null) {
                 throw new IllegalArgumentException("Version cannot be null");
             }
-            SortedMap<BundleVersion, AddonVersion> locVersions = versions;
+            SortedMap<Version, AddonVersion> locVersions = versions;
             if (locVersions == null) {
                 locVersions = new TreeMap<>(); //TODO: (Nad) Comparator
             }

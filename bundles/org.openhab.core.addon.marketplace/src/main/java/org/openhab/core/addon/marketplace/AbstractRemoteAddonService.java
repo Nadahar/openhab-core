@@ -70,20 +70,15 @@ public abstract class AbstractRemoteAddonService implements AddonService {
             return compatible;
         }
         try {
-            // Add-on versions often contain a dash instead of a dot as separator for the qualifier (e.g. -SNAPSHOT)
-            // This is not a valid format and everything after the dash needs to be removed.
-            BundleVersion version1 = new BundleVersion(addon1.getVersion().replaceAll("-.*", ".0"));
-            BundleVersion version2 = new BundleVersion(addon2.getVersion().replaceAll("-.*", ".0"));
-
             // prefer newer version over older
-            return version2.compareTo(version1);
+            return Version.parseVersion(addon2.getVersion()).compareTo(Version.parseVersion(addon1.getVersion()));
         } catch (IllegalArgumentException e) {
             // assume they are equal (for ordering) if we can't compare the versions
             return 0;
         }
     };
 
-    protected final BundleVersion coreVersion;
+    protected final Version coreVersion;
 
     protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
     protected final Set<MarketplaceAddonHandler> addonHandlers = new HashSet<>();
@@ -108,8 +103,8 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         this.coreVersion = getCoreVersion();
     }
 
-    protected BundleVersion getCoreVersion() {
-        return new BundleVersion(FrameworkUtil.getBundle(OpenHAB.class).getVersion().toString());
+    protected Version getCoreVersion() {
+        return Version.valueOf(FrameworkUtil.getBundle(OpenHAB.class).getVersion());
     }
 
     private Addon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
