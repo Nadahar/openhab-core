@@ -37,6 +37,7 @@ import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
+import org.openhab.core.addon.marketplace.VersionRange;
 import org.openhab.core.addon.marketplace.internal.json.model.AddonEntryDTO;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.config.core.ConfigurableService;
@@ -197,7 +198,7 @@ public class JsonAddonService extends AbstractRemoteAddonService {
 
         boolean compatible = true;
         try {
-            compatible = coreVersion.inRange(addonEntry.compatibleVersions);
+            compatible = VersionRange.valueOf(addonEntry.compatibleVersions).includes(coreVersion);
         } catch (IllegalArgumentException e) {
             logger.debug("Failed to determine compatibility for addon {}: {}", addonEntry.id, e.getMessage());
         }

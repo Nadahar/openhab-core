@@ -12,8 +12,8 @@ public class VersionRange extends org.osgi.framework.VersionRange {
     public static final VersionRange ANY = new VersionRange('[', Version.valueOf("0.0.0"), null, ']');
     protected static final Pattern WHITESPACE = Pattern.compile("\\s+");
     protected static final Pattern SEPARATORS = Pattern.compile(":|;|\\.\\.");
-    protected static final Pattern RANGE_PATTERN = Pattern.compile(
-            "(?<leftType>[\\[\\(])(?<left>\\d+(\\.\\d+(\\.\\d+(\\.[^\\)\\]]+)?)?)?),(?<right>\\d+(\\.\\d+(\\.\\d+(\\.[^\\)\\]]+)?)?)?)?(?<rightType>[\\]\\)])");
+    public static final Pattern RANGE_PATTERN = Pattern.compile(
+            "\\s*(?<leftType>[\\[\\(])(?<left>\\d+(\\.\\d+(\\.\\d+(\\.[^\\)\\]]+)?)?)?)(?:,|;|:|\\.\\.)(?<right>\\d+(\\.\\d+(\\.\\d+(\\.[^\\)\\]]+)?)?)?)?(?<rightType>[\\]\\)])\\s*$");
 
     public VersionRange(char leftType, Version leftEndpoint, @Nullable Version rightEndpoint, char rightType) {
         super(leftType, leftEndpoint, rightEndpoint, rightType);
