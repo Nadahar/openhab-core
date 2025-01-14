@@ -41,9 +41,10 @@ import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
 import org.openhab.core.addon.marketplace.AddonVersion;
-import org.openhab.core.addon.marketplace.BundleVersion;
 import org.openhab.core.addon.marketplace.MarketplaceAddon;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
+import org.openhab.core.addon.marketplace.Version;
+import org.openhab.core.addon.marketplace.VersionRange;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO.DiscoursePosterInfo;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO.DiscourseTopicItem;
@@ -315,22 +316,15 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             String title = topic.title;
             boolean compatible = true;
 
-            int compatibilityStart = topic.title.lastIndexOf("["); // version range always starts with [
-            if (topic.title.lastIndexOf(" ") < compatibilityStart) { // check includes [ not present
-                String potentialRange = topic.title.substring(compatibilityStart);
-                Matcher matcher = BundleVersion.RANGE_PATTERN.matcher(potentialRange);
-                if (matcher.matches()) {
-                    try {
-                        compatible = coreVersion.inRange(potentialRange);
-                        title = topic.title.substring(0, compatibilityStart).trim();
-                        logger.debug("{} is {}compatible with core version {}", topic.title, compatible ? "" : "NOT ",
-                                coreVersion);
-                    } catch (IllegalArgumentException e) {
-                        logger.debug("Failed to determine compatibility for addon {}: {}", topic.title, e.getMessage());
-                        compatible = true;
-                    }
-                } else {
-                    logger.debug("Range pattern does not match '{}'", potentialRange);
+            Matcher matcher = VersionRange.RANGE_PATTERN.matcher(title);
+            if (matcher.find()) {
+                try {
+                    compatible = VersionRange.valueOf(matcher.group().trim()).includes(coreVersion);
+                    title = title.substring(0, matcher.start());
+                    logger.debug("{} is {}compatible with core version {}", topic.title, compatible ? "" : "NOT ", coreVersion);
+                } catch (IllegalArgumentException e) {
+                    logger.debug("Failed to determine compatibility for addon {}: {}", topic.title, e.getMessage());
+                    compatible = true;
                 }
             }
 
@@ -495,7 +489,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         while (matcher.find()) {
             String resourceCode = unescapeEntities(matcher.group("content"));
             detailedDescription = matcher.replaceFirst("");
-            BundleVersion version;
+            Version version;
             boolean skip = false;
             Map<String, Object> resourceProperties = null;
             matcher = KEY_VALUE_PATTERN.matcher(resourceCode);
@@ -503,7 +497,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 switch (matcher.group("key").toLowerCase(Locale.ROOT)) {
                     case "version":
                         try {
-                            version = new BundleVersion(matcher.group("value"));
+                            version = Version.parseVersion(matcher.group("value"));
                         } catch (IllegalArgumentException e) {
                             skip = true; // TODO: (Nad) Log?
                             break;
@@ -583,15 +577,10 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid)));
 
         String title = topic.title;
-        int compatibilityStart = topic.title.lastIndexOf("["); // version range always starts with [
-        if (topic.title.lastIndexOf(" ") < compatibilityStart) { // check includes [ not present
-            String potentialRange = topic.title.substring(compatibilityStart);
-            matcher = BundleVersion.RANGE_PATTERN.matcher(potentialRange);
-            if (matcher.matches()) {
-                title = topic.title.substring(0, compatibilityStart).trim();
-            }
+        matcher = VersionRange.RANGE_PATTERN.matcher(title);
+        if (matcher.find()) {
+            title = title.substring(0, matcher.start());
         }
-
         builder.withLabel(title).withDetailedDescription(detailedDescription).withProperties(properties);
 
         return builder.build();
