@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,12 +29,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.osgi.framework.VersionRange;
 
 /**
- * The {@link VersionTest} contains tests for the {@link BundleVersion} class
+ * The {@link VersionTest} contains tests for the {@link Version} class
  *
- * @author Jan N. Klug - Initial contribution
+ * @author  - Initial contribution
  */
 @NonNullByDefault
 @ExtendWith(MockitoExtension.class)
@@ -105,53 +103,6 @@ public class VersionTest {
         version = Version.parseVersion("");
         assertTrue(osgiVersion.equals(version));
         assertTrue(version.equals(osgiVersion));
-    }
-
-    @Test
-    public void testIllegalRangeThrowsException() {
-        BundleVersion bundleVersion = new BundleVersion("3.1.0");
-        assertThrows(IllegalArgumentException.class, () -> bundleVersion.inRange("illegal"));
-    }
-
-    private static Stream<Arguments> provideInRangeArguments() {
-        return Stream.of(Arguments.of("3.2.0", "[3.1.0;3.2.1)", true), // in range
-                Arguments.of("3.2.0", "[3.1.0;3.2.0)", false), // at end of range, non-inclusive
-                Arguments.of("3.2.0", "[3.1.0;3.2.0]", true), // at end of range, inclusive
-                Arguments.of("3.2.0", "[3.1.0;3.1.5)", false), // above range
-                Arguments.of("3.2.0", "[3.3.0;3.4.0)", false), // below range
-                Arguments.of("3.2.0", "", true), // empty range assumes in range
-                Arguments.of("3.2.0", null, true)//,
-//                Arguments.of("5.0.0.RC1", "[3.3.0;5.0.0)", false)
-
-                );
-    }
-
-    @ParameterizedTest
-    @MethodSource("provideInRangeArguments")
-    public void inRangeTest(String version, @Nullable String range, boolean result) {
-        BundleVersion frameworkVersion = new BundleVersion(version);
-        assertThat(frameworkVersion.inRange(range), is(result));
-    }
-
-    private static Stream<Arguments> provideInRangeOSGiArguments() {
-        return Stream.of(Arguments.of("3.2.0", "[3.1.0,3.2.1)", true), // in range
-                Arguments.of("3.2.0", "[3.1.0,3.2.0)", false), // at end of range, non-inclusive
-                Arguments.of("3.2.0", "[3.1.0,3.2.0]", true), // at end of range, inclusive
-                Arguments.of("3.2.0", "[3.1.0,3.1.5)", false), // above range
-                Arguments.of("3.2.0", "[3.3.0,3.4.0)", false), // below range
-//                Arguments.of("3.2.0", "", true), // empty range assumes in range
-//                Arguments.of("3.2.0", null, true),
-                Arguments.of("5.0.0.RC1", "[3.3.0,5.0.0)", false)
-
-                );
-    }
-
-    @ParameterizedTest
-    @MethodSource("provideInRangeOSGiArguments")
-    public void inRangeOSGiTest(String version, @Nullable String range, boolean result) {
-        Version frameworkVersion = Version.parseVersion(version);
-        VersionRange oRange = VersionRange.valueOf(range);
-        assertThat(oRange.includes(frameworkVersion), is(result));
     }
 
     private enum Result {
