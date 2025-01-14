@@ -15,7 +15,7 @@ import com.google.gson.annotations.SerializedName;
 public class AddonVersion {
 
     protected final @Exclude String uid;
-    protected final @Nullable @Exclude BundleVersion version;
+    protected final @Nullable @Exclude Version version;
     @SerializedName("version")
     protected final @Nullable String versionString;
     protected final @Nullable @Exclude VersionRange coreRange;
@@ -30,7 +30,7 @@ public class AddonVersion {
     protected final @Exclude Map<String, Object> properties;
     protected final @Exclude List<String> loggerPackages;
 
-    protected AddonVersion(String uid, @Nullable BundleVersion version, @Nullable VersionRange coreRange,
+    protected AddonVersion(String uid, @Nullable Version version, @Nullable VersionRange coreRange,
         @Nullable String maturity, boolean compatible, @Nullable String documentationLink,
         @Nullable String issuesLink, boolean installed, @Nullable String description, @Nullable String keywords,
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
@@ -59,7 +59,7 @@ public class AddonVersion {
         return uid;
     }
 
-    public @Nullable BundleVersion getVersion() {
+    public @Nullable Version getVersion() {
         return version;
     }
 
@@ -113,7 +113,7 @@ public class AddonVersion {
 
     public static class Builder {
         protected @Nullable String uid;
-        protected @Nullable BundleVersion version;
+        protected @Nullable Version version;
         protected @Nullable VersionRange coreRange;
         protected @Nullable String maturity;
         protected boolean compatible;
@@ -131,7 +131,7 @@ public class AddonVersion {
             return this;
         }
 
-        public Builder withVersion(BundleVersion version) {
+        public Builder withVersion(Version version) {
             this.version = version;
             return this;
         }
