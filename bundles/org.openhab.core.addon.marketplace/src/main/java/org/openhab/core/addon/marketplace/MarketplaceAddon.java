@@ -1,6 +1,7 @@
 package org.openhab.core.addon.marketplace;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
@@ -50,7 +51,14 @@ public class MarketplaceAddon extends Addon {
             }
             SortedMap<Version, AddonVersion> locVersions = versions;
             if (locVersions == null) {
-                locVersions = new TreeMap<>(); //TODO: (Nad) Comparator
+                locVersions = new TreeMap<>(new Comparator<Version>() {
+
+                    @Override
+                    public int compare(Version o1, Version o2) {
+                        // Sort newest first
+                        return o2.compareTo(o1);
+                    }
+                });
             }
             locVersions.put(addonVersion.getVersion(), addonVersion);
             versions = locVersions;
