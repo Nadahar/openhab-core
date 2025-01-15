@@ -14,21 +14,23 @@ import com.google.gson.annotations.SerializedName;
 @NonNullByDefault
 public class AddonVersion {
 
-    protected final @Exclude String uid;
+    protected final /*@Exclude*/ String uid; //TODO: (Nad) Excluded exclude
     protected final @Nullable @Exclude Version version;
     @SerializedName("version")
     protected final @Nullable String versionString;
     protected final @Nullable @Exclude VersionRange coreRange;
-    protected final @Nullable @Exclude String maturity;
+    @SerializedName("coreRange")
+    protected final @Nullable String coreRangeString;
+    protected final @Nullable /*@Exclude*/ String maturity;
     protected final boolean compatible;
-    protected final @Nullable @Exclude String documentationLink;
-    protected final @Nullable @Exclude String issuesLink;
+    protected final @Nullable /*@Exclude*/ String documentationLink;
+    protected final @Nullable /*@Exclude*/ String issuesLink;
     protected final boolean installed;
-    protected final @Nullable @Exclude String description;
-    protected final @Nullable @Exclude String keywords;
-    protected final @Exclude List<String> countries;
-    protected final @Exclude Map<String, Object> properties;
-    protected final @Exclude List<String> loggerPackages;
+    protected final @Nullable /*@Exclude*/ String description;
+    protected final @Nullable /*@Exclude*/ String keywords;
+    protected final /*@Exclude*/ List<String> countries;
+    protected final /*@Exclude*/ Map<String, Object> properties;
+    protected final /*@Exclude*/ List<String> loggerPackages;
 
     protected AddonVersion(String uid, @Nullable Version version, @Nullable VersionRange coreRange,
         @Nullable String maturity, boolean compatible, @Nullable String documentationLink,
@@ -42,6 +44,7 @@ public class AddonVersion {
         this.version = version;
         this.versionString = version == null ? null : version.toString();
         this.coreRange = coreRange;
+        this.coreRangeString = coreRange == null ? null : coreRange.toString();
         this.maturity = maturity;
         this.compatible = compatible;
         this.documentationLink = documentationLink;
@@ -131,17 +134,17 @@ public class AddonVersion {
             return this;
         }
 
-        public Builder withVersion(Version version) {
+        public Builder withVersion(@Nullable Version version) {
             this.version = version;
             return this;
         }
 
-        public Builder withCoreRange(VersionRange coreRange) {
+        public Builder withCoreRange(@Nullable VersionRange coreRange) {
             this.coreRange = coreRange;
             return this;
         }
 
-        public Builder withMaturity(String maturity) {
+        public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
             return this;
         }
@@ -151,12 +154,12 @@ public class AddonVersion {
             return this;
         }
 
-        public Builder withDocumentationLink(String documentationLink) {
+        public Builder withDocumentationLink(@Nullable String documentationLink) {
             this.documentationLink = documentationLink;
             return this;
         }
 
-        public Builder withIssuesLink(String issuesLink) {
+        public Builder withIssuesLink(@Nullable String issuesLink) {
             this.issuesLink = issuesLink;
             return this;
         }
@@ -166,17 +169,17 @@ public class AddonVersion {
             return this;
         }
 
-        public Builder withDescription(String description) {
+        public Builder withDescription(@Nullable String description) {
             this.description = description;
             return this;
         }
 
-        public Builder withKeywords(String keywords) {
+        public Builder withKeywords(@Nullable String keywords) {
             this.keywords = keywords;
             return this;
         }
 
-        public Builder withCountries(List<String> countries) {
+        public Builder withCountries(@Nullable List<String> countries) {
             this.countries = countries;
             return this;
         }
@@ -186,7 +189,7 @@ public class AddonVersion {
             return this;
         }
 
-        public Builder withLoggerPackages(List<String> loggerPackages) {
+        public Builder withLoggerPackages(@Nullable List<String> loggerPackages) {
             this.loggerPackages = loggerPackages;
             return this;
         }
