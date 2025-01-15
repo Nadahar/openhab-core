@@ -14,7 +14,6 @@ package org.openhab.core.addon.marketplace.internal.community;
 
 import static org.openhab.core.addon.Addon.CODE_MATURITY_LEVELS;
 import static org.openhab.core.addon.marketplace.MarketplaceConstants.*;
-
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
@@ -29,6 +28,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -98,13 +98,16 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
     private static final String ADDON_ID_PREFIX = SERVICE_ID + ":";
 
     private static final Pattern CODE_MARKUP_PATTERN = Pattern.compile(
-            "<pre(?: data-code-wrap=\"[a-zA-Z]+\")?><code class=\"lang-(?<lang>(?i)(?:yaml|json)(?-i))\">(?<content>.*?)</code></pre>",
+            "<pre(?: data-code-wrap=\"[-a-zA-Z]+\")?><code class=\"lang-(?<lang>[-a-zA-Z]+)\">(?<content>.*?)</code></pre>\\n?",
             Pattern.DOTALL);
+    private static final Pattern CODE_INLINE_RESOURCE_PATTERN = Pattern.compile(
+        "<pre(?: data-code-wrap=\"(?i)(?:yaml|json)(?-i)\")?><code class=\"lang-(?i)(?<lang>yaml|json)(?-i)\">(?<content>.*?)</code></pre>\\n?",
+        Pattern.DOTALL);
     private static final Pattern CODE_ADDON_PATTERN = Pattern.compile(
-            "<pre(?: data-code-wrap=\"(?i)(?:addon|add-on)(?-i)\")?><code class=\"lang-(?i)(?:addon|add-on)(?-i)\">(?<content>.*?)</code></pre>",
+            "<pre(?: data-code-wrap=\"(?i)(?:addon|add-on)(?-i)\")?><code class=\"lang-(?i)(?:addon|add-on)(?-i)\">(?<content>.*?)</code></pre>\\n?",
             Pattern.DOTALL);
-    private static final Pattern CODE_RESOURCE_PATTERN = Pattern.compile(
-        "<pre(?: data-code-wrap=\"(?i)resource(?-i)\")?><code class=\"lang-(?i)resource(?-i)\">(?<content>.*?)</code></pre>",
+    private static final Pattern CODE_VERSION_PATTERN = Pattern.compile(
+        "<pre(?: data-code-wrap=\"(?i)version(?-i)\")?><code class=\"lang-(?i)version(?-i)\">(?<content>.*?)</code></pre>\\n?",
         Pattern.DOTALL);
     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
             "^\\s*(?<key>\\w+)\\s*(?:=|:)\\s*(?<value>.*?)\\s*$", Pattern.MULTILINE);
@@ -116,6 +119,14 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
     private static final Integer TRANSFORMATIONS_CATEGORY = 80;
 
     private static final String PUBLISHED_TAG = "published";
+
+    private static final Map<String, Set<String>> VALID_RESOURCE_TYPES = Map.of(
+        JAR_CONTENT_TYPE, Set.of(JAR_DOWNLOAD_URL_PROPERTY),
+        KAR_CONTENT_TYPE, Set.of(KAR_DOWNLOAD_URL_PROPERTY),
+        RULETEMPLATES_CONTENT_TYPE, Set.of(JSON_DOWNLOAD_URL_PROPERTY, YAML_DOWNLOAD_URL_PROPERTY, JSON_CONTENT_PROPERTY, YAML_CONTENT_PROPERTY),
+        TRANSFORMATIONS_CONTENT_TYPE, Set.of(JSON_DOWNLOAD_URL_PROPERTY, YAML_DOWNLOAD_URL_PROPERTY, JSON_CONTENT_PROPERTY, YAML_CONTENT_PROPERTY),
+        UIWIDGETS_CONTENT_TYPE, Set.of(YAML_DOWNLOAD_URL_PROPERTY, YAML_CONTENT_PROPERTY),
+        BLOCKLIBRARIES_CONTENT_TYPE, Set.of(YAML_DOWNLOAD_URL_PROPERTY, YAML_CONTENT_PROPERTY));
 
     private final Logger logger = LoggerFactory.getLogger(CommunityMarketplaceAddonService.class);
 
@@ -270,6 +281,14 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         return null;
     }
 
+    private Set<String> getValidResourceTypes(@Nullable String contentType) {
+        if (contentType == null) {
+            return Set.of();
+        }
+        Set<String> result = VALID_RESOURCE_TYPES.get(contentType);
+        return result == null ? Set.of() : result;
+    }
+
     private String getContentType(@Nullable Integer category, List<String> tags) {
         // check if we can determine the addon type from the category
         if (TRANSFORMATIONS_CATEGORY.equals(category)) {
@@ -385,6 +404,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         AddonType addonType = getAddonType(topic.categoryId, tags);
         String type = (addonType != null) ? addonType.getId() : "";
         String contentType = getContentType(topic.categoryId, tags);
+        Set<String> validResourceTypes = getValidResourceTypes(contentType);
+        List<MarketplaceAddonHandler> relevantHandlers = addonHandlers.stream().filter(handler -> handler.supports(type, contentType)).toList();
 
         int likeCount = topic.likeCount;
         int views = topic.views;
@@ -408,7 +429,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         String id = null;
 
         // try to extract contents or links
-        if (topic.postStream.posts[0].linkCounts != null) {
+        if (topic.postStream.posts[0].linkCounts != null) { //TODO: (Nad) Fix ID handling - look at versions
             for (DiscoursePostLink postLink : topic.postStream.posts[0].linkCounts) {
                 if (postLink.url.endsWith(".jar")) {
                     properties.put(JAR_DOWNLOAD_URL_PROPERTY, postLink.url);
@@ -484,46 +505,53 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             }
         }
 
-        matcher = CODE_RESOURCE_PATTERN.matcher(detailedDescription);
-        AddonVersion.Builder resourceBuilder = AddonVersion.create();
-        while (matcher.find()) {
-            String resourceCode = unescapeEntities(matcher.group("content"));
+        AddonVersion.Builder versionBuilder;
+        Matcher innerMatcher;
+        while ((matcher = CODE_VERSION_PATTERN.matcher(detailedDescription)).find()) {
+            versionBuilder = AddonVersion.create().withCompatible(true);
+            String versionCode = unescapeEntities(matcher.group("content"));
             detailedDescription = matcher.replaceFirst("");
             Version version;
             boolean skip = false;
-            Map<String, Object> resourceProperties = null;
-            matcher = KEY_VALUE_PATTERN.matcher(resourceCode);
-            while (!skip && matcher.find()) {
-                switch (matcher.group("key").toLowerCase(Locale.ROOT)) {
+            Map<String, Object> versionProperties = null;
+            innerMatcher = KEY_VALUE_PATTERN.matcher(versionCode);
+            while (!skip && innerMatcher.find()) {
+                switch (innerMatcher.group("key").toLowerCase(Locale.ROOT)) {
                     case "version":
                         try {
-                            version = Version.parseVersion(matcher.group("value"));
+                            version = Version.parseVersion(innerMatcher.group("value"));
                         } catch (IllegalArgumentException e) {
-                            skip = true; // TODO: (Nad) Log?
+                            logger.debug("Invalid version \"{}\" specified for Marketplace add-on \"{}\" - skipping version entry", innerMatcher.group("value"), topic.title);
+                            skip = true;
                             break;
                         }
-                        resourceBuilder.withVersion(version);
+                        versionBuilder.withVersion(version);
                         break;
                     case "corerange":
-                        // TODO: (Nad) Make
-                        // TODO: (Nad) Set compatible
+                        try {
+                            VersionRange range = VersionRange.valueOf(innerMatcher.group("value"));
+                            versionBuilder.withCoreRange(range);
+                            versionBuilder.withCompatible(range.includes(coreVersion));
+                        } catch (IllegalArgumentException e) {
+                            logger.debug("Invalid version range \"{}\" specified for Marketplace add-on \"{}\"", innerMatcher.group("value"), topic.title);
+                        }
                         break;
                     case "maturity":
-                        s = matcher.group("value").trim().toLowerCase(Locale.ROOT);
+                        s = innerMatcher.group("value").trim().toLowerCase(Locale.ROOT);
                         if (CODE_MATURITY_LEVELS.contains(s)) {
-                            resourceBuilder.withMaturity(s);
+                            versionBuilder.withMaturity(s);
                         }
                         break;
                     case "keywords":
-                        resourceBuilder.withKeywords(matcher.group("value"));
+                        versionBuilder.withKeywords(innerMatcher.group("value"));
                         break;
                     case "countries":
-                        List<String> countries = Arrays.stream(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"))
+                        List<String> countries = Arrays.stream(innerMatcher.group("value").trim().split("\\s*(?:,|;)\\s*"))
                             .filter(e -> !e.isBlank()).toList();
-                        resourceBuilder.withCountries(countries);
+                        versionBuilder.withCountries(countries);
                         break;
                     case "connection":
-                        s = matcher.group("value").toLowerCase(Locale.ROOT);
+                        s = innerMatcher.group("value").toLowerCase(Locale.ROOT);
                         if ("local".equals(s) || "cloud".equals(s) || "hybrid".equals(s)
                             || "cloudDiscovery".equals(s)) {
                             builder.withConnection(s);
@@ -531,54 +559,99 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                         break;
                     case "loggerpackages":
                         List<String> loggerPackages = Arrays
-                            .asList(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
+                            .asList(innerMatcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
                         loggerPackages = loggerPackages.stream().filter(e -> !e.isBlank()).toList();
-                        resourceBuilder.withLoggerPackages(loggerPackages);
+                        versionBuilder.withLoggerPackages(loggerPackages);
                         break;
                     case "documentation":
-                        resourceBuilder.withDocumentationLink(matcher.group("value"));
+                        versionBuilder.withDocumentationLink(innerMatcher.group("value"));
                         break;
                     case "issues":
-                        resourceBuilder.withIssuesLink(matcher.group("value"));
+                        versionBuilder.withIssuesLink(innerMatcher.group("value"));
                         break;
                     case "description":
-                        resourceBuilder.withDescription(matcher.group("value"));
+                        versionBuilder.withDescription(innerMatcher.group("value"));
                         break;
                     case "url":
-                        if (resourceProperties == null) {
-                            resourceProperties = new HashMap<>();
+                        if (versionProperties == null) {
+                            versionProperties = new HashMap<>();
                         }
-                        // TODO: (Nad) Handle
+                        s = innerMatcher.group("value").toLowerCase(Locale.ROOT);
+                        int i = s.lastIndexOf('.');
+                        if (i >= 0) {
+                            String urlProperty;
+                            switch (s.substring(i + 1)) {
+                                case "jar":
+                                    urlProperty = JAR_DOWNLOAD_URL_PROPERTY;
+                                    break;
+                                case "kar":
+                                    urlProperty = KAR_DOWNLOAD_URL_PROPERTY;
+                                    break;
+                                case "json":
+                                    urlProperty = JSON_DOWNLOAD_URL_PROPERTY;
+                                    break;
+                                case "yaml":
+                                    urlProperty = YAML_DOWNLOAD_URL_PROPERTY;
+                                    break;
+                                default:
+                                    urlProperty = null;
+                                    break;
+                            }
+                            if (urlProperty != null) {
+                                if (validResourceTypes.contains(urlProperty)) {
+                                    versionProperties.put(urlProperty, s);
+                                } else {
+                                    logger.debug("Ignoring invalid version URL type \"{}\" for Marketplace add-on \"{}\"", urlProperty, topic.title);
+                                }
+                            } else {
+                                logger.debug("Ignoring URL with unknown resource extension \"{}\" for Marketplace add-on \"{}\"", s.substring(i + 1), topic.title);
+                            }
+                        } else {
+                            logger.debug("Unknown resource type for URL \"{}\" for Marketplace add-on \"{}\" - ignoring URL", s, topic.title);
+                        }
                         break;
                     default:
-                        logger.warn("{}: {}", matcher.group("key"), matcher.group("value")); // TODO: (Nad) Temp test
+                        logger.warn("{}: {}", innerMatcher.group("key"), innerMatcher.group("value")); // TODO: (Nad) Temp test
                         break;
                 }
             }
-            resourceBuilder.withProperties(resourceProperties);
+
+            if ((versionProperties == null || !versionProperties.keySet().stream().anyMatch(p -> validResourceTypes.contains(p))) && (validResourceTypes.contains(JSON_CONTENT_PROPERTY) || validResourceTypes.contains(YAML_CONTENT_PROPERTY))) {
+                // Look for inline resource
+                int pos = matcher.start();
+                matcher = CODE_MARKUP_PATTERN.matcher(detailedDescription);
+                if (matcher.find(pos)) {
+                    if (("yaml".equals(s = matcher.group("lang").toLowerCase(Locale.ROOT)) && validResourceTypes.contains(YAML_CONTENT_PROPERTY)) || ("json".equals(s = matcher.group("lang").toLowerCase(Locale.ROOT)) && validResourceTypes.contains(JSON_CONTENT_PROPERTY))) {
+                        if (versionProperties == null) {
+                            versionProperties = new HashMap<>();
+                        }
+                        versionProperties.put(s + CODE_CONTENT_SUFFIX, unescapeEntities(matcher.group("content")));
+                        detailedDescription = detailedDescription.substring(0, matcher.start()) + detailedDescription.substring(matcher.end());
+                    }
+                }
+            }
+            versionBuilder.withProperties(versionProperties);
             // TODO: (Nad) Set uid
-            resourceBuilder.withUID(uid + ":test"); // TODO: (Nad) Temp test
-            // TODO: (Nad) Set installed
-            // TODO: (Nad) Handle URL/content
-            if (resourceBuilder.isValid()) { // TODO: (Nad)
-                builder.withAddonVersion(resourceBuilder.build());
+            versionBuilder.withUID(uid + ":test"); // TODO: (Nad) Temp test
+            versionBuilder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid + ":test"))); //TODO: (Nad) Real UID
+            if (versionBuilder.isValid()) { // TODO: (Nad)
+                builder.withAddonVersion(versionBuilder.build());
             }
         }
 
-        matcher = CODE_MARKUP_PATTERN.matcher(detailedDescription);
+        matcher = CODE_INLINE_RESOURCE_PATTERN.matcher(detailedDescription);
         if (matcher.find()) {
-            properties.put(matcher.group("lang") + CODE_CONTENT_SUFFIX,
+            properties.put(matcher.group("lang").toLowerCase(Locale.ROOT) + CODE_CONTENT_SUFFIX,
                 unescapeEntities(matcher.group("content")));
             detailedDescription = matcher.replaceFirst("");
         }
 
         // try to use a handler to determine if the add-on is installed
-        builder.withInstalled(addonHandlers.stream()
-            .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid)));
+        builder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid)));
 
         String title = topic.title;
         matcher = VersionRange.RANGE_PATTERN.matcher(title);
-        if (matcher.find()) {
+        if (matcher.find()) { //TODO: (Nad) Do compatible
             title = title.substring(0, matcher.start());
         }
         builder.withLabel(title).withDetailedDescription(detailedDescription).withProperties(properties);
