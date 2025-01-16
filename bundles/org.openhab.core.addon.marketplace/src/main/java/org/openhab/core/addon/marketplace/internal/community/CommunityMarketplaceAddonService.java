@@ -431,18 +431,18 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         // try to extract contents or links
         if (topic.postStream.posts[0].linkCounts != null) { //TODO: (Nad) Fix ID handling - look at versions
             for (DiscoursePostLink postLink : topic.postStream.posts[0].linkCounts) {
-                if (postLink.url.endsWith(".jar")) {
+                if (postLink.url.endsWith(".jar") && validResourceTypes.contains(JAR_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(JAR_DOWNLOAD_URL_PROPERTY, postLink.url);
                     id = determineIdFromUrl(postLink.url);
                 }
-                if (postLink.url.endsWith(".kar")) {
+                if (postLink.url.endsWith(".kar") && validResourceTypes.contains(KAR_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(KAR_DOWNLOAD_URL_PROPERTY, postLink.url);
                     id = determineIdFromUrl(postLink.url);
                 }
-                if (postLink.url.endsWith(".json")) {
+                if (postLink.url.endsWith(".json") && validResourceTypes.contains(JSON_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(JSON_DOWNLOAD_URL_PROPERTY, postLink.url);
                 }
-                if (postLink.url.endsWith(".yaml")) {
+                if (postLink.url.endsWith(".yaml") && validResourceTypes.contains(YAML_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(YAML_DOWNLOAD_URL_PROPERTY, postLink.url);
                 }
             }
@@ -641,9 +641,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         matcher = CODE_INLINE_RESOURCE_PATTERN.matcher(detailedDescription);
         if (matcher.find()) {
-            properties.put(matcher.group("lang").toLowerCase(Locale.ROOT) + CODE_CONTENT_SUFFIX,
-                unescapeEntities(matcher.group("content")));
-            detailedDescription = matcher.replaceFirst("");
+            s = matcher.group("lang").toLowerCase(Locale.ROOT);
+            if (("json".equals(s) && validResourceTypes.contains(JSON_CONTENT_PROPERTY)) || ("yaml".equals(s) && validResourceTypes.contains(YAML_CONTENT_PROPERTY))) {
+                properties.put(s + CODE_CONTENT_SUFFIX, unescapeEntities(matcher.group("content")));
+                detailedDescription = matcher.replaceFirst("");
+            }
         }
 
         // try to use a handler to determine if the add-on is installed
