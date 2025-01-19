@@ -39,10 +39,17 @@ import org.mockito.quality.Strictness;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class VersionRangeTest {
 
+    @SuppressWarnings("null")
     @Test
     public void testIllegalRangeThrowsException() {
         assertThrows(IllegalArgumentException.class, () -> VersionRange.valueOf("illegal"));
         assertThrows(IllegalArgumentException.class, () -> VersionRange.valueOf("[4.3,0:)"));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange(null));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange("  "));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange("[,]"));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange("[  ,  ]"));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange('b', Version.valueOf("1.3.0"), null, ']'));
+        assertThrows(IllegalArgumentException.class, () -> new VersionRange('(', Version.valueOf("1.3.0"), null, 'e'));
     }
 
     @Test
@@ -56,10 +63,10 @@ public class VersionRangeTest {
 
     @Test
     public void testIncludes() {
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(org.osgi.framework.Version.parseVersion("3.2.0")), is(false));
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0]").includes(org.osgi.framework.Version.parseVersion("3.4.0.M1")), is(true));
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(org.osgi.framework.Version.parseVersion("3.4.0.M1")), is(false));
-        assertThat(VersionRange.valueOf("[3.3.0;)").includes(org.osgi.framework.Version.parseVersion("3.4.0.M1")), is(true));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.parseVersion("3.2.0")), is(false));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0]").includes(Version.parseVersion("3.4.0.M1")), is(true));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.parseVersion("3.4.0.M1")), is(false));
+        assertThat(VersionRange.valueOf("[3.3.0;)").includes(Version.parseVersion("3.4.0.M1")), is(true));
     }
 
     @Test
