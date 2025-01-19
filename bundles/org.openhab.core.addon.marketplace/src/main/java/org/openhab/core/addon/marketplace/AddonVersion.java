@@ -1,10 +1,13 @@
 package org.openhab.core.addon.marketplace;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.addon.Addon;
 import org.openhab.core.io.rest.core.Exclude;
 import org.osgi.framework.VersionRange;
 
@@ -15,10 +18,10 @@ import com.google.gson.annotations.SerializedName;
 public class AddonVersion {
 
     protected final /*@Exclude*/ String uid; //TODO: (Nad) Excluded exclude
-    protected final @Nullable @Exclude Version version;
+    protected final @Nullable @Exclude Version versionObj;
     @SerializedName("version")
     protected final @Nullable String versionString;
-    protected final @Nullable @Exclude VersionRange coreRange;
+    protected final @Nullable @Exclude VersionRange coreRangeObj;
     @SerializedName("coreRange")
     protected final @Nullable String coreRangeString;
     protected final @Nullable /*@Exclude*/ String maturity;
@@ -41,9 +44,9 @@ public class AddonVersion {
             throw new IllegalArgumentException("uid cannot be blank");
         }
         this.uid = uid;
-        this.version = version;
+        this.versionObj = version;
         this.versionString = version == null ? null : version.toString();
-        this.coreRange = coreRange;
+        this.coreRangeObj = coreRange;
         this.coreRangeString = coreRange == null ? null : coreRange.toString();
         this.maturity = maturity;
         this.compatible = compatible;
@@ -63,11 +66,11 @@ public class AddonVersion {
     }
 
     public @Nullable Version getVersion() {
-        return version;
+        return versionObj;
     }
 
     public @Nullable VersionRange getCoreRange() {
-        return coreRange;
+        return coreRangeObj;
     }
 
     public @Nullable String getMaturity() {
@@ -110,6 +113,20 @@ public class AddonVersion {
         return loggerPackages;
     }
 
+    public boolean isStable() {
+        Version v = versionObj;
+        if (v == null) {
+            return false;
+        }
+
+        if (maturity != null && Addon.CODE_MATURITY_LEVELS.contains(maturity)) {
+            return "stable".equals(maturity) || "mature".equals(maturity);
+        }
+
+        // Deem versions without a qualifier as stable
+        return v.getQualifier().isBlank();
+    }
+
     public static Builder create() {
         return new Builder();
     }
@@ -129,6 +146,11 @@ public class AddonVersion {
         protected @Nullable Map<String, Object> properties;
         protected @Nullable List<String> loggerPackages;
 
+        @Nullable
+        public String getUID() {
+            return uid;
+        }
+
         public Builder withUID(String uid) {
             this.uid = uid;
             return this;
@@ -145,7 +167,7 @@ public class AddonVersion {
         }
 
         public Builder withMaturity(@Nullable String maturity) {
-            this.maturity = maturity;
+            this.maturity = maturity == null ? null : maturity.toLowerCase(Locale.ROOT);
             return this;
         }
 
@@ -194,11 +216,18 @@ public class AddonVersion {
             return this;
         }
 
-        public boolean isValid() {
-            if (uid == null || uid.isBlank() || version == null) {
+        public boolean isValid(@Nullable Set<String> validResourceTypes) {
+            String s;
+            if ((s = uid) == null || s.isBlank() || version == null) {
                 return false;
             }
-            //TODO: (Nad) Check valid resource
+            Map<String, Object> p;
+            if (validResourceTypes != null) {
+                if ((p = properties) == null) {
+                    return false;
+                }
+                return p.keySet().stream().anyMatch(prop -> validResourceTypes.contains(prop));
+            }
             return true;
         }
 
