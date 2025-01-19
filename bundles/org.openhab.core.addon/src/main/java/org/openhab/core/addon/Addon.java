@@ -355,7 +355,7 @@ public class Addon {
     }
 
     public static class Builder {
-        protected final String uid;
+        protected String uid;
         protected String id;
         protected String label;
         protected String version = "";
@@ -383,6 +383,11 @@ public class Addon {
 
         protected Builder(String uid) {
             this.uid = uid;
+        }
+
+        public Builder withUid(String uid) {
+            this.uid = uid;
+            return this;
         }
 
         public Builder withType(String type) {
