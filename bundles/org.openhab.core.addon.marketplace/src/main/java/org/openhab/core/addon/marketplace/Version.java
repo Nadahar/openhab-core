@@ -31,11 +31,6 @@ public class Version extends org.osgi.framework.Version {
         super(major, minor, micro, qualifier);
     }
 
-    @Override
-    public String toString() {
-        return this.equals(emptyVersion) ? "none" : super.toString();
-    }
-
     public static Version parseVersion(@Nullable String version) {
         if (version == null) {
             return emptyVersion;
