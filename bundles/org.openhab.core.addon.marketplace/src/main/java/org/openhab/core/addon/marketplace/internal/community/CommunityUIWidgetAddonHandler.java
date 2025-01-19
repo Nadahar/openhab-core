@@ -28,6 +28,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
+import org.openhab.core.addon.marketplace.VersionedAddon;
 import org.openhab.core.ui.components.RootUIComponent;
 import org.openhab.core.ui.components.UIComponentRegistry;
 import org.openhab.core.ui.components.UIComponentRegistryFactory;
@@ -82,10 +83,11 @@ public class CommunityUIWidgetAddonHandler implements MarketplaceAddonHandler {
             String yamlDownloadUrl = (String) addon.getProperties().get(YAML_DOWNLOAD_URL_PROPERTY);
             String yamlContent = (String) addon.getProperties().get(YAML_CONTENT_PROPERTY);
 
+            String uid = addon instanceof VersionedAddon va ? va.getMasterUid() : addon.getUid(); //TODO: (Nad) Do this for all "install()" and uninstall
             if (yamlDownloadUrl != null) {
-                addWidgetAsYAML(addon.getUid(), getWidgetFromURL(yamlDownloadUrl));
+                addWidgetAsYAML(uid, getWidgetFromURL(yamlDownloadUrl));
             } else if (yamlContent != null) {
-                addWidgetAsYAML(addon.getUid(), yamlContent);
+                addWidgetAsYAML(uid, yamlContent);
             } else {
                 throw new IllegalArgumentException(
                         "Couldn't find the widget in the add-on entry. The starting code fence may not be marked as ```yaml");
@@ -101,7 +103,8 @@ public class CommunityUIWidgetAddonHandler implements MarketplaceAddonHandler {
 
     @Override
     public void uninstall(Addon addon) throws MarketplaceHandlerException {
-        widgetRegistry.getAll().stream().filter(w -> w.hasTag(addon.getUid())).forEach(w -> {
+        String uid = addon instanceof VersionedAddon va ? va.getMasterUid() : addon.getUid();
+        widgetRegistry.getAll().stream().filter(w -> w.hasTag(uid)).forEach(w -> {
             widgetRegistry.remove(w.getUID());
         });
     }
