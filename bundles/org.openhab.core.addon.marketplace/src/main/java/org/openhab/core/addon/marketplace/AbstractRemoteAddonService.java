@@ -53,6 +53,10 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
 
 /**
  * The {@link AbstractRemoteAddonService} implements basic functionality of a remote add-on-service
@@ -80,7 +84,27 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     protected final Version coreVersion;
 
-    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
+    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .registerTypeAdapter(Version.class, new TypeAdapter<Version>() {
+
+            @Override
+            public @Nullable Version read(JsonReader in) throws IOException {
+                if (in.peek() == JsonToken.NULL) {
+                    in.nextNull();
+                    return null;
+                }
+                return Version.valueOf(in.nextString());
+            }
+
+            @Override
+            public void write(JsonWriter out, @Nullable Version version) throws IOException {
+                if (version == null) {
+                    out.nullValue();
+                } else {
+                    out.value(version.toString());
+                }
+            }
+        }).create();
     protected final Set<MarketplaceAddonHandler> addonHandlers = new HashSet<>();
     protected final Storage<String> installedAddonStorage;
     protected final EventPublisher eventPublisher;
@@ -107,11 +131,11 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         return Version.valueOf(FrameworkUtil.getBundle(OpenHAB.class).getVersion());
     }
 
-    private Addon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
-        Addon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), Addon.class));
+    private VersionedAddon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
+        VersionedAddon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), VersionedAddon.class));
         AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(storedAddon.getType() + "-" + storedAddon.getId());
         if (addonInfo != null && storedAddon.getConfigDescriptionURI().isBlank()) {
-            return Addon.create(storedAddon).withConfigDescriptionURI(addonInfo.getConfigDescriptionURI()).build();
+            return new VersionedAddon.Builder(storedAddon).withConfigDescriptionURI(addonInfo.getConfigDescriptionURI()).build();
         } else {
             return storedAddon;
         }
@@ -245,6 +269,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
                         postInstalledEvent(addon.getUid());
                     } catch (MarketplaceHandlerException e) {
                         postFailureEvent(addon.getUid(), e.getMessage());
+                        logger.warn("Failed to install add-on \"{}\": {}", addon.getUid(), e.getMessage());
                     }
                 } else {
                     postFailureEvent(addon.getUid(), "Add-on is already installed.");
@@ -273,6 +298,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
                         postUninstalledEvent(addon.getUid());
                     } catch (MarketplaceHandlerException e) {
                         postFailureEvent(addon.getUid(), e.getMessage());
+                        logger.warn("Failed to uninstall add-on \"{}\": {}", addon.getUid(), e.getMessage());
                     }
                 } else {
                     installedAddonStorage.remove(id);
