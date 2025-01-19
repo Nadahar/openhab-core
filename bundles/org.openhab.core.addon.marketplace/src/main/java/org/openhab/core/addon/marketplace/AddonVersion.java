@@ -9,7 +9,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.io.rest.core.Exclude;
-import org.osgi.framework.VersionRange;
 
 import com.google.gson.annotations.SerializedName;
 
