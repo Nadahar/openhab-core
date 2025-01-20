@@ -55,18 +55,18 @@ public class VersionRangeTest {
     @Test
     public void testConstructor() {
         VersionRange range = new VersionRange('(', Version.valueOf("4.2.2"), null, ')');
-        assertThat(range.includes(Version.parseVersion(null)), is(false));
-        assertThat(range.includes(Version.parseVersion("4.2.2")), is(false));
+        assertThat(range.includes(Version.valueOf((String) null)), is(false));
+        assertThat(range.includes(Version.valueOf("4.2.2")), is(false));
         range = new VersionRange('[', Version.valueOf("4.2.2"), null, ')');
-        assertThat(range.includes(Version.parseVersion("4.2.2")), is(true));
+        assertThat(range.includes(Version.valueOf("4.2.2")), is(true));
     }
 
     @Test
     public void testIncludes() {
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.parseVersion("3.2.0")), is(false));
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0]").includes(Version.parseVersion("3.4.0.M1")), is(true));
-        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.parseVersion("3.4.0.M1")), is(false));
-        assertThat(VersionRange.valueOf("[3.3.0;)").includes(Version.parseVersion("3.4.0.M1")), is(true));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.valueOf("3.2.0")), is(false));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0]").includes(Version.valueOf("3.4.0.M1")), is(true));
+        assertThat(VersionRange.valueOf("[3.3.0;3.4.0)").includes(Version.valueOf("3.4.0.M1")), is(false));
+        assertThat(VersionRange.valueOf("[3.3.0;)").includes(Version.valueOf("3.4.0.M1")), is(true));
     }
 
     @Test
@@ -105,7 +105,7 @@ public class VersionRangeTest {
     @ParameterizedTest
     @MethodSource("provideInRangeArguments")
     public void inRangeTest(String versionStr, @Nullable String rangeStr, boolean result) {
-        Version version = Version.parseVersion(versionStr);
+        Version version = Version.valueOf(versionStr);
         VersionRange range = VersionRange.valueOf(rangeStr);
         assertThat(range.includes(version), is(result));
     }
