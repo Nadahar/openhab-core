@@ -61,7 +61,9 @@ public class VersionTest {
                 Arguments.of("5.0.0-SNAPSHOT", "5.0.0", Result.OLDER),
                 Arguments.of("5.0.0-SNAPSHOT", "5.0.0-alpha", Result.NEWER),
                 Arguments.of("5.0.0-alpha", "5.0.0-beta", Result.OLDER),
-                Arguments.of("5.0.0_snapshot", "5.0.0-SNAPSHOT", Result.NEWER), // remain consistent with equals()
+                Arguments.of("5.0.0_snapshot", "5.0.0-SNAPSHOT", Result.NEWER),
+                Arguments.of("5.0.0_SNAPSHOT", "5.0.0-SNAPSHOT", Result.EQUAL),
+                Arguments.of("5.0.0-SNAPSHOT", "5.0.0-SNAPSHOT", Result.EQUAL),
                 Arguments.of("5.0.0.M2", "5.0.0-SNAPSHOT", Result.OLDER),
                 Arguments.of("5", "5.0.0", Result.EQUAL),
                 Arguments.of("5.0.0", "5.0", Result.EQUAL),
@@ -73,8 +75,8 @@ public class VersionTest {
     @ParameterizedTest
     @MethodSource("provideCompareVersionsArguments")
     public void testCompareVersions(String v1, String v2, Result result) {
-        Version version1 = Version.parseVersion(v1);
-        Version version2 = Version.parseVersion(v2);
+        Version version1 = Version.valueOf(v1);
+        Version version2 = Version.valueOf(v2);
         switch (result) {
             case OLDER:
                 assertThat(version1.compareTo(version2), lessThan(0));
@@ -89,20 +91,47 @@ public class VersionTest {
     }
 
     @Test
-    public void testOSGiVersionEquality() {
-        org.osgi.framework.Version osgiVersion = org.osgi.framework.Version.parseVersion("5.0.0.RC3");
-        Version version = Version.valueOf(osgiVersion);
-        assertTrue(osgiVersion.equals(version));
-        assertTrue(version.equals(osgiVersion));
+    public void testConstructors() {
+        assertThrows(IllegalArgumentException.class, () -> new Version("illegal"));
+        assertThrows(IllegalArgumentException.class, () -> new Version("5.0.2:alpha"));
+        assertThrows(IllegalArgumentException.class, () -> new Version("5.-2.2.alpha"));
+        assertThrows(IllegalArgumentException.class, () -> new Version(0, -1, 3));
+        assertThrows(IllegalArgumentException.class, () -> new Version(-2, 1, 3));
+        assertThrows(IllegalArgumentException.class, () -> new Version(2, 1, -3));
+        assertThrows(IllegalArgumentException.class, () -> new Version(1, 2, 3, "snap$hot"));
+        assertThrows(IllegalArgumentException.class, () -> new Version(1, 2, 3, ':', "snapshot"));
+        assertEquals("1.2.3", new Version(1, 2, 3).toString());
+        assertEquals("1.2.3", new Version(1, 2, 3, "").toString());
+        assertEquals("1.2.3.beta", new Version(1, 2, 3, "beta").toString());
+        assertEquals("1.2.3.93", new Version(1, 2, 3, "93").toString());
+        assertEquals("1.2.3-SNAPSHOT", new Version(1, 2, 3, '-', "SNAPSHOT").toString());
+        assertEquals("1.2.3_test", new Version(1, 2, 3, '_', "test").toString());
+    }
 
-        osgiVersion = org.osgi.framework.Version.emptyVersion;
-        version = Version.parseVersion(null);
-        assertTrue(osgiVersion.equals(version));
-        assertTrue(version.equals(osgiVersion));
-
-        version = Version.parseVersion("");
-        assertTrue(osgiVersion.equals(version));
-        assertTrue(version.equals(osgiVersion));
+    @Test
+    public void testMisc() {
+        Version v = Version.valueOf((String) null);
+        org.osgi.framework.Version ov = v.toOSGiVersion();
+        assertEquals('.', v.getLastSeparator());
+        assertEquals(Version.EMPTY_VERSION, v);
+        assertEquals("0.0.0", v.toString());
+        assertEquals(v.toString(), v.toString());
+        assertEquals(v.hashCode(), v.hashCode());
+        assertTrue(v.equals(v));
+        assertFalse(v.equals(ov));
+        assertEquals(0, v.compareTo(ov));
+        Version v2 = Version.valueOf("  ");
+        assertEquals(v, v2);
+        v = new Version(9, 8, 0, null);
+        ov = v.toOSGiVersion();
+        assertEquals(0, v.compareTo(ov));
+        v2 = Version.valueOf(ov);
+        assertEquals(v, v2);
+        v = new Version(9, 8, 0, "alpha");
+        ov = v.toOSGiVersion();
+        assertEquals(0, v.compareTo(ov));
+        v2 = Version.valueOf(ov);
+        assertEquals(v, v2);
     }
 
     private enum Result {

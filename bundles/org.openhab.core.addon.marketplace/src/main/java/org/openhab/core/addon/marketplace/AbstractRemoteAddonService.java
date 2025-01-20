@@ -75,7 +75,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         }
         try {
             // prefer newer version over older
-            return Version.parseVersion(addon2.getVersion()).compareTo(Version.parseVersion(addon1.getVersion()));
+            return Version.valueOf(addon2.getVersion()).compareTo(Version.valueOf(addon1.getVersion()));
         } catch (IllegalArgumentException e) {
             // assume they are equal (for ordering) if we can't compare the versions
             return 0;

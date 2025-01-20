@@ -57,8 +57,8 @@ public class VersionRange {
         }
         String right = matcher.group("right");
         this.leftClosed = "[".equals(matcher.group("leftType"));
-        this.left = Version.parseVersion(matcher.group("left"));
-        this.right = right == null ? null : Version.parseVersion(right);
+        this.left = Version.valueOf(matcher.group("left"));
+        this.right = right == null ? null : Version.valueOf(right);
         this.rightClosed = "]".equals(matcher.group("rightType"));
     }
 
