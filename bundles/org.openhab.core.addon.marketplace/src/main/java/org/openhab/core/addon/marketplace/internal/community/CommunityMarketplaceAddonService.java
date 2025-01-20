@@ -502,7 +502,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                         try {
                             s = innerMatcher.group("value");
                             if (!s.isBlank()) {
-                                version = Version.parseVersion(innerMatcher.group("value"));
+                                version = Version.valueOf(innerMatcher.group("value"));
                             }
                         } catch (IllegalArgumentException e) {
                             logger.debug("Invalid version \"{}\" specified for Marketplace add-on \"{}\" - skipping version entry", innerMatcher.group("value"), topic.title);
