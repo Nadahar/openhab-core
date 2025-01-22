@@ -57,7 +57,6 @@ import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.config.core.ConfigurableService;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.storage.StorageService;
-import org.openhab.core.util.UIDUtils;
 import org.osgi.framework.Constants;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.annotations.Activate;
@@ -581,7 +580,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                             }
                             if (urlProperty != null) {
                                 if (validResourceTypes.contains(urlProperty)) {
-                                    versionProperties.put(urlProperty, s);
+                                    versionProperties.put(urlProperty, innerMatcher.group("value"));
                                 } else {
                                     logger.debug("Ignoring invalid version URL type \"{}\" for Marketplace add-on \"{}\"", urlProperty, topic.title);
                                 }
@@ -589,7 +588,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                                 logger.debug("Ignoring URL with unknown resource extension \"{}\" for Marketplace add-on \"{}\"", s.substring(i + 1), topic.title);
                             }
                         } else {
-                            logger.debug("Unknown resource type for URL \"{}\" for Marketplace add-on \"{}\" - ignoring URL", s, topic.title);
+                            logger.debug("Unknown resource type for URL \"{}\" for Marketplace add-on \"{}\" - ignoring URL", innerMatcher.group("value"), topic.title);
                         }
                         break;
                     default:
@@ -620,7 +619,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 }
             }
 
-            String versionUID = uid + ":v" + UIDUtils.encode(version.toString());
+            String versionUID = uid + ":v" + version.toUidString();
             versionBuilder.withProperties(versionProperties).withUID(versionUID).withVersion(version)
                     .withCompatible(compatible).withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(versionUID)));
             if (versionBuilder.isValid(validResourceTypes)) { // TODO: (Nad)
@@ -664,21 +663,21 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         // Gather resources in the "traditional way" if none are found using version sections
         if (!resourceFound && topic.postStream.posts[0].linkCounts != null) {
             for (DiscoursePostLink postLink : topic.postStream.posts[0].linkCounts) {
-                if (postLink.url.endsWith(".jar") && validResourceTypes.contains(JAR_DOWNLOAD_URL_PROPERTY)) {
+                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".jar") && validResourceTypes.contains(JAR_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(JAR_DOWNLOAD_URL_PROPERTY, postLink.url);
                     id = determineIdFromUrl(postLink.url);
                     resourceFound = true;
                 }
-                if (postLink.url.endsWith(".kar") && validResourceTypes.contains(KAR_DOWNLOAD_URL_PROPERTY)) {
+                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".kar") && validResourceTypes.contains(KAR_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(KAR_DOWNLOAD_URL_PROPERTY, postLink.url);
                     id = determineIdFromUrl(postLink.url);
                     resourceFound = true;
                 }
-                if (postLink.url.endsWith(".json") && validResourceTypes.contains(JSON_DOWNLOAD_URL_PROPERTY)) {
+                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".json") && validResourceTypes.contains(JSON_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(JSON_DOWNLOAD_URL_PROPERTY, postLink.url);
                     resourceFound = true;
                 }
-                if (postLink.url.endsWith(".yaml") && validResourceTypes.contains(YAML_DOWNLOAD_URL_PROPERTY)) {
+                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".yaml") && validResourceTypes.contains(YAML_DOWNLOAD_URL_PROPERTY)) {
                     properties.put(YAML_DOWNLOAD_URL_PROPERTY, postLink.url);
                     resourceFound = true;
                 }

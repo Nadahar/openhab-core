@@ -141,6 +141,16 @@ public class Version implements Comparable<Version> {
         return versionString = sb.toString();
     }
 
+    public String toUidString() {
+        int qLen = qualifier.length();
+        StringBuilder sb = new StringBuilder(20 + qLen);
+        sb.append(major).append('-').append(minor).append('-').append(micro);
+        if (qLen > 0) {
+            sb.append('-').append(qualifier);
+        }
+        return sb.toString();
+    }
+
     // Doc: inconsistent with equals for 'lastSeparator'
     @Override
     public int compareTo(Version other) {
