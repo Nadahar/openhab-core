@@ -74,7 +74,7 @@ public class ManagedUIComponentProvider extends AbstractProvider<RootUIComponent
 
         if (storage.get(element.getUID()) != null) {
             throw new IllegalArgumentException("Cannot add UI component to namespace " + namespace
-                    + ", because a component with same UID (" + element.getUID() + ") already exists.");
+                    + ", because a component with the same UID (" + element.getUID() + ") already exists.");
         }
         storage.put(element.getUID(), element);
         notifyListenersAboutAddedElement(element);
