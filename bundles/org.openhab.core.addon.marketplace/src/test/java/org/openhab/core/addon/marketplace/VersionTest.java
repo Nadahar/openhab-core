@@ -108,6 +108,7 @@ public class VersionTest {
         assertEquals("1.2.3_test", new Version(1, 2, 3, '_', "test").toString());
     }
 
+    @SuppressWarnings("unlikely-arg-type")
     @Test
     public void testMisc() {
         Version v = Version.valueOf((String) null);
