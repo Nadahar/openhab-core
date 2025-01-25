@@ -12,11 +12,15 @@
  */
 package org.openhab.core.addon;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
@@ -35,7 +39,7 @@ public class Addon {
 
     private final String id;
     private final String label;
-    private final String version;
+    private final @Nullable Version version;
     private final @Nullable String maturity;
     private final @NonNull Set<String> dependsOn;
     private final boolean compatible;
@@ -58,6 +62,8 @@ public class Addon {
     private final @Nullable String imageLink;
     private final Map<String, Object> properties;
     private final List<String> loggerPackages;
+    private final @NonNull SortedMap<Version, AddonVersion> versions;
+    private final @Nullable Version currentVersion;
 
     /**
      * Creates a new Addon instance
@@ -89,15 +95,18 @@ public class Addon {
      * @param imageLink the link to an image (png/svg) (may be null)
      * @param properties a {@link Map} containing addition information
      * @param loggerPackages a {@link List} containing the package names belonging to this add-on
+     * @param versions a {@link SortedMap} containing the {@link AddonVersion}s if applicable
+     * @param currentVersion the currently used {{@code versions} entry (may be null)
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
-    protected Addon(String uid, String type, String id, String label, String version, @Nullable String maturity,
+    protected Addon(String uid, String type, String id, String label, @Nullable Version version, @Nullable String maturity,
             @Nullable Set<String> dependsOn, boolean compatible, String contentType, @Nullable String link,
             @Nullable String documentationLink, @Nullable String issuesLink, String author, boolean verifiedAuthor,
             boolean installed, @Nullable String description, @Nullable String detailedDescription,
             String configDescriptionURI, String keywords, List<String> countries, @Nullable String license,
             String connection, @Nullable String backgroundColor, @Nullable String imageLink,
-            @Nullable Map<String, Object> properties, List<String> loggerPackages) {
+            @Nullable Map<String, Object> properties, List<String> loggerPackages,
+            @Nullable SortedMap<Version, AddonVersion> versions, @Nullable Version currentVersion) {
         if (uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -135,6 +144,8 @@ public class Addon {
         this.installed = installed;
         this.properties = properties == null ? Map.of() : properties;
         this.loggerPackages = loggerPackages;
+        this.versions = versions == null ? Collections.emptySortedMap() : Collections.unmodifiableSortedMap(versions);
+        this.currentVersion = currentVersion;
     }
 
     /**
@@ -203,7 +214,7 @@ public class Addon {
     /**
      * The version of the add-on
      */
-    public String getVersion() {
+    public @Nullable Version getVersion() {
         return version;
     }
 
@@ -327,6 +338,20 @@ public class Addon {
     }
 
     /**
+     * The {@link SortedMap} containing the {@link AddonVersion}s, if any
+     */
+    public @NonNull SortedMap<Version, AddonVersion> getVersions() {
+        return versions;
+    }
+
+    /**
+     * the currently used {{@code versions} entry (may be null)
+     */
+    public @Nullable Version getCurrentVersion() {
+        return currentVersion;
+    }
+
+    /**
      * Create a builder for an {@link Addon}
      *
      * @param uid the UID of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
@@ -337,40 +362,14 @@ public class Addon {
     }
 
     public static Builder create(Addon addon) {
-        Addon.Builder builder = new Builder(addon.uid);
-        builder.id = addon.id;
-        builder.label = addon.label;
-        builder.version = addon.version;
-        builder.maturity = addon.maturity;
-        builder.dependsOn = addon.dependsOn;
-        builder.compatible = addon.compatible;
-        builder.contentType = addon.contentType;
-        builder.link = addon.link;
-        builder.documentationLink = addon.documentationLink;
-        builder.issuesLink = addon.issuesLink;
-        builder.author = addon.author;
-        builder.verifiedAuthor = addon.verifiedAuthor;
-        builder.installed = addon.installed;
-        builder.type = addon.type;
-        builder.description = addon.description;
-        builder.detailedDescription = addon.detailedDescription;
-        builder.configDescriptionURI = addon.configDescriptionURI;
-        builder.keywords = addon.keywords;
-        builder.countries = addon.countries;
-        builder.license = addon.license;
-        builder.connection = addon.connection;
-        builder.backgroundColor = addon.backgroundColor;
-        builder.imageLink = addon.imageLink;
-        builder.properties = addon.properties;
-        builder.loggerPackages = addon.loggerPackages;
-        return builder;
+        return new Builder(addon);
     }
 
     public static class Builder {
         protected String uid;
         protected String id;
         protected String label;
-        protected String version = "";
+        protected Version version;
         protected @Nullable String maturity;
         protected @Nullable Set<String> dependsOn;
         protected boolean compatible = true;
@@ -393,9 +392,44 @@ public class Addon {
         protected @Nullable String imageLink;
         protected Map<String, Object> properties = new HashMap<>();
         protected List<String> loggerPackages = List.of();
+        protected SortedMap<Version, AddonVersion> versions;
+        protected Version currentVersion;
 
         protected Builder(String uid) {
             this.uid = uid;
+        }
+
+        protected Builder(Addon addon) {
+            this.uid = addon.uid;
+            this.id = addon.id;
+            this.label = addon.label;
+            this.version = addon.version;
+            this.maturity = addon.maturity;
+            this.dependsOn = addon.dependsOn;
+            this.compatible = addon.compatible;
+            this.contentType = addon.contentType;
+            this.link = addon.link;
+            this.documentationLink = addon.documentationLink;
+            this.issuesLink = addon.issuesLink;
+            this.author = addon.author;
+            this.verifiedAuthor = addon.verifiedAuthor;
+            this.installed = addon.installed;
+            this.type = addon.type;
+            this.description = addon.description;
+            this.detailedDescription = addon.detailedDescription;
+            this.configDescriptionURI = addon.configDescriptionURI;
+            this.keywords = addon.keywords;
+            this.countries = addon.countries;
+            this.license = addon.license;
+            this.connection = addon.connection;
+            this.backgroundColor = addon.backgroundColor;
+            this.imageLink = addon.imageLink;
+            this.properties = addon.properties;
+            this.loggerPackages = addon.loggerPackages;
+            SortedMap<Version, AddonVersion> locVersions = createVerionsMap();
+            locVersions.putAll(addon.versions);
+            this.versions = locVersions;
+            this.currentVersion = addon.currentVersion;
         }
 
         public Builder withUid(String uid) {
@@ -418,7 +452,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withVersion(String version) {
+        public Builder withVersion(@Nullable Version version) {
             this.version = version;
             return this;
         }
@@ -426,6 +460,10 @@ public class Addon {
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
             return this;
+        }
+
+        public @Nullable Set<String> getDependsOn() {
+            return dependsOn;
         }
 
         public Builder withDependsOn(@Nullable Set<String> dependsOn) {
@@ -494,6 +532,10 @@ public class Addon {
             return this;
         }
 
+        public @Nullable List<String> getCountries() {
+            return countries;
+        }
+
         public Builder withCountries(List<String> countries) {
             this.countries = countries;
             return this;
@@ -529,16 +571,54 @@ public class Addon {
             return this;
         }
 
+        public @Nullable List<String> getLoggerPackages() {
+            return loggerPackages;
+        }
+
         public Builder withLoggerPackages(List<String> loggerPackages) {
             this.loggerPackages = loggerPackages;
             return this;
+        }
+
+        @Nullable
+        public SortedMap<Version, AddonVersion> getVersions() {
+            return versions;
+        }
+
+        public Builder withAddonVersion(AddonVersion addonVersion) {
+            if (addonVersion.getVersion() == null) {
+                throw new IllegalArgumentException("Version cannot be null");
+            }
+            SortedMap<Version, AddonVersion> locVersions = versions;
+            if (locVersions == null) {
+                locVersions = createVerionsMap();
+            }
+            locVersions.put(addonVersion.getVersion(), addonVersion);
+            versions = locVersions;
+            return this;
+        }
+
+        public Builder withCurrentVersion(@Nullable Version currentVersion) {
+            this.currentVersion = currentVersion;
+            return this;
+        }
+
+        protected SortedMap<Version, AddonVersion> createVerionsMap() {
+            return new TreeMap<>(new Comparator<Version>() {
+
+                @Override
+                public int compare(Version o1, Version o2) {
+                    // Sort newest first
+                    return o2.compareTo(o1);
+                }
+            });
         }
 
         public Addon build() {
             return new Addon(uid, type, id, label, version, maturity, dependsOn, compatible, contentType, link,
                     documentationLink, issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
                     configDescriptionURI, keywords, countries, license, connection, backgroundColor, imageLink,
-                    properties.isEmpty() ? null : properties, loggerPackages);
+                    properties.isEmpty() ? null : properties, loggerPackages, versions, currentVersion);
         }
     }
 }
