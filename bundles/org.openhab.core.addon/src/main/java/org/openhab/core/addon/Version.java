@@ -1,4 +1,4 @@
-package org.openhab.core.addon.marketplace;
+package org.openhab.core.addon;
 
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -141,21 +141,14 @@ public class Version implements Comparable<Version> {
         return versionString = sb.toString();
     }
 
-    public String toUidString() { //TODO: (Nad) Remove?
-        int qLen = qualifier.length();
-        StringBuilder sb = new StringBuilder(20 + qLen);
-        sb.append(major).append('-').append(minor).append('-').append(micro);
-        if (qLen > 0) {
-            sb.append('-').append(qualifier);
-        }
-        return sb.toString();
-    }
-
     // Doc: inconsistent with equals for 'lastSeparator'
     @Override
-    public int compareTo(Version other) {
+    public int compareTo(@Nullable Version other) {
         if (other == this) {
             return 0;
+        }
+        if (other == null) {
+            return 1;
         }
 
         int result = major - other.major;

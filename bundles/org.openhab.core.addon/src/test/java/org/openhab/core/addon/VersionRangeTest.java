@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.addon.marketplace;
+package org.openhab.core.addon;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -44,7 +44,6 @@ public class VersionRangeTest {
     public void testIllegalRangeThrowsException() {
         assertThrows(IllegalArgumentException.class, () -> VersionRange.valueOf("illegal"));
         assertThrows(IllegalArgumentException.class, () -> VersionRange.valueOf("[4.3,0:)"));
-        assertThrows(IllegalArgumentException.class, () -> new VersionRange(null));
         assertThrows(IllegalArgumentException.class, () -> new VersionRange("  "));
         assertThrows(IllegalArgumentException.class, () -> new VersionRange("[,]"));
         assertThrows(IllegalArgumentException.class, () -> new VersionRange("[  ,  ]"));

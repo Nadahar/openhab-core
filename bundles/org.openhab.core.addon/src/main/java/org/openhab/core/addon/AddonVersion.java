@@ -1,4 +1,4 @@
-package org.openhab.core.addon.marketplace;
+package org.openhab.core.addon;
 
 import java.util.List;
 import java.util.Locale;
@@ -7,8 +7,6 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.addon.Addon;
-import org.openhab.core.io.rest.core.Exclude;
 
 import com.google.gson.annotations.SerializedName;
 
@@ -16,10 +14,9 @@ import com.google.gson.annotations.SerializedName;
 @NonNullByDefault
 public class AddonVersion {
 
-    protected final /*@Exclude*/ String uid; //TODO: (Nad) Excluded exclude
-    protected final @Nullable @Exclude Version versionObj;
+    protected final @Exclude Version versionObj; //TODO: (Nad) Excluded exclude
     @SerializedName("version")
-    protected final @Nullable String versionString;
+    protected final String versionString; //TODO: (Nad) Needed?
     protected final @Nullable @Exclude VersionRange coreRangeObj;
     @SerializedName("coreRange")
     protected final @Nullable String coreRangeString;
@@ -35,17 +32,13 @@ public class AddonVersion {
     protected final /*@Exclude*/ Map<String, Object> properties;
     protected final /*@Exclude*/ List<String> loggerPackages;
 
-    protected AddonVersion(String uid, @Nullable Version version, @Nullable VersionRange coreRange,
+    protected AddonVersion(Version version, @Nullable VersionRange coreRange,
         @Nullable String maturity, @Nullable Set<String> dependsOn, boolean compatible, @Nullable String documentationLink,
         @Nullable String issuesLink, boolean installed, @Nullable String description, @Nullable String keywords,
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
         @Nullable List<String> loggerPackages) {
-        if (uid.isBlank()) {
-            throw new IllegalArgumentException("uid cannot be blank");
-        }
-        this.uid = uid;
         this.versionObj = version;
-        this.versionString = version == null ? null : version.toString();
+        this.versionString = version.toString();
         this.coreRangeObj = coreRange;
         this.coreRangeString = coreRange == null ? null : coreRange.toString();
         this.maturity = maturity;
@@ -59,11 +52,6 @@ public class AddonVersion {
         this.countries = countries == null ? List.of() : List.copyOf(countries);
         this.properties = properties == null ? Map.of() : Map.copyOf(properties);
         this.loggerPackages = loggerPackages == null ? List.of() : List.copyOf(loggerPackages);
-    }
-
-
-    private String getUid() {
-        return uid;
     }
 
     public @Nullable Version getVersion() {
@@ -119,8 +107,7 @@ public class AddonVersion {
     }
 
     public boolean isStable() {
-        Version v = versionObj;
-        if (v == null) {
+        if (Version.EMPTY_VERSION.equals(versionObj)) {
             return false;
         }
 
@@ -129,7 +116,7 @@ public class AddonVersion {
         }
 
         // Deem versions without a qualifier as stable
-        return v.getQualifier().isBlank();
+        return versionObj.getQualifier().isBlank();
     }
 
     public static Builder create() {
@@ -137,7 +124,6 @@ public class AddonVersion {
     }
 
     public static class Builder {
-        protected @Nullable String uid;
         protected @Nullable Version version;
         protected @Nullable VersionRange coreRange;
         protected @Nullable String maturity;
@@ -151,16 +137,6 @@ public class AddonVersion {
         protected @Nullable List<String> countries;
         protected @Nullable Map<String, Object> properties;
         protected @Nullable List<String> loggerPackages;
-
-        @Nullable
-        public String getUID() {
-            return uid;
-        }
-
-        public Builder withUID(String uid) {
-            this.uid = uid;
-            return this;
-        }
 
         public Builder withVersion(@Nullable Version version) {
             this.version = version;
@@ -228,8 +204,7 @@ public class AddonVersion {
         }
 
         public boolean isValid(@Nullable Set<String> validResourceTypes) {
-            String s;
-            if ((s = uid) == null || s.isBlank() || version == null) {
+            if (version == null) {
                 return false;
             }
             Map<String, Object> p;
@@ -243,12 +218,12 @@ public class AddonVersion {
         }
 
         public AddonVersion build() {
-            String localUID = uid;
-            if (localUID == null) {
-                throw new IllegalArgumentException("uid cannot be null");
+            Version v = version;
+            if (v == null) {
+                v = Version.EMPTY_VERSION;
             }
-            return new AddonVersion(localUID, version, coreRange, maturity, dependsOn, compatible, documentationLink,
-                    issuesLink, installed, description, keywords, countries, properties, loggerPackages);
+            return new AddonVersion(v, coreRange, maturity, dependsOn, compatible, documentationLink, issuesLink,
+                    installed, description, keywords, countries, properties, loggerPackages);
         }
     }
 }

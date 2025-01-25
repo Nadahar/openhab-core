@@ -24,6 +24,9 @@ import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.addon.AnnotationExclusionStrategy;
+import org.openhab.core.addon.Version;
+import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.library.types.DateTimeType;
 
 import com.google.gson.Gson;
@@ -41,7 +44,9 @@ import com.google.gson.GsonBuilder;
 @NonNullByDefault
 public class Stream2JSONInputStream extends InputStream implements JSONInputStream {
 
-    private static final Gson GSON = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS).create();
+    private static final Gson GSON = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS)
+            .setExclusionStrategies(new AnnotationExclusionStrategy())
+            .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
 
     private final InputStream stream;
 

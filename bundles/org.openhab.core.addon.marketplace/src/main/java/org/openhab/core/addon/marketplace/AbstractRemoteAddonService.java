@@ -37,6 +37,8 @@ import org.openhab.core.addon.AddonInfo;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
+import org.openhab.core.addon.Version;
+import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.cache.ExpiringCache;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigParser;
@@ -53,10 +55,6 @@ import org.slf4j.LoggerFactory;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
 
 /**
  * The {@link AbstractRemoteAddonService} implements basic functionality of a remote add-on-service
@@ -73,38 +71,14 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         if (compatible != 0) {
             return compatible;
         }
-        try {
-            // prefer newer version over older
-            return Version.valueOf(addon2.getVersion()).compareTo(Version.valueOf(addon1.getVersion()));
-        } catch (IllegalArgumentException e) {
-            // assume they are equal (for ordering) if we can't compare the versions
-            return 0;
-        }
+        Version v2 = addon2.getVersion();
+        return v2 == null ? 1 : v2.compareTo(addon1.getVersion());
     };
 
     protected final Version coreVersion;
 
     protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-        .registerTypeAdapter(Version.class, new TypeAdapter<Version>() {
-
-            @Override
-            public @Nullable Version read(JsonReader in) throws IOException {
-                if (in.peek() == JsonToken.NULL) {
-                    in.nextNull();
-                    return null;
-                }
-                return Version.valueOf(in.nextString());
-            }
-
-            @Override
-            public void write(JsonWriter out, @Nullable Version version) throws IOException {
-                if (version == null) {
-                    out.nullValue();
-                } else {
-                    out.value(version.toString());
-                }
-            }
-        }).create();
+        .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
     protected final Set<MarketplaceAddonHandler> addonHandlers = new HashSet<>();
     protected final Storage<String> installedAddonStorage;
     protected final EventPublisher eventPublisher;
@@ -131,11 +105,11 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         return Version.valueOf(FrameworkUtil.getBundle(OpenHAB.class).getVersion());
     }
 
-    private VersionedAddon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
-        VersionedAddon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), VersionedAddon.class));
+    private Addon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
+        Addon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), Addon.class));
         AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(storedAddon.getType() + "-" + storedAddon.getId());
         if (addonInfo != null && storedAddon.getConfigDescriptionURI().isBlank()) {
-            return new VersionedAddon.Builder(storedAddon).withConfigDescriptionURI(addonInfo.getConfigDescriptionURI()).build();
+            return Addon.create(storedAddon).withConfigDescriptionURI(addonInfo.getConfigDescriptionURI()).build();
         } else {
             return storedAddon;
         }
