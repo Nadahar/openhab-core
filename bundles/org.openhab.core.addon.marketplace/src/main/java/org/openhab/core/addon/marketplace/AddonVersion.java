@@ -24,6 +24,7 @@ public class AddonVersion {
     @SerializedName("coreRange")
     protected final @Nullable String coreRangeString;
     protected final @Nullable /*@Exclude*/ String maturity;
+    protected final Set<String> dependsOn;
     protected final boolean compatible;
     protected final @Nullable /*@Exclude*/ String documentationLink;
     protected final @Nullable /*@Exclude*/ String issuesLink;
@@ -35,7 +36,7 @@ public class AddonVersion {
     protected final /*@Exclude*/ List<String> loggerPackages;
 
     protected AddonVersion(String uid, @Nullable Version version, @Nullable VersionRange coreRange,
-        @Nullable String maturity, boolean compatible, @Nullable String documentationLink,
+        @Nullable String maturity, @Nullable Set<String> dependsOn, boolean compatible, @Nullable String documentationLink,
         @Nullable String issuesLink, boolean installed, @Nullable String description, @Nullable String keywords,
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
         @Nullable List<String> loggerPackages) {
@@ -48,6 +49,7 @@ public class AddonVersion {
         this.coreRangeObj = coreRange;
         this.coreRangeString = coreRange == null ? null : coreRange.toString();
         this.maturity = maturity;
+        this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
         this.compatible = compatible;
         this.documentationLink = documentationLink;
         this.issuesLink = issuesLink;
@@ -60,7 +62,7 @@ public class AddonVersion {
     }
 
 
-    public String getUid() {
+    private String getUid() {
         return uid;
     }
 
@@ -74,6 +76,10 @@ public class AddonVersion {
 
     public @Nullable String getMaturity() {
         return maturity;
+    }
+
+    public Set<String> getDependsOn() {
+        return dependsOn;
     }
 
     public boolean isCompatible() {
@@ -135,6 +141,7 @@ public class AddonVersion {
         protected @Nullable Version version;
         protected @Nullable VersionRange coreRange;
         protected @Nullable String maturity;
+        protected @Nullable Set<String> dependsOn;
         protected boolean compatible;
         protected @Nullable String documentationLink;
         protected @Nullable String issuesLink;
@@ -167,6 +174,11 @@ public class AddonVersion {
 
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity == null ? null : maturity.toLowerCase(Locale.ROOT);
+            return this;
+        }
+
+        public Builder withDependsOn(@Nullable Set<String> dependsOn) {
+            this.dependsOn = dependsOn;
             return this;
         }
 
@@ -235,8 +247,8 @@ public class AddonVersion {
             if (localUID == null) {
                 throw new IllegalArgumentException("uid cannot be null");
             }
-            return new AddonVersion(localUID, version, coreRange, maturity, compatible, documentationLink, issuesLink,
-                installed, description, keywords, countries, properties, loggerPackages);
+            return new AddonVersion(localUID, version, coreRange, maturity, dependsOn, compatible, documentationLink,
+                    issuesLink, installed, description, keywords, countries, properties, loggerPackages);
         }
     }
 }
