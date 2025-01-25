@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,6 +34,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -431,8 +433,9 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         String detailedDescription = topic.postStream.posts[0].cooked;
 
+        Addon installedAddon = cachedAddons.stream().filter(a -> uid.equals(a.getUid())).findAny().orElse(null);
         VersionedAddon.Builder builder = new VersionedAddon.Builder(uid)
-            .withType(type).withContentType(contentType)
+            .withType(type).withContentType(contentType).withInstalled(installedAddon != null)
             .withImageLink(topic.imageUrl).withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
             .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity);
 
@@ -449,6 +452,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                         break;
                     case "keywords":
                         builder.withKeywords(matcher.group("value"));
+                        break;
+                    case "dependson":
+                    case "dependency":
+                    case "dependencies":
+                        builder.withDependsOn(new HashSet<String>(Arrays.stream(matcher.group("value").trim().split("\\s*(?:,|;)\\s*")).filter(d -> !d.isBlank()).toList()));
                         break;
                     case "countries":
                         List<String> countries = Arrays.asList(matcher.group("value").trim().split("\\s*(?:,|;)\\s*"));
@@ -522,6 +530,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                         if (CODE_MATURITY_LEVELS.contains(s)) {
                             versionBuilder.withMaturity(s);
                         }
+                        break;
+                    case "dependson":
+                    case "dependency":
+                    case "dependencies":
+                        versionBuilder.withDependsOn(new HashSet<String>(Arrays.stream(innerMatcher.group("value").trim().split("\\s*(?:,|;)\\s*")).filter(d -> !d.isBlank()).toList()));
                         break;
                     case "keywords":
                         versionBuilder.withKeywords(innerMatcher.group("value"));
@@ -619,11 +632,13 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 }
             }
 
-            String versionUID = uid + ":v" + version.toUidString();
+            String versionUID = uid; // + ":v" + version.toUidString(); //TODO: (Nad) REmove..?
             versionBuilder.withProperties(versionProperties).withUID(versionUID).withVersion(version)
-                    .withCompatible(compatible).withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(versionUID)));
+                    .withCompatible(compatible)
+                    .withInstalled(installedAddon instanceof VersionedAddon va && version.equals(va.getCurrentVersion()));
+//                    .withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(versionUID)));
             if (versionBuilder.isValid(validResourceTypes)) { // TODO: (Nad)
-                builder.withAddonVersion(versionBuilder.build());
+                builder.withAddonVersion(versionBuilder.build()); //TODO: (NAd) Damn - can't store currentVersion because of serialization :(
             } else {
                 //TODO: (Nad) Log
             }
@@ -699,7 +714,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         }
 
         // try to use a handler to determine if the add-on is installed
-        builder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid))); //TODO: (Nad) Apply logic?
+//        builder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid))); //TODO: (Nad) Apply logic?
 
         String title = topic.title;
         matcher = VersionRange.RANGE_PATTERN.matcher(title);
@@ -712,8 +727,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         builder.withLabel(title).withId(id).withCompatible(compatible).withDetailedDescription(detailedDescription).withProperties(properties);
         //TODO: (Nad) Test
         if (latestStable != null) {
-            builder.withCompatible(latestStable.isCompatible()).withInstalled(latestStable.isInstalled())
-                    .withUid(latestStable.getUid());
+            builder.withCompatible(latestStable.isCompatible()).withInstalled(latestStable.isInstalled());
+//                    .withUid(latestStable.getUid()); //TODO: (Nad) Test
             if (latestStable.getVersion() != null) {
                 builder.withVersion(latestStable.getVersion().toString());
             }
@@ -747,6 +762,14 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             }
             if ((s = latestStable.getMaturity()) != null && !s.isBlank()) {
                 builder.withMaturity(s);
+            }
+            Set<String> deps;
+            if (!latestStable.getDependsOn().isEmpty()) {
+                if ((deps = builder.getDependsOn()) != null) {
+                    builder.withDependsOn(Stream.concat(deps.stream(), latestStable.getDependsOn().stream()).collect(Collectors.toSet()));
+                } else {
+                    builder.withDependsOn(latestStable.getDependsOn());
+                }
             }
 
             properties.putAll(latestStable.getProperties());
