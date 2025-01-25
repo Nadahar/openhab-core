@@ -31,7 +31,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,7 +46,6 @@ import org.openhab.core.addon.AddonVersion;
 import org.openhab.core.addon.Version;
 import org.openhab.core.addon.VersionRange;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
-import org.openhab.core.addon.marketplace.VersionedAddon;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO.DiscoursePosterInfo;
@@ -434,7 +432,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         String detailedDescription = topic.postStream.posts[0].cooked;
 
         Addon installedAddon = cachedAddons.stream().filter(a -> uid.equals(a.getUid())).findAny().orElse(null);
-        VersionedAddon.Builder builder = new VersionedAddon.Builder(uid)
+        Addon.Builder builder = Addon.create(uid)
             .withType(type).withContentType(contentType).withInstalled(installedAddon != null)
             .withImageLink(topic.imageUrl).withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
             .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity);
@@ -448,7 +446,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             while (matcher.find()) {
                 switch (matcher.group("key").toLowerCase(Locale.ROOT)) {
                     case "version":
-                        builder.withVersion(matcher.group("value"));
+                        builder.withVersion(Version.valueOf(matcher.group("value")));
                         break;
                     case "keywords":
                         builder.withKeywords(matcher.group("value"));
@@ -632,10 +630,9 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 }
             }
 
-            String versionUID = uid;
             versionBuilder.withProperties(versionProperties).withVersion(version)
                     .withCompatible(compatible)
-                    .withInstalled(installedAddon instanceof VersionedAddon va && version.equals(va.getCurrentVersion()));
+                    .withInstalled(installedAddon != null && version.equals(installedAddon.getCurrentVersion()));
 //                    .withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(versionUID)));
             if (versionBuilder.isValid(validResourceTypes)) { // TODO: (Nad)
                 builder.withAddonVersion(versionBuilder.build()); //TODO: (NAd) Damn - can't store currentVersion because of serialization :(
@@ -649,7 +646,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         boolean resourceFound = false;
         boolean compatible = true;
         AddonVersion latestStable = null; //TODO: (Nad) Fallback to non-compatible
-        SortedMap<Version, AddonVersion> versions = builder.getVersions();
+        Map<Version, AddonVersion> versions = builder.getVersions();
         if (versions != null && !versions.isEmpty()) {
             compatible = false;
             List<Entry<String, Object>> props = versions.values().stream().filter(a -> !a.getProperties().isEmpty())
@@ -730,7 +727,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             builder.withCompatible(latestStable.isCompatible()).withInstalled(latestStable.isInstalled());
 //                    .withUid(latestStable.getUid()); //TODO: (Nad) Test
             if (latestStable.getVersion() != null) {
-                builder.withVersion(latestStable.getVersion().toString());
+                builder.withVersion(latestStable.getVersion());
             }
             if (!latestStable.getCountries().isEmpty()) {
                 if (builder.getCountries() == null) {
