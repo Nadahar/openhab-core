@@ -250,12 +250,33 @@ public class AddonResource implements RESTResource {
     @Path("/{addonId: [a-zA-Z_0-9-:]+}/install")
     @Operation(operationId = "installAddonById", summary = "Installs the add-on with the given ID.", responses = {
             @ApiResponse(responseCode = "200", description = "OK"),
+            @ApiResponse(responseCode = "466", description = "Dependency not met"),
             @ApiResponse(responseCode = "404", description = "Not found") })
     public Response installAddon(final @PathParam("addonId") @Parameter(description = "addon ID") String addonId,
             @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId) {
         AddonService addonService = (serviceId != null) ? getServiceById(serviceId) : getDefaultService();
-        if (addonService == null || addonService.getAddon(addonId, null) == null) {
+        Addon addon;
+        if (addonService == null || (addon = addonService.getAddon(addonId, null)) == null) {
             return Response.status(HttpStatus.NOT_FOUND_404).build();
+        }
+        if (!addon.getDependsOn().isEmpty()) {
+            List<Addon> addons = getAllAddons(null).toList();
+            boolean ok;
+            Addon dep;
+            for (String dependency : addon.getDependsOn()) {
+                ok = false;
+                for (AddonService as : addonServices) {
+                    dep = as.getAddon(dependency, null);
+                    if (dep != null && dep.isInstalled()) { //TODO: (Nad) Versions..
+                        ok = true;
+                        break;
+                    }
+                }
+                if (!ok) {
+                    logger.warn("Couldn't install add-on \"{}\" because dependency \"{}\" isn't installed", addon.getLabel(), dependency);
+                    return Response.status(466).build();
+                }
+            }
         }
 
         ThreadPoolManager.getPool(THREAD_POOL_NAME).submit(() -> {
@@ -289,7 +310,7 @@ public class AddonResource implements RESTResource {
     }
 
     @POST
-    @Path("/{addonId: [a-zA-Z_0-9-:]+}/uninstall")
+    @Path("/{addonId: [a-zA-Z_0-9-:]+}/uninstall") // TODO: (Nad) Check if anything depends on?
     @Operation(operationId = "uninstallAddon", summary = "Uninstalls the add-on with the given ID.", responses = {
             @ApiResponse(responseCode = "200", description = "OK"),
             @ApiResponse(responseCode = "404", description = "Not found") })
@@ -412,7 +433,7 @@ public class AddonResource implements RESTResource {
                 .findFirst().orElse(addonServices.stream().findFirst().orElse(null));
     }
 
-    private Stream<Addon> getAllAddons(Locale locale) {
+    private Stream<Addon> getAllAddons(@Nullable Locale locale) {
         return addonServices.stream().map(s -> s.getAddons(locale)).flatMap(Collection::stream);
     }
 
