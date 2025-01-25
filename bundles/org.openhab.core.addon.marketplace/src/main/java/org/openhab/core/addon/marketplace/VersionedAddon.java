@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -16,18 +17,19 @@ import org.openhab.core.addon.Addon;
 public class VersionedAddon extends Addon {
 
     protected final @NonNull SortedMap<Version, AddonVersion> versions;
-    protected final @NonNull String masterUid;
+    protected final @NonNull String masterUid; //TODO: (Nad) Remove..?
+    protected final @Nullable Version currentVersion;
 
     protected VersionedAddon(String uid, String masterUid, String type, String id, @Nullable String label,
-            @Nullable String version, @Nullable String maturity,
+            @Nullable String version, @Nullable String maturity, @Nullable Set<String> dependsOn,
             boolean compatible, @Nullable String contentType, @Nullable String link, @Nullable String documentationLink,
             @Nullable String issuesLink, @Nullable String author, boolean verifiedAuthor, boolean installed,
             @Nullable String description, @Nullable String detailedDescription, @Nullable String configDescriptionURI,
             @Nullable String keywords, @Nullable List<String> countries, @Nullable String license,
             @Nullable String connection, @Nullable String backgroundColor, @Nullable String imageLink,
             @Nullable Map<String, Object> properties, @Nullable List<String> loggerPackages,
-            @Nullable SortedMap<Version, AddonVersion> versions) {
-        super(uid, type, id, label, version, maturity, compatible, contentType, link, documentationLink, issuesLink,
+            @Nullable SortedMap<Version, AddonVersion> versions, @Nullable Version currentVersion) {
+        super(uid, type, id, label, version, maturity, dependsOn, compatible, contentType, link, documentationLink, issuesLink,
             author, verifiedAuthor, installed, description, detailedDescription, configDescriptionURI, keywords,
             countries, license, connection, backgroundColor, imageLink, properties, loggerPackages);
         if (masterUid.isBlank()) {
@@ -35,6 +37,7 @@ public class VersionedAddon extends Addon {
         }
         this.masterUid = masterUid;
         this.versions = versions == null ? Collections.emptySortedMap() : Collections.unmodifiableSortedMap(versions);
+        this.currentVersion = currentVersion;
     }
 
     public VersionedAddon consolidate() {
@@ -51,6 +54,11 @@ public class VersionedAddon extends Addon {
         return versions;
     }
 
+    @Nullable
+    public Version getCurrentVersion() {
+        return currentVersion;
+    }
+
     public static class Builder {
         protected String uid;
         protected String masterUid;
@@ -58,6 +66,7 @@ public class VersionedAddon extends Addon {
         protected String label;
         protected String version = "";
         protected String maturity;
+        protected Set<String> dependsOn;
         protected boolean compatible = true;
         protected String contentType;
         protected String link;
@@ -79,6 +88,7 @@ public class VersionedAddon extends Addon {
         protected Map<String, Object> properties = new HashMap<>();
         protected List<String> loggerPackages = List.of();
         protected SortedMap<Version, AddonVersion> versions;
+        protected Version currentVersion;
 
         public Builder(@NonNull String uid) {
             this.uid = uid;
@@ -96,6 +106,7 @@ public class VersionedAddon extends Addon {
             label = addon.getLabel();
             version = addon.getVersion();
             maturity = addon.getMaturity();
+            dependsOn = addon.getDependsOn();
             compatible = addon.getCompatible();
             contentType = addon.getContentType();
             link = addon.getLink();
@@ -120,6 +131,7 @@ public class VersionedAddon extends Addon {
                 SortedMap<Version, AddonVersion> locVersions = createVerionsMap();
                 locVersions.putAll(va.versions);
                 versions = locVersions;
+                currentVersion = va.getCurrentVersion();
             }
         }
 
@@ -150,6 +162,16 @@ public class VersionedAddon extends Addon {
 
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
+            return this;
+        }
+
+        @Nullable
+        public Set<String> getDependsOn() {
+            return dependsOn;
+        }
+
+        public Builder withDependsOn(@Nullable Set<String> dependsOn) {
+            this.dependsOn = dependsOn;
             return this;
         }
 
@@ -282,6 +304,11 @@ public class VersionedAddon extends Addon {
             return this;
         }
 
+        public Builder withCurrentVersion(@Nullable Version currentVersion) {
+            this.currentVersion = currentVersion;
+            return this;
+        }
+
         protected SortedMap<Version, AddonVersion> createVerionsMap() {
             return new TreeMap<>(new Comparator<Version>() {
 
@@ -294,11 +321,11 @@ public class VersionedAddon extends Addon {
         }
 
         public VersionedAddon build() {
-            return new VersionedAddon(uid, masterUid, type, id, label, version, maturity, compatible, contentType, link,
-                documentationLink, issuesLink, author,
+            return new VersionedAddon(uid, masterUid, type, id, label, version, maturity, dependsOn, compatible,
+                contentType, link, documentationLink, issuesLink, author,
                 verifiedAuthor, installed, description, detailedDescription, configDescriptionURI, keywords,
                 countries, license, connection, backgroundColor, imageLink,
-                properties.isEmpty() ? null : properties, loggerPackages, versions);
+                properties.isEmpty() ? null : properties, loggerPackages, versions, currentVersion);
         }
     }
 }

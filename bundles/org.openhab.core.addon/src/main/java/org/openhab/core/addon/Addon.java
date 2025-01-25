@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
@@ -36,6 +37,7 @@ public class Addon {
     private final String label;
     private final String version;
     private final @Nullable String maturity;
+    private final @NonNull Set<String> dependsOn;
     private final boolean compatible;
     private final String contentType;
     private final @Nullable String link;
@@ -66,6 +68,7 @@ public class Addon {
      * @param label the label of the add-on
      * @param version the version of the add-on
      * @param maturity the maturity level of this version
+     * @param dependsOn the other add-ons this add-on depends on
      * @param compatible if this add-on is compatible with the current core version
      * @param contentType the content type of the add-on
      * @param link the link to find more information about the add-on (may be null)
@@ -89,12 +92,12 @@ public class Addon {
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
     protected Addon(String uid, String type, String id, String label, String version, @Nullable String maturity,
-            boolean compatible, String contentType, @Nullable String link, @Nullable String documentationLink,
-            @Nullable String issuesLink, String author, boolean verifiedAuthor, boolean installed,
-            @Nullable String description, @Nullable String detailedDescription, String configDescriptionURI,
-            String keywords, List<String> countries, @Nullable String license, String connection,
-            @Nullable String backgroundColor, @Nullable String imageLink, @Nullable Map<String, Object> properties,
-            List<String> loggerPackages) {
+            @Nullable Set<String> dependsOn, boolean compatible, String contentType, @Nullable String link,
+            @Nullable String documentationLink, @Nullable String issuesLink, String author, boolean verifiedAuthor,
+            boolean installed, @Nullable String description, @Nullable String detailedDescription,
+            String configDescriptionURI, String keywords, List<String> countries, @Nullable String license,
+            String connection, @Nullable String backgroundColor, @Nullable String imageLink,
+            @Nullable Map<String, Object> properties, List<String> loggerPackages) {
         if (uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -112,6 +115,7 @@ public class Addon {
         this.label = label;
         this.version = version;
         this.maturity = maturity;
+        this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
         this.compatible = compatible;
         this.contentType = contentType;
         this.description = description;
@@ -208,6 +212,13 @@ public class Addon {
      */
     public @Nullable String getMaturity() {
         return maturity;
+    }
+
+    /**
+     * The other add-ons this add-on depends on
+     */
+    public @NonNull Set<String> getDependsOn() {
+        return dependsOn;
     }
 
     /**
@@ -331,6 +342,7 @@ public class Addon {
         builder.label = addon.label;
         builder.version = addon.version;
         builder.maturity = addon.maturity;
+        builder.dependsOn = addon.dependsOn;
         builder.compatible = addon.compatible;
         builder.contentType = addon.contentType;
         builder.link = addon.link;
@@ -360,6 +372,7 @@ public class Addon {
         protected String label;
         protected String version = "";
         protected @Nullable String maturity;
+        protected @Nullable Set<String> dependsOn;
         protected boolean compatible = true;
         protected String contentType;
         protected @Nullable String link;
@@ -412,6 +425,11 @@ public class Addon {
 
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
+            return this;
+        }
+
+        public Builder withDependsOn(@Nullable Set<String> dependsOn) {
+            this.dependsOn = dependsOn;
             return this;
         }
 
@@ -517,8 +535,8 @@ public class Addon {
         }
 
         public Addon build() {
-            return new Addon(uid, type, id, label, version, maturity, compatible, contentType, link, documentationLink,
-                    issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
+            return new Addon(uid, type, id, label, version, maturity, dependsOn, compatible, contentType, link,
+                    documentationLink, issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
                     configDescriptionURI, keywords, countries, license, connection, backgroundColor, imageLink,
                     properties.isEmpty() ? null : properties, loggerPackages);
         }
