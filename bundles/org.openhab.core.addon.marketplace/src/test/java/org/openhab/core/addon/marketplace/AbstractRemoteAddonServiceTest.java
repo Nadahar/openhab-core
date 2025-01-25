@@ -42,6 +42,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.AddonInfoRegistry;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.test.TestAddonHandler;
 import org.openhab.core.addon.marketplace.test.TestAddonService;
 import org.openhab.core.events.Event;
@@ -280,7 +281,7 @@ public class AbstractRemoteAddonServiceTest {
 
     private Addon getMockedAddon(String version, boolean compatible) {
         Addon addon = mock(Addon.class);
-        when(addon.getVersion()).thenReturn(version);
+        when(addon.getVersion()).thenReturn(Version.valueOf(version));
         when(addon.getCompatible()).thenReturn(compatible);
         return addon;
     }

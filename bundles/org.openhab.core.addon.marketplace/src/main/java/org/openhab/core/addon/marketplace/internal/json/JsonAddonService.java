@@ -33,9 +33,10 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
+import org.openhab.core.addon.Version;
+import org.openhab.core.addon.VersionRange;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
-import org.openhab.core.addon.marketplace.VersionRange;
 import org.openhab.core.addon.marketplace.internal.json.model.AddonEntryDTO;
 import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.config.core.ConfigurableService;
@@ -191,9 +192,10 @@ public class JsonAddonService extends AbstractRemoteAddonService {
             logger.debug("Failed to determine compatibility for addon {}: {}", addonEntry.id, e.getMessage());
         }
 
+        Version v = addonEntry.version == null || addonEntry.version.isBlank() ? null : Version.valueOf(addonEntry.version);
         return Addon.create(uid).withType(addonEntry.type).withId(addonEntry.id).withInstalled(installed)
                 .withDetailedDescription(addonEntry.description).withContentType(addonEntry.contentType)
-                .withAuthor(addonEntry.author).withVersion(addonEntry.version).withLabel(addonEntry.title)
+                .withAuthor(addonEntry.author).withVersion(v).withLabel(addonEntry.title)
                 .withCompatible(compatible).withMaturity(addonEntry.maturity).withProperties(properties)
                 .withLink(addonEntry.link).withImageLink(addonEntry.imageUrl)
                 .withConfigDescriptionURI(addonEntry.configDescriptionURI).withLoggerPackages(addonEntry.loggerPackages)

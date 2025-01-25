@@ -25,7 +25,6 @@ import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceBundleInstaller;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
-import org.openhab.core.addon.marketplace.VersionedAddon;
 import org.openhab.core.common.ThreadPoolManager;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
@@ -76,7 +75,7 @@ public class CommunityBundleAddonHandler extends MarketplaceBundleInstaller impl
     public void install(Addon addon) throws MarketplaceHandlerException {
         try {
             URL sourceUrl = new URL((String) addon.getProperties().get(JAR_DOWNLOAD_URL_PROPERTY));
-            String addonId = addon instanceof VersionedAddon va ? va.getMasterUid() : addon.getUid();
+            String addonId = addon.getUid();
             addBundleToCache(addonId, sourceUrl);
             installFromCache(bundleContext, addonId);
         } catch (MalformedURLException e) {
