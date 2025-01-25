@@ -1,4 +1,4 @@
-package org.openhab.core.addon.marketplace;
+package org.openhab.core.addon;
 
 import java.util.Objects;
 import java.util.regex.Matcher;
