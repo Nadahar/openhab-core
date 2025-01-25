@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.io.rest.core;
+package org.openhab.core.addon;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
