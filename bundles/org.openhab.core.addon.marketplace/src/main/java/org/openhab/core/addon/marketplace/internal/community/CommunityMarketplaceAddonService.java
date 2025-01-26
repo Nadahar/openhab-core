@@ -434,7 +434,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         Addon installedAddon = cachedAddons.stream().filter(a -> uid.equals(a.getUid())).findAny().orElse(null);
         Addon.Builder builder = Addon.create(uid)
-            .withType(type).withContentType(contentType).withInstalled(installedAddon != null)
+            .withType(type).withContentType(contentType).withInstalled(installedAddon != null) //TODO: (Nad) Installed flawed
             .withImageLink(topic.imageUrl).withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
             .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity);
 

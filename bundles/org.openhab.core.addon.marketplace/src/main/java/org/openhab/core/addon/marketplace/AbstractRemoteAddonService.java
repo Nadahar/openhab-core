@@ -130,7 +130,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         // cache
         try {
             installedAddonStorage.stream().map(this::convertFromStorage).forEach(addon -> {
-                setInstalled(addon);
+                setInstalled(addon); //TODO: (Nad) Sets addon to if is installed according to handler
                 addons.add(addon);
             });
         } catch (JsonSyntaxException e) {
@@ -228,6 +228,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     public void install(String id) {
         Addon addon = getAddon(id, null);
         if (addon == null) {
+            logger.warn("Failed to install add-on \"{}\" because it's unknown", id);
             postFailureEvent(id, "Add-on can't be installed because it is not known.");
             return;
         }
@@ -246,11 +247,13 @@ public abstract class AbstractRemoteAddonService implements AddonService {
                         logger.warn("Failed to install add-on \"{}\": {}", addon.getUid(), e.getMessage());
                     }
                 } else {
+                    logger.warn("Failed to install add-on \"{}\" because it is already installed", id);
                     postFailureEvent(addon.getUid(), "Add-on is already installed.");
                 }
                 return;
             }
         }
+        logger.warn("Failed to install add-on \"{}\" because no handler could be found", id);
         postFailureEvent(id, "Add-on can't be installed because there is no handler for it.");
     }
 
