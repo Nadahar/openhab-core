@@ -24,7 +24,6 @@ public class AddonVersion {
     protected final boolean compatible;
     protected final @Nullable String documentationLink;
     protected final @Nullable String issuesLink;
-    protected final boolean installed;
     protected final @Nullable String description;
     protected final @Nullable String keywords;
     protected final List<String> countries;
@@ -33,7 +32,7 @@ public class AddonVersion {
 
     protected AddonVersion(Version version, @Nullable VersionRange coreRange,
         @Nullable String maturity, @Nullable Set<String> dependsOn, boolean compatible, @Nullable String documentationLink,
-        @Nullable String issuesLink, boolean installed, @Nullable String description, @Nullable String keywords,
+        @Nullable String issuesLink, @Nullable String description, @Nullable String keywords,
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
         @Nullable List<String> loggerPackages) {
         this.version = version;
@@ -45,7 +44,6 @@ public class AddonVersion {
         this.compatible = compatible;
         this.documentationLink = documentationLink;
         this.issuesLink = issuesLink;
-        this.installed = installed;
         this.description = description;
         this.keywords = keywords;
         this.countries = countries == null ? List.of() : List.copyOf(countries);
@@ -83,10 +81,6 @@ public class AddonVersion {
 
     public @Nullable String getIssuesLink() {
         return issuesLink;
-    }
-
-    public boolean isInstalled() {
-        return installed;
     }
 
     public @Nullable String getDescription() {
@@ -163,7 +157,6 @@ public class AddonVersion {
         protected boolean compatible;
         protected @Nullable String documentationLink;
         protected @Nullable String issuesLink;
-        protected boolean installed;
         protected @Nullable String description;
         protected @Nullable String keywords;
         protected @Nullable List<String> countries;
@@ -202,11 +195,6 @@ public class AddonVersion {
 
         public Builder withIssuesLink(@Nullable String issuesLink) {
             this.issuesLink = issuesLink;
-            return this;
-        }
-
-        public Builder withInstalled(boolean installed) {
-            this.installed = installed;
             return this;
         }
 
@@ -255,7 +243,7 @@ public class AddonVersion {
                 v = Version.EMPTY_VERSION;
             }
             return new AddonVersion(v, coreRange, maturity, dependsOn, compatible, documentationLink, issuesLink,
-                    installed, description, keywords, countries, properties, loggerPackages);
+                    description, keywords, countries, properties, loggerPackages);
         }
     }
 }
