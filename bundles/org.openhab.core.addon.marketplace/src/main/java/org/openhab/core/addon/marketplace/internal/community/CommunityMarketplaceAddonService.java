@@ -432,9 +432,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         String detailedDescription = topic.postStream.posts[0].cooked;
 
-        Addon installedAddon = cachedAddons.stream().filter(a -> uid.equals(a.getUid())).findAny().orElse(null);
         Addon.Builder builder = Addon.create(uid)
-            .withType(type).withContentType(contentType).withInstalled(installedAddon != null) //TODO: (Nad) Installed flawed
+            .withType(type).withContentType(contentType)
             .withImageLink(topic.imageUrl).withLink(COMMUNITY_TOPIC_URL + topic.id.toString())
             .withAuthor(topic.postStream.posts[0].displayUsername).withMaturity(maturity);
 
@@ -631,10 +630,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 }
             }
 
-            versionBuilder.withProperties(versionProperties).withVersion(version)
-                    .withCompatible(compatible)
-                    .withInstalled(installedAddon != null && version.equals(installedAddon.getCurrentVersion()));
-//                    .withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(versionUID)));
+            versionBuilder.withProperties(versionProperties).withVersion(version).withCompatible(compatible);
             if (versionBuilder.isValid(validResourceTypes)) { // TODO: (Nad)
                 builder.withAddonVersion(versionBuilder.build()); //TODO: (NAd) Damn - can't store currentVersion because of serialization :(
             } else {
@@ -712,7 +708,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         }
 
         // try to use a handler to determine if the add-on is installed
-//        builder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid))); //TODO: (Nad) Apply logic?
+        builder.withInstalled(relevantHandlers.stream().anyMatch(handler -> handler.isInstalled(uid))); //TODO: (Nad) Apply logic?
 
         String title = topic.title;
         matcher = VersionRange.RANGE_PATTERN.matcher(title);
@@ -725,9 +721,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         builder.withLabel(title).withId(id).withCompatible(compatible).withDetailedDescription(detailedDescription).withProperties(properties);
         //TODO: (Nad) Test
         if (latestStable != null) {
-            builder.withCompatible(latestStable.isCompatible()).withInstalled(latestStable.isInstalled());
-//                    .withUid(latestStable.getUid()); //TODO: (Nad) Test
-            if (latestStable.getVersion() != null) {
+            builder.withCompatible(latestStable.isCompatible());
+            if (latestStable.getVersion() != null) { //TODO: Must be true if valid..
                 builder.withVersion(latestStable.getVersion());
             }
             if (!latestStable.getCountries().isEmpty()) {
