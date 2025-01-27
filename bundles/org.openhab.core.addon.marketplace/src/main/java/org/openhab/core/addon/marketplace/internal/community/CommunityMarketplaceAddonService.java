@@ -726,10 +726,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 builder.withVersion(latestStable.getVersion());
             }
             if (!latestStable.getCountries().isEmpty()) {
-                if (builder.getCountries() == null) {
+                List<String> builderCountries = builder.getCountries();
+                if (builderCountries == null) {
                     builder.withCountries(latestStable.getCountries());
                 } else {
-                    List<String> c = new ArrayList<>(builder.getCountries());
+                    List<String> c = new ArrayList<>(builderCountries);
                     c.addAll(latestStable.getCountries());
                     builder.withCountries(c);
                 }
@@ -745,10 +746,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 builder.withKeywords(s);
             }
             if (!latestStable.getLoggerPackages().isEmpty()) {
-                if (builder.getLoggerPackages() == null) {
+                List<String> builderLoggerPackages = builder.getLoggerPackages();
+                if (builderLoggerPackages == null) {
                     builder.withLoggerPackages(latestStable.getLoggerPackages());
                 } else {
-                    List<String> l = new ArrayList<>(builder.getLoggerPackages());
+                    List<String> l = new ArrayList<>(builderLoggerPackages);
                     l.addAll(latestStable.getLoggerPackages());
                     builder.withLoggerPackages(l);
                 }
@@ -756,8 +758,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             if ((s = latestStable.getMaturity()) != null && !s.isBlank()) {
                 builder.withMaturity(s);
             }
-            Set<String> deps;
             if (!latestStable.getDependsOn().isEmpty()) {
+                Set<String> deps;
                 if ((deps = builder.getDependsOn()) != null) {
                     builder.withDependsOn(Stream.concat(deps.stream(), latestStable.getDependsOn().stream()).collect(Collectors.toSet()));
                 } else {
