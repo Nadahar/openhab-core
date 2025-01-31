@@ -55,6 +55,7 @@ import org.openhab.core.addon.AddonInfo;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
+import org.openhab.core.addon.Version;
 import org.openhab.core.auth.Role;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigDescription;
@@ -274,18 +275,56 @@ public class AddonResource implements RESTResource, EventSubscriber {
     @Operation(operationId = "getAddonById", summary = "Get add-on with given ID.", responses = {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = Addon.class))),
             @ApiResponse(responseCode = "404", description = "Not found") })
+            @ApiResponse(responseCode = "422", description = "Version not found")
     public Response getById(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
             @PathParam("addonId") @Parameter(description = "addon ID") String addonId,
-            @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId) {
+            @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId,
+            @QueryParam("version") @Parameter(description = "version") @Nullable String version) {
         logger.debug("Received HTTP GET request at '{}'.", uriInfo.getPath());
         Locale locale = localeService.getLocale(language);
+        Addon responseObject;
+        if ("all".equals(serviceId)) {
+            for (AddonService addonService : getAllServices()) {
+                responseObject = addonService.getAddon(addonId, locale);
+                if (responseObject != null) {
+                    if (version != null && !version.isBlank()) {
+                        try {
+                            responseObject = responseObject.mergeVersion(Version.valueOf(version));
+                        } catch (IllegalArgumentException e) {
+                            return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+                        }
+                    } else {
+                        Version defaultVersion;
+                        if (responseObject.getCurrentVersion() == null && (defaultVersion = responseObject
+                                .getDefaultVersion()) != null) {
+                            responseObject = responseObject.mergeVersion(defaultVersion);
+                        }
+                    }
+                    return Response.ok(responseObject).build();
+                }
+            }
+            return Response.status(HttpStatus.NOT_FOUND_404).build();
+        }
         AddonService addonService = (serviceId != null) ? getServiceById(serviceId) : getDefaultService();
         if (addonService == null) {
             return Response.status(HttpStatus.NOT_FOUND_404).build();
         }
-        Addon responseObject = addonService.getAddon(addonId, locale);
+        responseObject = addonService.getAddon(addonId, locale);
         if (responseObject != null) {
+            if (version != null && !version.isBlank()) {
+                try {
+                    responseObject = responseObject.mergeVersion(Version.valueOf(version));
+                } catch (IllegalArgumentException e) {
+                    return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+                }
+            } else {
+                Version defaultVersion;
+                if (responseObject.getCurrentVersion() == null && (defaultVersion = responseObject
+                        .getDefaultVersion()) != null) {
+                    responseObject = responseObject.mergeVersion(defaultVersion);
+                }
+            }
             return Response.ok(responseObject).build();
         }
 
@@ -306,12 +345,11 @@ public class AddonResource implements RESTResource, EventSubscriber {
             return Response.status(HttpStatus.NOT_FOUND_404).build();
         }
         if (!addon.getDependsOn().isEmpty()) {
-            List<Addon> addons = getAllAddons(null).toList();
             boolean ok;
             Addon dep;
             for (String dependency : addon.getDependsOn()) {
                 ok = false;
-                for (AddonService as : addonServices) {
+                for (AddonService as : getAllServices()) {
                     dep = as.getAddon(dependency, null);
                     if (dep != null && dep.isInstalled()) { //TODO: (Nad) Versions..
                         ok = true;
@@ -499,6 +537,10 @@ public class AddonResource implements RESTResource, EventSubscriber {
         Set<AddonType> ret = new TreeSet<>((o1, o2) -> coll.compare(o1.getLabel(), o2.getLabel()));
         ret.addAll(addonService.getTypes(locale));
         return ret;
+    }
+
+    private Set<AddonService> getAllServices() {
+        return Set.copyOf(addonServices);
     }
 
     private @Nullable AddonService getServiceById(final String serviceId) {
