@@ -14,16 +14,15 @@ import com.google.gson.annotations.SerializedName;
 @NonNullByDefault
 public class AddonVersion {
 
-    protected final @Exclude Version versionObj; //TODO: (Nad) Excluded exclude
-    @SerializedName("version")
-    protected final String versionString; //TODO: (Nad) Needed?
+    protected final Version version; //TODO: (Nad) Excluded exclude
     protected final @Nullable @Exclude VersionRange coreRangeObj;
     @SerializedName("coreRange")
     protected final @Nullable String coreRangeString;
     protected final @Nullable /*@Exclude*/ String maturity;
+    protected final boolean stable;
     protected final Set<String> dependsOn;
     protected final boolean compatible;
-    protected final @Nullable /*@Exclude*/ String documentationLink;
+    protected final @Nullable  String documentationLink;
     protected final @Nullable /*@Exclude*/ String issuesLink;
     protected final @Nullable /*@Exclude*/ String description;
     protected final @Nullable /*@Exclude*/ String keywords;
@@ -36,11 +35,11 @@ public class AddonVersion {
         @Nullable String issuesLink, @Nullable String description, @Nullable String keywords,
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
         @Nullable List<String> loggerPackages) {
-        this.versionObj = version;
-        this.versionString = version.toString();
+        this.version = version;
         this.coreRangeObj = coreRange;
         this.coreRangeString = coreRange == null ? null : coreRange.toString();
         this.maturity = maturity;
+        this.stable = resoleStable(version, maturity);
         this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
         this.compatible = compatible;
         this.documentationLink = documentationLink;
@@ -52,8 +51,8 @@ public class AddonVersion {
         this.loggerPackages = loggerPackages == null ? List.of() : List.copyOf(loggerPackages);
     }
 
-    public @Nullable Version getVersion() {
-        return versionObj;
+    public Version getVersion() {
+        return version;
     }
 
     public @Nullable VersionRange getCoreRange() {
@@ -62,6 +61,10 @@ public class AddonVersion {
 
     public @Nullable String getMaturity() {
         return maturity;
+    }
+
+    public boolean isStable() {
+        return stable;
     }
 
     public Set<String> getDependsOn() {
@@ -100,8 +103,37 @@ public class AddonVersion {
         return loggerPackages;
     }
 
-    public boolean isStable() {
-        if (Version.EMPTY_VERSION.equals(versionObj)) {
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getClass().getSimpleName()).append(" [").append("version=").append(version).append(", ");
+        if (coreRangeString != null) {
+            sb.append("coreRange=").append(coreRangeString).append(", ");
+        }
+        if (maturity != null) {
+            sb.append("maturity=").append(maturity).append(", ");
+        }
+        sb.append("stable=").append(stable).append(", ").append("dependsOn=").append(dependsOn).append(", ")
+                .append("compatible=").append(compatible).append(", ");
+        if (documentationLink != null) {
+            sb.append("documentationLink=").append(documentationLink).append(", ");
+        }
+        if (issuesLink != null) {
+            sb.append("issuesLink=").append(issuesLink).append(", ");
+        }
+        if (description != null) {
+            sb.append("description=").append(description).append(", ");
+        }
+        if (keywords != null) {
+            sb.append("keywords=").append(keywords).append(", ");
+        }
+        sb.append("countries=").append(countries).append(", ").append("properties=").append(properties).append(", ")
+                .append("loggerPackages=").append(loggerPackages).append("]");
+        return sb.toString();
+    }
+
+    protected boolean resoleStable(@Nullable Version version, @Nullable String maturity) {
+        if (version == null || Version.EMPTY_VERSION.equals(version)) {
             return false;
         }
 
@@ -110,7 +142,7 @@ public class AddonVersion {
         }
 
         // Deem versions without a qualifier as stable
-        return versionObj.getQualifier().isBlank();
+        return version.getQualifier().isBlank();
     }
 
     public static Builder create() {
