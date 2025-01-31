@@ -175,6 +175,9 @@ public class EclipseAddonService implements AddonService {
     public @Nullable Addon getAddon(String uid, @Nullable Locale locale) {
         String id = uid.replaceFirst(ADDON_ID_PREFIX, "");
         String[] segments = id.split(Addon.ADDON_SEPARATOR);
+        if (segments.length < 2) {
+            return null;
+        }
         String symbolicName = BUNDLE_SYMBOLIC_NAME_PREFIX + ADDON_BUNDLE_TYPE_MAP.get(segments[0]) + "." + segments[1];
         return Arrays.stream(bundleContext.getBundles()) //
                 .filter(bundle -> bundle.getSymbolicName().equals(symbolicName)) //
