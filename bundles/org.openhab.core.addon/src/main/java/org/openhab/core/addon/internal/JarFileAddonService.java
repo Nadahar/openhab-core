@@ -181,7 +181,7 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
     }
 
     @Override
-    public void install(String id) {
+    public void install(String id, @Nullable String version) {
         throw new UnsupportedOperationException();
     }
 

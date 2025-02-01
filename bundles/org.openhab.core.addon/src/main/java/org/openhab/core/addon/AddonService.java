@@ -88,8 +88,9 @@ public interface AddonService {
      * add-on events will be sent upon its completion.
      *
      * @param id the id of the add-on to install
+     * @param version the version of the add-on to install (optional)
      */
-    void install(String id);
+    void install(String id, @Nullable String version);
 
     /**
      * Uninstalls the given add-on.

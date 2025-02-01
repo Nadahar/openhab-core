@@ -111,7 +111,7 @@ public class EclipseAddonService implements AddonService {
     }
 
     @Override
-    public void install(String id) {
+    public void install(String id, @Nullable String version) {
         throw new UnsupportedOperationException(getName() + " does not support installing add-ons");
     }
 

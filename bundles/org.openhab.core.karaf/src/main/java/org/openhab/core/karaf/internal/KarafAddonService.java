@@ -161,7 +161,7 @@ public class KarafAddonService implements AddonService {
     }
 
     @Override
-    public void install(String id) {
+    public void install(String id, @Nullable String version) {
         featureInstaller.addAddon(getAddonType(id), getName(id));
     }
 
