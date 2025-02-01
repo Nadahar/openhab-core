@@ -349,6 +349,10 @@ public class Addon {
         return loggerPackages;
     }
 
+    public boolean isVersioned() {
+        return !versions.isEmpty();
+    }
+
     /**
      * The {@link SortedMap} containing the {@link AddonVersion}s, if any
      */
@@ -366,16 +370,19 @@ public class Addon {
     /**
      * Merges the information from a specific {@link AddonVersion} with the "base information"
      * and returns a new combined {@link Addon}.
+     * <p>
+     * <b>Note:</b> This should only be called on a "base instance", not on an instance that has
+     * already been "merged" with another version.
      *
-     * @param version the {@link Version} whose {@link AddonVersion} to merge.
-     * @return The merged {@link Addon}.
+     * @param version the {@link Version} whose {@link AddonVersion} to merge
+     * @return The merged {@link Addon}
      * @throws IllegalArgumentException If the version doesn't exist
      */
     public @NonNull Addon mergeVersion(@NonNull Version version) {
         if (version.equals(this.version)) {
             return this;
         }
-        AddonVersion addonVersion = versions.get(version);
+        AddonVersion addonVersion = versions.get(version); //TODO: (Nad) Throw if currentversion is set?
         if (addonVersion == null) {
             throw new IllegalArgumentException("Non-existing version " + version);
         }
