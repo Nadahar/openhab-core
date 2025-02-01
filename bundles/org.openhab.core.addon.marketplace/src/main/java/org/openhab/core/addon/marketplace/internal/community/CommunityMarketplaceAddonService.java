@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -232,7 +231,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         // check if it is an installed add-on (cachedAddons also contains possibly incomplete results from the remote
         // side, we need to retrieve them from Discourse)
 
-        if (installedAddonIds.contains(queryId)) {
+        if (installedAddonIds.contains(queryId)) { //TODO: (Nad) How to avoid cache on request?
             return cachedAddons.stream().filter(e -> queryId.equals(e.getUid())).findAny().orElse(null);
         }
 
@@ -658,7 +657,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             }
             resourceFound = !props.isEmpty();
             //TODO: (Nad) Maybe redesign the above and do all checks in one big loop..?
-            for (AddonVersion addonVersion : versions.values()) {
+            for (AddonVersion addonVersion : versions.values()) { //TODO: (Nad) Figure out...
                 compatible |= addonVersion.isCompatible();
                 if (latestStable == null && addonVersion.isCompatible() && addonVersion.isStable()) {
                     latestStable = addonVersion;
@@ -719,57 +718,6 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             title = title.substring(0, matcher.start());
         }
         builder.withLabel(title).withId(id).withCompatible(compatible).withDetailedDescription(detailedDescription).withProperties(properties);
-        //TODO: (Nad) Test
-        if (latestStable != null) {
-            builder.withCompatible(latestStable.isCompatible());
-            if (latestStable.getVersion() != null) { //TODO: Must be true if valid..
-                builder.withVersion(latestStable.getVersion());
-            }
-            if (!latestStable.getCountries().isEmpty()) {
-                List<String> builderCountries = builder.getCountries();
-                if (builderCountries == null) {
-                    builder.withCountries(latestStable.getCountries());
-                } else {
-                    List<String> c = new ArrayList<>(builderCountries);
-                    c.addAll(latestStable.getCountries());
-                    builder.withCountries(c);
-                }
-            }
-            //TODO: (Nad) Handle description
-            if ((s = latestStable.getDocumentationLink()) != null) {
-                builder.withDocumentationLink(s);
-            }
-            if ((s = latestStable.getIssuesLink()) != null) {
-                builder.withIssuesLink(s);
-            }
-            if ((s = latestStable.getKeywords()) != null) { //TODO: (Nad) Combine?
-                builder.withKeywords(s);
-            }
-            if (!latestStable.getLoggerPackages().isEmpty()) {
-                List<String> builderLoggerPackages = builder.getLoggerPackages();
-                if (builderLoggerPackages == null) {
-                    builder.withLoggerPackages(latestStable.getLoggerPackages());
-                } else {
-                    List<String> l = new ArrayList<>(builderLoggerPackages);
-                    l.addAll(latestStable.getLoggerPackages());
-                    builder.withLoggerPackages(l);
-                }
-            }
-            if ((s = latestStable.getMaturity()) != null && !s.isBlank()) {
-                builder.withMaturity(s);
-            }
-            if (!latestStable.getDependsOn().isEmpty()) {
-                Set<String> deps;
-                if ((deps = builder.getDependsOn()) != null) {
-                    builder.withDependsOn(Stream.concat(deps.stream(), latestStable.getDependsOn().stream()).collect(Collectors.toSet()));
-                } else {
-                    builder.withDependsOn(latestStable.getDependsOn());
-                }
-            }
-
-            properties.putAll(latestStable.getProperties());
-            builder.withProperties(properties);
-        }
 
         return builder.build();
     }
