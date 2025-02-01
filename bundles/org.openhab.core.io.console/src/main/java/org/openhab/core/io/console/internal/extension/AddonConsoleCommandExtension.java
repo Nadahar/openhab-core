@@ -95,10 +95,12 @@ public class AddonConsoleCommandExtension extends AbstractConsoleCommandExtensio
                     break;
                 case SUBCMD_INSTALL:
                     if (args.length == 2) {
-                        installAddon(console, args[1]);
+                        installAddon(console, args[1], null);
+                    } else if (args.length == 3) {
+                        installAddon(console, args[1], args[2]);
                     } else {
                         console.println("Specify the UID of the add-on to install: " + getCommand() + " "
-                                + SUBCMD_INSTALL + " <addonUid>");
+                                + SUBCMD_INSTALL + " <addonUid> [<version>]");
                     }
                     break;
                 case SUBCMD_UNINSTALL:
@@ -144,7 +146,7 @@ public class AddonConsoleCommandExtension extends AbstractConsoleCommandExtensio
                 addon.getUid(), addon.getVersion() == null ? "not set" : addon.getVersion(), addon.getLabel())));
     }
 
-    private void installAddon(Console console, String addonUid) {
+    private void installAddon(Console console, String addonUid, @Nullable String version) {
         String[] parts = addonUid.split(":");
         String serviceId = parts.length == 2 ? parts[0] : "karaf";
         String addonId = parts.length == 2 ? parts[1] : parts[0];
@@ -158,7 +160,7 @@ public class AddonConsoleCommandExtension extends AbstractConsoleCommandExtensio
             } else if (addon.isInstalled()) {
                 console.println("Add-on " + addonUid + " is already installed.");
             } else {
-                service.install(addonId);
+                service.install(addonId, version);
                 console.println("Installed " + addonUid + ".");
             }
         }
