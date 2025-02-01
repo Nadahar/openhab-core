@@ -283,47 +283,45 @@ public class AddonResource implements RESTResource, EventSubscriber {
             @QueryParam("version") @Parameter(description = "version") @Nullable String version) {
         logger.debug("Received HTTP GET request at '{}'.", uriInfo.getPath());
         Locale locale = localeService.getLocale(language);
-        Addon responseObject;
+        Addon responseObject = null; //TODO: (Nad) Installed version...?
         if ("all".equals(serviceId)) {
             for (AddonService addonService : getAllServices()) {
                 responseObject = addonService.getAddon(addonId, locale);
                 if (responseObject != null) {
-                    if (version != null && !version.isBlank()) {
-                        try {
-                            responseObject = responseObject.mergeVersion(Version.valueOf(version));
-                        } catch (IllegalArgumentException e) {
-                            return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
-                        }
-                    } else {
-                        Version defaultVersion;
-                        if (responseObject.getCurrentVersion() == null && (defaultVersion = responseObject
-                                .getDefaultVersion()) != null) {
-                            responseObject = responseObject.mergeVersion(defaultVersion);
-                        }
-                    }
-                    return Response.ok(responseObject).build();
+                    break;
                 }
             }
-            return Response.status(HttpStatus.NOT_FOUND_404).build();
+        } else {
+            AddonService addonService = (serviceId != null) ? getServiceById(serviceId) : getDefaultService();
+            if (addonService == null) {
+                return Response.status(HttpStatus.NOT_FOUND_404).build();
+            }
+            responseObject = addonService.getAddon(addonId, locale);
         }
-        AddonService addonService = (serviceId != null) ? getServiceById(serviceId) : getDefaultService();
-        if (addonService == null) {
-            return Response.status(HttpStatus.NOT_FOUND_404).build();
-        }
-        responseObject = addonService.getAddon(addonId, locale);
         if (responseObject != null) {
+            Version v;
             if (version != null && !version.isBlank()) {
                 try {
-                    responseObject = responseObject.mergeVersion(Version.valueOf(version));
+                    v = Version.valueOf(version);
                 } catch (IllegalArgumentException e) {
                     return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
                 }
             } else {
-                Version defaultVersion;
-                if (responseObject.getCurrentVersion() == null && (defaultVersion = responseObject
-                        .getDefaultVersion()) != null) {
-                    responseObject = responseObject.mergeVersion(defaultVersion);
+                v = null;
+            }
+            if (responseObject.isVersioned()) {
+                if (v == null && responseObject.getCurrentVersion() == null) {
+                    v = responseObject.getDefaultVersion();
                 }
+                if (v != null) { //TODO: (Nad) Make "merge" fail if current is set?
+                    try {
+                        responseObject = responseObject.mergeVersion(v); //TODO: (Nad) Installed can't be merged..!
+                    } catch (IllegalArgumentException e) {
+                        return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+                    }
+                }
+            } else if (v != null && !v.equals(responseObject.getVersion())){
+                return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
             }
             return Response.ok(responseObject).build();
         }
@@ -335,15 +333,48 @@ public class AddonResource implements RESTResource, EventSubscriber {
     @Path("/{addonId: [a-zA-Z_0-9-:]+}/install")
     @Operation(operationId = "installAddonById", summary = "Installs the add-on with the given ID.", responses = {
             @ApiResponse(responseCode = "200", description = "OK"),
-            @ApiResponse(responseCode = "466", description = "Dependency not met"),
-            @ApiResponse(responseCode = "404", description = "Not found") })
+            @ApiResponse(responseCode = "404", description = "Not found"),
+            @ApiResponse(responseCode = "422", description = "Version not found"),
+            @ApiResponse(responseCode = "466", description = "Dependency not met") })
     public Response installAddon(final @PathParam("addonId") @Parameter(description = "addon ID") String addonId,
-            @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId) {
+            @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId,
+            @QueryParam("version") @Parameter(description = "version") @Nullable String version) {
         AddonService addonService = (serviceId != null) ? getServiceById(serviceId) : getDefaultService();
         Addon addon;
         if (addonService == null || (addon = addonService.getAddon(addonId, null)) == null) {
+            logger.warn("Couldn't install add-on id \"{}\" with service id \"{}\" because it wasn't found", addonId,
+                    addonService);
             return Response.status(HttpStatus.NOT_FOUND_404).build();
         }
+        Version v = null;
+        if (version != null) {
+            try {
+                v = Version.valueOf(version);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Couldn't install version \"{}\" of add-on \"{}\" because the version is invalid",
+                        version, addon.getLabel());
+                return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+            }
+        }
+        if (addon.isVersioned()) {
+            if (v == null) {
+                v = addon.getDefaultVersion();
+            }
+            if (v != null && !v.equals(addon.getCurrentVersion())) {
+                try {
+                    addon = addon.mergeVersion(v);
+                } catch (IllegalArgumentException e) {
+                    logger.warn("Couldn't install version \"{}\" of add-on \"{}\" because the version doesn't exist",
+                            version, addon.getLabel());
+                    return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+                }
+            }
+        } else if (v != null && !v.equals(addon.getVersion())) {
+            logger.warn("Couldn't install version \"{}\" of add-on \"{}\" because the version doesn't exist",
+                    version, addon.getLabel());
+            return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
+        }
+
         if (!addon.getDependsOn().isEmpty()) {
             boolean ok;
             Addon dep;
@@ -351,7 +382,7 @@ public class AddonResource implements RESTResource, EventSubscriber {
                 ok = false;
                 for (AddonService as : getAllServices()) {
                     dep = as.getAddon(dependency, null);
-                    if (dep != null && dep.isInstalled()) { //TODO: (Nad) Versions..
+                    if (dep != null && dep.isInstalled()) {
                         ok = true;
                         break;
                     }
@@ -363,9 +394,10 @@ public class AddonResource implements RESTResource, EventSubscriber {
             }
         }
 
+        final Version ver = v;
         ThreadPoolManager.getPool(THREAD_POOL_NAME).submit(() -> {
             try {
-                addonService.install(addonId);
+                addonService.install(addonId, ver == null ? null : ver.toString());
             } catch (Exception e) {
                 logger.error("Exception while installing add-on: {}", e.getMessage());
                 postFailureEvent(addonId, e.getMessage());
@@ -378,13 +410,16 @@ public class AddonResource implements RESTResource, EventSubscriber {
     @Path("/url/{url}/install")
     @Operation(operationId = "installAddonFromURL", summary = "Installs the add-on from the given URL.", responses = {
             @ApiResponse(responseCode = "200", description = "OK"),
-            @ApiResponse(responseCode = "400", description = "The given URL is malformed or not valid.") })
+            @ApiResponse(responseCode = "400", description = "The given URL is malformed or not valid."),
+            @ApiResponse(responseCode = "422", description = "Version not found"),
+            @ApiResponse(responseCode = "466", description = "Dependency not met") })
     public Response installAddonByURL(
-            final @PathParam("url") @Parameter(description = "addon install URL") String url) {
+            @PathParam("url") @Parameter(description = "addon install URL") String url,
+            @QueryParam("version") @Parameter(description = "version") @Nullable String version) {
         try {
             URI addonURI = new URI(url);
             String addonId = getAddonId(addonURI);
-            installAddon(addonId, getAddonServiceForAddonId(addonURI));
+            installAddon(addonId, getAddonServiceForAddonId(addonURI), version);
         } catch (URISyntaxException | IllegalArgumentException e) {
             logger.error("Exception while parsing the addon URL '{}': {}", url, e.getMessage());
             return JSONResponse.createErrorResponse(Status.BAD_REQUEST, "The given URL is malformed or not valid.");
