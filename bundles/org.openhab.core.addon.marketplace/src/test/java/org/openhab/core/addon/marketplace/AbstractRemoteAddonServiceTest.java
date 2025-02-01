@@ -169,7 +169,7 @@ public class AbstractRemoteAddonServiceTest {
     public void testAddonInstall() {
         addonService.getAddons(null);
 
-        addonService.install(TEST_ADDON);
+        addonService.install(TEST_ADDON, null);
 
         checkResult(TEST_ADDON, getFullAddonId(TEST_ADDON) + "/installed", true, true);
     }
@@ -178,7 +178,7 @@ public class AbstractRemoteAddonServiceTest {
     public void testAddonInstallFailsWithHandlerException() {
         addonService.getAddons(null);
 
-        addonService.install(INSTALL_EXCEPTION_ADDON);
+        addonService.install(INSTALL_EXCEPTION_ADDON, null);
 
         checkResult(INSTALL_EXCEPTION_ADDON, getFullAddonId(INSTALL_EXCEPTION_ADDON) + "/failed", false, true);
     }
@@ -189,7 +189,7 @@ public class AbstractRemoteAddonServiceTest {
         addonService.addToStorage(TEST_ADDON);
         addonService.getAddons(null);
 
-        addonService.install(TEST_ADDON);
+        addonService.install(TEST_ADDON, null);
 
         checkResult(TEST_ADDON, getFullAddonId(TEST_ADDON) + "/failed", true, true);
     }
@@ -198,7 +198,7 @@ public class AbstractRemoteAddonServiceTest {
     public void testAddonInstallFailsOnUnknownAddon() {
         addonService.getAddons(null);
 
-        addonService.install("unknown");
+        addonService.install("unknown", null);
 
         checkResult("unknown", "unknown/failed", false, false);
     }

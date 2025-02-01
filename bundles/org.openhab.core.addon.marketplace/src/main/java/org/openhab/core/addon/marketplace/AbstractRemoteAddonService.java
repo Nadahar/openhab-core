@@ -107,12 +107,15 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     private Addon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
         Addon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), Addon.class));
+
+        // Note: The retrieved add-on must be recreated whether additional info exists or not,
+        // since GSON doesn't properly recreate all details, like the Comparator for "versions".
+        Addon.Builder builder = Addon.create(storedAddon);
         AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(storedAddon.getType() + "-" + storedAddon.getId());
         if (addonInfo != null && storedAddon.getConfigDescriptionURI().isBlank()) {
-            return Addon.create(storedAddon).withConfigDescriptionURI(addonInfo.getConfigDescriptionURI()).build();
-        } else {
-            return storedAddon;
+            builder.withConfigDescriptionURI(addonInfo.getConfigDescriptionURI());
         }
+        return builder.build();
     }
 
     @Override
@@ -176,7 +179,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
         if (!missingAddons.isEmpty()) {
             logger.info("Re-installing missing add-ons from remote repository: {}", missingAddons);
-            scheduler.execute(() -> missingAddons.forEach(this::install));
+            scheduler.execute(() -> missingAddons.forEach((a) ->  install(a, null))); //TODO: (Nad) Figure out version
         }
     }
 
@@ -225,11 +228,39 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     }
 
     @Override
-    public void install(String id) {
+    public void install(String id, @Nullable String version) {
         Addon addon = getAddon(id, null);
         if (addon == null) {
             logger.warn("Failed to install add-on \"{}\" because it's unknown", id);
             postFailureEvent(id, "Add-on can't be installed because it is not known.");
+            return;
+        }
+        Version v = null;
+        if (version != null) {
+            try {
+                v = Version.valueOf(version);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Failed to install add-on \"{}\" because the requested version \"{}\" is invalid", id, version);
+                postFailureEvent(addon.getUid(), "Requested version is invalid: " + version);
+                return;
+            }
+        }
+        if (addon.isVersioned()) {
+            if (v == null) {
+                v = addon.getDefaultVersion();
+            }
+            if (v != null && !v.equals(addon.getCurrentVersion())) {
+                try {
+                    addon = addon.mergeVersion(v);
+                } catch (IllegalArgumentException e) {
+                    logger.warn("Failed to install add-on \"{}\" because the requested version \"{}\" doesn't exist", id, v);
+                    postFailureEvent(addon.getUid(), "Requested version doesn't exist: " + v.toString());
+                    return;
+                }
+            }
+        } else if (v != null && !v.equals(addon.getVersion())) {
+            logger.warn("Failed to install add-on \"{}\" because the requested version \"{}\" doesn't exist", id, v);
+            postFailureEvent(addon.getUid(), "Requested version doesn't exist: " + v.toString());
             return;
         }
         for (MarketplaceAddonHandler handler : addonHandlers) {
