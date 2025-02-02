@@ -160,12 +160,12 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
     @Override
     @Reference(cardinality = ReferenceCardinality.AT_LEAST_ONE, policy = ReferencePolicy.DYNAMIC)
-    protected void addAddonHandler(MarketplaceAddonHandler handler) {
+    protected synchronized void addAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.add(handler);
     }
 
     @Override
-    protected void removeAddonHandler(MarketplaceAddonHandler handler) {
+    protected synchronized void removeAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.remove(handler);
     }
 
@@ -231,8 +231,10 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         // check if it is an installed add-on (cachedAddons also contains possibly incomplete results from the remote
         // side, we need to retrieve them from Discourse)
 
-        if (installedAddonIds.contains(queryId)) { //TODO: (Nad) How to avoid cache on request?
-            return cachedAddons.stream().filter(e -> queryId.equals(e.getUid())).findAny().orElse(null);
+        synchronized (this) {
+            if (installedAddonIds.contains(queryId)) { //TODO: (Nad) How to avoid cache on request?
+                return cachedAddons.stream().filter(e -> queryId.equals(e.getUid())).findAny().orElse(null);
+            }
         }
 
         if (!remoteEnabled()) {
@@ -241,7 +243,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         // retrieve from remote
         try {
-            URL url = URI.create(COMMUNITY_TOPIC_URL + uid.replace(ADDON_ID_PREFIX, "")).toURL();
+            URL url = URI.create(COMMUNITY_TOPIC_URL + uid.replace(ADDON_ID_PREFIX, "")).toURL(); //TODO: (Nad) Cache?
             URLConnection connection = url.openConnection();
             connection.addRequestProperty("Accept", "application/json");
             if (this.apiKey != null) {
@@ -372,8 +374,11 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                     "tags", tags.toArray(String[]::new));
 
             // try to use a handler to determine if the add-on is installed
-            boolean installed = addonHandlers.stream()
-                    .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid));
+            boolean installed;
+            synchronized (this) {
+                installed = addonHandlers.stream()
+                        .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid));
+            }
 
             return Addon.create(uid).withType(type).withId(id).withContentType(contentType)
                     .withImageLink(topic.imageUrl).withAuthor(author).withProperties(properties).withLabel(title)
@@ -409,7 +414,10 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         String type = (addonType != null) ? addonType.getId() : "";
         String contentType = getContentType(topic.categoryId, tags);
         Set<String> validResourceTypes = getValidResourceTypes(contentType);
-        List<MarketplaceAddonHandler> relevantHandlers = addonHandlers.stream().filter(handler -> handler.supports(type, contentType)).toList();
+        List<MarketplaceAddonHandler> relevantHandlers;
+        synchronized (this) {
+            relevantHandlers = addonHandlers.stream().filter(handler -> handler.supports(type, contentType)).toList();
+        }
 
         int likeCount = topic.likeCount;
         int views = topic.views;

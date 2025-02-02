@@ -117,12 +117,12 @@ public class JsonAddonService extends AbstractRemoteAddonService {
 
     @Override
     @Reference(cardinality = ReferenceCardinality.AT_LEAST_ONE, policy = ReferencePolicy.DYNAMIC)
-    protected void addAddonHandler(MarketplaceAddonHandler handler) {
+    protected synchronized void addAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.add(handler);
     }
 
     @Override
-    protected void removeAddonHandler(MarketplaceAddonHandler handler) {
+    protected synchronized void removeAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.remove(handler);
     }
 
@@ -176,7 +176,9 @@ public class JsonAddonService extends AbstractRemoteAddonService {
     @Override
     public @Nullable Addon getAddon(String id, @Nullable Locale locale) {
         String queryId = id.startsWith(ADDON_ID_PREFIX) ? id : ADDON_ID_PREFIX + id;
-        return cachedAddons.stream().filter(e -> queryId.equals(e.getUid())).findAny().orElse(null);
+        synchronized (this) {
+            return cachedAddons.stream().filter(e -> queryId.equals(e.getUid())).findAny().orElse(null);
+        }
     }
 
     @Override
@@ -186,8 +188,11 @@ public class JsonAddonService extends AbstractRemoteAddonService {
 
     private Addon fromAddonEntry(AddonEntryDTO addonEntry) {
         String uid = ADDON_ID_PREFIX + addonEntry.uid;
-        boolean installed = addonHandlers.stream().anyMatch(
-                handler -> handler.supports(addonEntry.type, addonEntry.contentType) && handler.isInstalled(uid));
+        boolean installed;
+        synchronized (this) {
+            installed = addonHandlers.stream().anyMatch(
+                    handler -> handler.supports(addonEntry.type, addonEntry.contentType) && handler.isInstalled(uid));
+        }
 
         Map<String, Object> properties = new HashMap<>();
         if (addonEntry.url.endsWith(".jar")) {
