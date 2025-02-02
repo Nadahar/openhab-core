@@ -79,14 +79,18 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
         .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
+    // Guarded by "this"
     protected final Set<MarketplaceAddonHandler> addonHandlers = new HashSet<>();
+    // Guarded by "this"
     protected final Storage<String> installedAddonStorage;
     protected final EventPublisher eventPublisher;
     protected final ConfigurationAdmin configurationAdmin;
     protected final ExpiringCache<List<Addon>> cachedRemoteAddons = new ExpiringCache<>(Duration.ofMinutes(15),
             this::getRemoteAddons);
     protected final AddonInfoRegistry addonInfoRegistry;
+    // Guarded by "this"
     protected List<Addon> cachedAddons = List.of();
+    // Guarded by "this"
     protected List<String> installedAddonIds = List.of();
 
     private final Logger logger = LoggerFactory.getLogger(AbstractRemoteAddonService.class);
@@ -119,7 +123,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     }
 
     @Override
-    public void refreshSource() {
+    public synchronized void refreshSource() {
         if (!addonHandlers.stream().allMatch(MarketplaceAddonHandler::isReady)) {
             logger.debug("Add-on service '{}' tried to refresh source before add-on handlers ready. Exiting.",
                     getClass());
@@ -183,6 +187,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         }
     }
 
+    // Guarded by "this"
     private void setInstalled(Addon addon) {
         addon.setInstalled(addonHandlers.stream().anyMatch(h -> h.isInstalled(addon.getUid())));
     }
@@ -217,9 +222,9 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     protected abstract List<Addon> getRemoteAddons();
 
     @Override
-    public List<Addon> getAddons(@Nullable Locale locale) {
+    public synchronized List<Addon> getAddons(@Nullable Locale locale) {
         refreshSource();
-        return cachedAddons;
+        return List.copyOf(cachedAddons);
     }
 
     @Override
@@ -228,7 +233,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     }
 
     @Override
-    public void install(String id, @Nullable String version) {
+    public synchronized void install(String id, @Nullable String version) {
         Addon addon = getAddon(id, null);
         if (addon == null) {
             logger.warn("Failed to install add-on \"{}\" because it's unknown", id);
@@ -289,7 +294,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     }
 
     @Override
-    public void uninstall(String id) {
+    public synchronized void uninstall(String id) {
         Addon addon = getAddon(id, null);
         if (addon == null) {
             postFailureEvent(id, "Add-on can't be uninstalled because it is not known.");

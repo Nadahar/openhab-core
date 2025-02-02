@@ -61,12 +61,12 @@ public class TestAddonService extends AbstractRemoteAddonService {
     }
 
     @Override
-    public void addAddonHandler(MarketplaceAddonHandler handler) {
+    public synchronized void addAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.add(handler);
     }
 
     @Override
-    public void removeAddonHandler(MarketplaceAddonHandler handler) {
+    public synchronized void removeAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.remove(handler);
     }
 
@@ -95,7 +95,9 @@ public class TestAddonService extends AbstractRemoteAddonService {
     @Override
     public @Nullable Addon getAddon(String id, @Nullable Locale locale) {
         String remoteId = id.startsWith(SERVICE_PID) ? id : SERVICE_PID + ":" + id;
-        return cachedAddons.stream().filter(a -> remoteId.equals(a.getUid())).findAny().orElse(null);
+        synchronized (this) {
+            return cachedAddons.stream().filter(a -> remoteId.equals(a.getUid())).findAny().orElse(null);
+        }
     }
 
     @Override
@@ -121,13 +123,15 @@ public class TestAddonService extends AbstractRemoteAddonService {
         Addon addon = Addon.create(SERVICE_PID + ":" + id).withType("binding").withId(id.substring("binding-".length()))
                 .withVersion(Version.valueOf("4.1.0")).withContentType(TestAddonHandler.TEST_ADDON_CONTENT_TYPE).build();
 
-        addonHandlers.forEach(addonHandler -> {
-            try {
-                addonHandler.install(addon);
-            } catch (MarketplaceHandlerException e) {
-                // ignore
-            }
-        });
+        synchronized (this) {
+            addonHandlers.forEach(addonHandler -> {
+                try {
+                    addonHandler.install(addon);
+                } catch (MarketplaceHandlerException e) {
+                    // ignore
+                }
+            });
+        }
     }
 
     /**
@@ -140,6 +144,8 @@ public class TestAddonService extends AbstractRemoteAddonService {
                 .withVersion(Version.valueOf("4.1.0")).withContentType(TestAddonHandler.TEST_ADDON_CONTENT_TYPE).build();
 
         addon.setInstalled(true);
-        installedAddonStorage.put(id, gson.toJson(addon));
+        synchronized (this) {
+            installedAddonStorage.put(id, gson.toJson(addon));
+        }
     }
 }
