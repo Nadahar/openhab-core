@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.hasEntry;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
-import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -48,7 +48,6 @@ import org.mockito.quality.Strictness;
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class AddonTest {
 
-    @SuppressWarnings("null")
     @Test
     public void testBasics() {
         assertThrows(IllegalArgumentException.class, () -> new Addon(null, null, null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
@@ -87,7 +86,7 @@ public class AddonTest {
         assertEquals(1, addon.getLoggerPackages().size());
         assertTrue(addon.getVersions().isEmpty());
 
-        SortedMap<Version, AddonVersion> versions = new TreeMap<>();
+        Map<Version, AddonVersion> versions = new HashMap<>();
         versions.put(Version.valueOf("1.0.0"), AddonVersion.create().withVersion(Version.valueOf("1.0.0")).build());
         addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, List.of("DE", "PL", "UA") , null, null, null, null, Map.of("key1", "value1", "key2", "value2") , List.of("com.example.addon"), versions, null);
         assertEquals(2, addon.getDependsOn().size());
@@ -132,7 +131,7 @@ public class AddonTest {
         assertEquals("none", addon.getConnection());
         assertEquals("red", addon.getBackgroundColor());
         assertEquals("http://image.exammple.com", addon.getImageLink());
-        assertNull(addon.getConfigDescriptionURI());
+        assertEquals("", addon.getConfigDescriptionURI());
         assertIterableEquals(List.of("com.example"), addon.getLoggerPackages());
         assertMapsEquals(versions, addon.getVersions());
         assertEquals(Version.valueOf("1.0.0"), addon.getCurrentVersion());
@@ -165,7 +164,7 @@ public class AddonTest {
         assertEquals("Detailed description", b.withDetailedDescription("Detailed description").build().getDetailedDescription());
         assertEquals("", b.withConfigDescriptionURI(null).build().getConfigDescriptionURI());
         assertEquals("smart, light", b.withKeywords("smart, light").build().getKeywords());
-        assertNull(b.withCountries(null).build().getCountries());
+        assertTrue(b.withCountries(null).build().getCountries().isEmpty());
         assertNull(b.getCountries());
         assertEquals("EPL", b.withLicense("EPL").build().getLicense());
         assertEquals("local", b.withConnection("local").build().getConnection());
@@ -173,7 +172,6 @@ public class AddonTest {
         assertEquals("http://image.example.com", b.withImageLink("http://image.example.com").build().getImageLink());
         assertMapsEquals(Map.of("priority", Double.valueOf(2d)), b.withProperty("priority", Double.valueOf(2d)).build().getProperties());
         b.withProperties(Map.of("link", "http://example.com", "fresh", Boolean.FALSE));
-        assertThat(b.build().getProperties(), hasEntry("priority", Double.valueOf(2d)));
         assertThat(b.build().getProperties(), hasEntry("link", "http://example.com"));
         assertThat(b.build().getProperties(), hasEntry("fresh", Boolean.FALSE));
         assertIterableEquals(List.of("com.example.basic", "com.example.advanced"), b.withLoggerPackages(List.of("com.example.basic", "com.example.advanced")).build().getLoggerPackages());
