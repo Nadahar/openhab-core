@@ -39,33 +39,32 @@ public class Addon {
     public static final String ADDON_SEPARATOR = "-";
 
     private final @NonNull String uid;
-
     private final @NonNull String id;
-    private final String label;
+    private final @Nullable String label;
     private final @Nullable Version version;
     private final @Nullable String maturity;
     private final @Nullable Version defaultVersion;
     private final @NonNull Set<@NonNull String> dependsOn;
     private final boolean compatible;
-    private final String contentType;
+    private final @Nullable String contentType;
     private final @Nullable String link;
     private final @Nullable String documentationLink;
     private final @Nullable String issuesLink;
-    private final String author;
+    private final @NonNull String author;
     private final boolean verifiedAuthor;
     private boolean installed;
     private final @NonNull String type;
     private final @Nullable String description;
     private final @Nullable String detailedDescription;
-    private final String configDescriptionURI;
-    private final String keywords;
-    private final @Nullable List<@NonNull String> countries;
+    private final @NonNull String configDescriptionURI;
+    private final @NonNull String keywords;
+    private final @NonNull List<@NonNull String> countries;
     private final @Nullable String license;
-    private final String connection;
+    private final @NonNull String connection;
     private final @Nullable String backgroundColor;
     private final @Nullable String imageLink;
-    private final Map<@NonNull String, @NonNull Object> properties;
-    private final List<@NonNull String> loggerPackages;
+    private final @NonNull Map<@NonNull String, @NonNull Object> properties;
+    private final @NonNull List<@NonNull String> loggerPackages;
     private final @NonNull SortedMap<@NonNull Version, @NonNull AddonVersion> versions;
     private final @Nullable Version currentVersion;
 
@@ -103,14 +102,15 @@ public class Addon {
      * @param currentVersion the currently used {{@code versions} entry (may be null)
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
-    protected Addon(String uid, String type, String id, String label, @Nullable Version version, @Nullable String maturity,
-            @Nullable Set<@NonNull String> dependsOn, boolean compatible, String contentType, @Nullable String link,
-            @Nullable String documentationLink, @Nullable String issuesLink, String author, boolean verifiedAuthor,
+    protected Addon(String uid, String type, String id, @Nullable String label, @Nullable Version version, @Nullable String maturity,
+            @Nullable Set<@NonNull String> dependsOn, boolean compatible, @Nullable String contentType, @Nullable String link,
+            @Nullable String documentationLink, @Nullable String issuesLink, @Nullable String author, boolean verifiedAuthor,
             boolean installed, @Nullable String description, @Nullable String detailedDescription,
-            String configDescriptionURI, String keywords, List<@NonNull String> countries, @Nullable String license,
-            String connection, @Nullable String backgroundColor, @Nullable String imageLink,
-            @Nullable Map<@NonNull String, @NonNull Object> properties, List<@NonNull String> loggerPackages,
-            @Nullable SortedMap<@NonNull Version, @NonNull AddonVersion> versions, @Nullable Version currentVersion) {
+            @Nullable String configDescriptionURI, @Nullable String keywords, @Nullable List<@NonNull String> countries,
+            @Nullable String license, @Nullable String connection, @Nullable String backgroundColor,
+            @Nullable String imageLink, @Nullable Map<@NonNull String, @NonNull Object> properties,
+            @Nullable List<@NonNull String> loggerPackages, @Nullable Map<@NonNull Version,
+            @NonNull AddonVersion> versions, @Nullable Version currentVersion) {
         if (uid == null || uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -133,22 +133,28 @@ public class Addon {
         this.contentType = contentType;
         this.description = description;
         this.detailedDescription = detailedDescription;
-        this.configDescriptionURI = configDescriptionURI;
-        this.keywords = keywords;
-        this.countries = countries;
+        this.configDescriptionURI = configDescriptionURI == null || configDescriptionURI.isBlank() ? "" : configDescriptionURI;
+        this.keywords = keywords == null || keywords.isBlank() ? "" : keywords;
+        this.countries = countries == null ? List.of() : List.copyOf(countries);
         this.license = license;
-        this.connection = connection;
+        this.connection = connection == null || connection.isBlank() ? "" : connection;
         this.backgroundColor = backgroundColor;
         this.link = link;
         this.documentationLink = documentationLink;
         this.issuesLink = issuesLink;
         this.imageLink = imageLink;
-        this.author = author;
+        this.author = author == null || author.isBlank() ? "" : author;
         this.verifiedAuthor = verifiedAuthor;
         this.installed = installed;
-        this.properties = properties == null ? Map.of() : properties;
-        this.loggerPackages = loggerPackages;
-        this.versions = versions == null ? Collections.emptySortedMap() : Collections.unmodifiableSortedMap(versions);
+        this.properties = properties == null ? Map.of() : Map.copyOf(properties);
+        this.loggerPackages = loggerPackages == null ? List.of() : List.copyOf(loggerPackages);
+        if (versions == null || versions.isEmpty()) {
+            this.versions = Collections.emptySortedMap();
+        } else {
+            SortedMap<@NonNull Version, @NonNull AddonVersion> locVersions = createVersionsMap();
+            locVersions.putAll(versions);
+            this.versions = Collections.unmodifiableSortedMap(locVersions);
+        }
         this.defaultVersion = resolveDefaultVersion();
         this.currentVersion = currentVersion;
     }
@@ -177,7 +183,7 @@ public class Addon {
     /**
      * The label of the add-on
      */
-    public String getLabel() {
+    public @Nullable String getLabel() {
         return label;
     }
 
@@ -205,7 +211,7 @@ public class Addon {
     /**
      * The author of the add-on
      */
-    public String getAuthor() {
+    public @NonNull String getAuthor() {
         return author;
     }
 
@@ -254,7 +260,7 @@ public class Addon {
     /**
      * The content type of the add-on
      */
-    public String getContentType() {
+    public @Nullable String getContentType() {
         return contentType;
     }
 
@@ -275,21 +281,21 @@ public class Addon {
     /**
      * The URI to the configuration description for this add-on
      */
-    public String getConfigDescriptionURI() {
+    public @NonNull String getConfigDescriptionURI() {
         return configDescriptionURI;
     }
 
     /**
      * The keywords for this add-on
      */
-    public String getKeywords() {
+    public @NonNull String getKeywords() {
         return keywords;
     }
 
     /**
      * A list of ISO 3166 codes relevant to this add-on
      */
-    public @Nullable List<@NonNull String> getCountries() {
+    public @NonNull List<@NonNull String> getCountries() {
         return countries;
     }
 
@@ -303,14 +309,14 @@ public class Addon {
     /**
      * A string describing the type of connection (local, cloud, cloudDiscovery) this add-on uses, if applicable.
      */
-    public String getConnection() {
+    public @NonNull String getConnection() {
         return connection;
     }
 
     /**
      * A set of additional properties relative to this add-on
      */
-    public Map<@NonNull String, @NonNull Object> getProperties() {
+    public @NonNull Map<@NonNull String, @NonNull Object> getProperties() {
         return properties;
     }
 
@@ -345,7 +351,7 @@ public class Addon {
     /**
      * The package names that are associated with this add-on
      */
-    public List<@NonNull String> getLoggerPackages() {
+    public @NonNull List<@NonNull String> getLoggerPackages() {
         return loggerPackages;
     }
 
@@ -389,10 +395,8 @@ public class Addon {
 
         String s;
         Builder builder = new Builder(this);
-        builder.withCurrentVersion(version).withCompatible(addonVersion.isCompatible());
-        if (addonVersion.getVersion() != null) {
-            builder.withVersion(addonVersion.getVersion());
-        }
+        builder.withCurrentVersion(version).withCompatible(addonVersion.isCompatible())
+                .withVersion(addonVersion.getVersion());
         if (!addonVersion.getCountries().isEmpty()) {
             List<@NonNull String> builderCountries = builder.getCountries();
             if (builderCountries == null) {
@@ -478,6 +482,17 @@ public class Addon {
         return versions.get(0).getVersion();
     }
 
+    protected SortedMap<@NonNull Version, @NonNull AddonVersion> createVersionsMap() {
+        return new TreeMap<>(new Comparator<Version>() {
+
+            @Override
+            public int compare(Version o1, Version o2) {
+                // Sort newest first
+                return o2.compareTo(o1);
+            }
+        });
+    }
+
     /**
      * Create a builder for an {@link Addon}
      *
@@ -493,36 +508,36 @@ public class Addon {
     }
 
     public static class Builder {
-        protected String uid;
-        protected String id;
-        protected String label;
-        protected Version version;
+        protected @NonNull String uid;
+        protected @Nullable String id;
+        protected @Nullable String label;
+        protected @Nullable Version version;
         protected @Nullable String maturity;
         protected @Nullable Set<@NonNull String> dependsOn;
         protected boolean compatible = true;
-        protected String contentType;
+        protected @Nullable String contentType;
         protected @Nullable String link;
         protected @Nullable String documentationLink;
         protected @Nullable String issuesLink;
-        protected String author = "";
+        protected @Nullable String author;
         protected boolean verifiedAuthor = false;
         protected boolean installed = false;
-        protected String type;
+        protected @Nullable String type;
         protected @Nullable String description;
         protected @Nullable String detailedDescription;
-        protected String configDescriptionURI = "";
-        protected String keywords = "";
-        protected List<@NonNull String> countries = List.of();
+        protected @Nullable String configDescriptionURI;
+        protected @Nullable String keywords;
+        protected @Nullable List<@NonNull String> countries = List.of();
         protected @Nullable String license;
-        protected String connection = "";
+        protected @Nullable String connection;
         protected @Nullable String backgroundColor;
         protected @Nullable String imageLink;
-        protected @NonNull Map<@NonNull String, @NonNull Object> properties = new HashMap<>();
-        protected List<@NonNull String> loggerPackages = List.of();
-        protected SortedMap<@NonNull Version, @NonNull AddonVersion> versions;
-        protected Version currentVersion;
+        protected @Nullable Map<@NonNull String, @NonNull Object> properties;
+        protected @Nullable List<@NonNull String> loggerPackages = List.of();
+        protected @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions;
+        protected @Nullable Version currentVersion;
 
-        protected Builder(String uid) {
+        protected Builder(@NonNull String uid) {
             this.uid = uid;
         }
 
@@ -553,9 +568,7 @@ public class Addon {
             this.imageLink = addon.imageLink;
             this.properties = addon.properties;
             this.loggerPackages = addon.loggerPackages;
-            SortedMap<@NonNull Version, @NonNull AddonVersion> locVersions = createVersionsMap();
-            locVersions.putAll(addon.versions);
-            this.versions = locVersions;
+            this.versions = new HashMap<>(addon.versions);
             this.currentVersion = addon.currentVersion;
         }
 
@@ -684,12 +697,17 @@ public class Addon {
         }
 
         public Builder withProperty(@NonNull String key, @NonNull Object value) {
-            this.properties.put(key, value);
+            Map<@NonNull String, @NonNull Object> props = this.properties;
+            if (props == null) {
+                props = new HashMap<>();
+            }
+            props.put(key, value);
+            this.properties = props;
             return this;
         }
 
-        public Builder withProperties(Map<@NonNull String, @NonNull Object> properties) {
-            this.properties.putAll(properties);
+        public Builder withProperties(@Nullable Map<@NonNull String, @NonNull Object> properties) {
+            this.properties = properties;
             return this;
         }
 
@@ -703,17 +721,22 @@ public class Addon {
         }
 
         @Nullable
-        public SortedMap<@NonNull Version, @NonNull AddonVersion> getVersions() {
+        public Map<@NonNull Version, @NonNull AddonVersion> getVersions() {
             return versions;
         }
 
         public Builder withAddonVersion(@NonNull AddonVersion addonVersion) {
-            SortedMap<@NonNull Version, @NonNull AddonVersion> locVersions = versions;
+            Map<@NonNull Version, @NonNull AddonVersion> locVersions = versions;
             if (locVersions == null) {
-                locVersions = createVersionsMap();
+                locVersions = new HashMap<>();
             }
             locVersions.put(addonVersion.getVersion(), addonVersion);
             versions = locVersions;
+            return this;
+        }
+
+        public Builder withAddonVersions(@Nullable Map<@NonNull Version, @NonNull AddonVersion> versions) {
+            this.versions = versions;
             return this;
         }
 
@@ -722,22 +745,11 @@ public class Addon {
             return this;
         }
 
-        protected SortedMap<@NonNull Version, @NonNull AddonVersion> createVersionsMap() {
-            return new TreeMap<>(new Comparator<Version>() {
-
-                @Override
-                public int compare(Version o1, Version o2) {
-                    // Sort newest first
-                    return o2.compareTo(o1);
-                }
-            });
-        }
-
         public Addon build() {
             return new Addon(uid, type, id, label, version, maturity, dependsOn, compatible, contentType, link,
                     documentationLink, issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
                     configDescriptionURI, keywords, countries, license, connection, backgroundColor, imageLink,
-                    properties.isEmpty() ? null : properties, loggerPackages, versions, currentVersion);
+                    properties, loggerPackages, versions, currentVersion);
         }
     }
 }
