@@ -254,6 +254,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                 return convertTopicToAddon(parsed);
             }
         } catch (Exception e) {
+            logger.error("Failed to retrieve community marketplace add-on: {}", e.getMessage());
+            logger.trace("", e);
             return null;
         }
     }
@@ -428,9 +430,15 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         String maturity = tags.stream().filter(CODE_MATURITY_LEVELS::contains).findAny().orElse(null);
 
         Map<String, Object> properties = new HashMap<>(10);
-        properties.put("created_at", createdDate);
-        properties.put("updated_at", updatedDate);
-        properties.put("last_posted", lastPostedDate);
+        if (createdDate != null) {
+            properties.put("created_at", createdDate);
+        }
+        if (updatedDate != null) {
+            properties.put("updated_at", updatedDate);
+        }
+        if (lastPostedDate != null) {
+            properties.put("last_posted", lastPostedDate);
+        }
         properties.put("like_count", likeCount);
         properties.put("views", views);
         properties.put("posts_count", postsCount);
