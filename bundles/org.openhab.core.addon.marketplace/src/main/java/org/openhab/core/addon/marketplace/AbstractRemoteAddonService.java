@@ -20,13 +20,14 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Dictionary;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -79,8 +80,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
         .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
-    // Guarded by "this"
-    protected final Set<MarketplaceAddonHandler> addonHandlers = new HashSet<>();
+    protected final CopyOnWriteArraySet<MarketplaceAddonHandler> addonHandlers = new CopyOnWriteArraySet<>();
     // Guarded by "this"
     protected final Storage<String> installedAddonStorage;
     protected final EventPublisher eventPublisher;
@@ -95,6 +95,8 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     private final Logger logger = LoggerFactory.getLogger(AbstractRemoteAddonService.class);
     private final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool(THREAD_POOL_NAME_COMMON);
+    // Guarded by "scheduler"
+    private @Nullable ScheduledFuture<?> scheduledRefresh;
 
     protected AbstractRemoteAddonService(EventPublisher eventPublisher, ConfigurationAdmin configurationAdmin,
             StorageService storageService, AddonInfoRegistry addonInfoRegistry, String servicePid) {
@@ -122,11 +124,36 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         return builder.build();
     }
 
+    /**
+     * Schedules {@link #refreshSource()} with a delay to allow addon handlers to register and become ready
+     * before the refresh is initiated. This is intended to be used when called from the constructor,
+     * where the handlers generally isn't yet up and running, which will then make the refresh "fail"
+     * in that all installed addons will be considered uninstalled, because no handler can confirm that
+     * they are installed.
+     */
+    protected void scheduleRefreshSource() {
+        synchronized (scheduler) {
+            if (scheduledRefresh != null) {
+                scheduledRefresh.cancel(false);
+            }
+            scheduledRefresh = scheduler.schedule(() -> {
+                synchronized (scheduler) {
+                    scheduledRefresh = null;
+                }
+                if (addonHandlers.isEmpty() || !addonHandlers.stream().allMatch(MarketplaceAddonHandler::isReady)) {
+                    scheduleRefreshSource();
+                    return;
+                }
+                refreshSource();
+            }, 500L, TimeUnit.MILLISECONDS);
+        }
+    }
+
     @Override
     public synchronized void refreshSource() {
-        if (!addonHandlers.stream().allMatch(MarketplaceAddonHandler::isReady)) {
+        if (addonHandlers.isEmpty() || !addonHandlers.stream().allMatch(MarketplaceAddonHandler::isReady)) {
             logger.debug("Add-on service '{}' tried to refresh source before add-on handlers ready. Exiting.",
-                    getClass());
+                    getClass().getSimpleName());
             return;
         }
 
@@ -187,10 +214,11 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         }
     }
 
-    // Guarded by "this"
     private void setInstalled(Addon addon) {
-        addon.setInstalled(addonHandlers.stream().anyMatch(h -> h.isInstalled(addon.getUid())),
-                addon.getInstalledVersion());
+        MarketplaceAddonHandler handler = addonHandlers.stream().filter(h -> h.supports(addon.getType(), addon.getContentType())).findFirst().orElse(null);
+        if (handler != null) {
+            addon.setInstalled(handler.isInstalled(addon.getUid()), addon.getInstalledVersion());
+        }
     }
 
     /**
