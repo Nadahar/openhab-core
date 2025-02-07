@@ -189,7 +189,8 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     // Guarded by "this"
     private void setInstalled(Addon addon) {
-        addon.setInstalled(addonHandlers.stream().anyMatch(h -> h.isInstalled(addon.getUid())));
+        addon.setInstalled(addonHandlers.stream().anyMatch(h -> h.isInstalled(addon.getUid())),
+                addon.getInstalledVersion());
     }
 
     /**
@@ -254,7 +255,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
             if (v == null) {
                 v = addon.getDefaultVersion();
             }
-            if (v != null && !v.equals(addon.getCurrentVersion())) {
+            if (v != null && !v.equals(addon.getVersion())) {
                 try {
                     addon = addon.mergeVersion(v);
                 } catch (IllegalArgumentException e) {
@@ -273,7 +274,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
                 if (!handler.isInstalled(addon.getUid())) {
                     try {
                         handler.install(addon);
-                        addon.setInstalled(true);
+                        addon.setInstalled(true, v);
                         installedAddonStorage.put(id, gson.toJson(addon));
                         cachedRemoteAddons.invalidateValue();
                         refreshSource();

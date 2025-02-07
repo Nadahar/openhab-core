@@ -37,36 +37,50 @@ import org.eclipse.jdt.annotation.Nullable;
 public class Addon {
     public static final Set<String> CODE_MATURITY_LEVELS = Set.of("alpha", "beta", "mature", "stable");
     public static final String ADDON_SEPARATOR = "-";
+    public static final Set<String> MARKETPLACE_RESOURCE_PROPERTIES = Set.of("json_content", "yaml_content",
+            "jar_download_url", "kar_download_url", "json_download_url", "yaml_download_url");
 
     private final @NonNull String uid;
     private final @NonNull String id;
     private final @Nullable String label;
     private final @Nullable Version version;
+    private final @Nullable Version baseVersion;
     private final @Nullable String maturity;
+    private final @Nullable @Exclude String baseMaturity;
     private final @Nullable Version defaultVersion;
     private final @NonNull Set<@NonNull String> dependsOn;
+    private final @NonNull @Exclude Set<@NonNull String> baseDependsOn;
     private final boolean compatible;
+    private final @Exclude boolean baseCompatible;
     private final @Nullable String contentType;
     private final @Nullable String link;
     private final @Nullable String documentationLink;
+    private final @Nullable @Exclude String baseDocumentationLink;
     private final @Nullable String issuesLink;
+    private final @Nullable @Exclude String baseIssuesLink;
     private final @NonNull String author;
     private final boolean verifiedAuthor;
     private boolean installed;
+    private @Nullable Version installedVersion;
     private final @NonNull String type;
     private final @Nullable String description;
+    private final @Nullable @Exclude String baseDescription;
     private final @Nullable String detailedDescription;
+    private final @Nullable @Exclude String baseDetailedDescription;
     private final @NonNull String configDescriptionURI;
     private final @NonNull String keywords;
+    private final @NonNull @Exclude String baseKeywords;
     private final @NonNull List<@NonNull String> countries;
+    private final @NonNull @Exclude List<@NonNull String> baseCountries;
     private final @Nullable String license;
     private final @NonNull String connection;
     private final @Nullable String backgroundColor;
     private final @Nullable String imageLink;
     private final @NonNull Map<@NonNull String, @NonNull Object> properties;
+    private final @NonNull @Exclude Map<@NonNull String, @NonNull Object> baseProperties;
     private final @NonNull List<@NonNull String> loggerPackages;
+    private final @NonNull @Exclude List<@NonNull String> baseLoggerPackages;
     private final @NonNull SortedMap<@NonNull Version, @NonNull AddonVersion> versions;
-    private final @Nullable Version currentVersion;
 
     /**
      * Creates a new Addon instance
@@ -99,18 +113,25 @@ public class Addon {
      * @param properties a {@link Map} containing addition information
      * @param loggerPackages a {@link List} containing the package names belonging to this add-on
      * @param versions a {@link SortedMap} containing the {@link AddonVersion}s if applicable
-     * @param currentVersion the currently used {{@code versions} entry (may be null)
+     * @param installedVersion the currently installed {@link Version}, if any (may be null)
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
-    protected Addon(String uid, String type, String id, @Nullable String label, @Nullable Version version, @Nullable String maturity,
-            @Nullable Set<@NonNull String> dependsOn, boolean compatible, @Nullable String contentType, @Nullable String link,
-            @Nullable String documentationLink, @Nullable String issuesLink, @Nullable String author, boolean verifiedAuthor,
-            boolean installed, @Nullable String description, @Nullable String detailedDescription,
-            @Nullable String configDescriptionURI, @Nullable String keywords, @Nullable List<@NonNull String> countries,
-            @Nullable String license, @Nullable String connection, @Nullable String backgroundColor,
-            @Nullable String imageLink, @Nullable Map<@NonNull String, @NonNull Object> properties,
-            @Nullable List<@NonNull String> loggerPackages, @Nullable Map<@NonNull Version,
-            @NonNull AddonVersion> versions, @Nullable Version currentVersion) {
+    protected Addon(String uid, String type, String id, @Nullable String label, @Nullable Version version, @Nullable Version baseVersion,
+            @Nullable String maturity, @Nullable String baseMaturity,
+            @Nullable Set<@NonNull String> dependsOn, @Nullable Set<@NonNull String> baseDependsOn,
+            boolean compatible, boolean baseCompatible,
+            @Nullable String contentType, @Nullable String link,
+            @Nullable String documentationLink, @Nullable String baseDocumentationLink,
+            @Nullable String issuesLink, @Nullable String baseIssuesLink, @Nullable String author, boolean verifiedAuthor,
+            boolean installed, @Nullable Version installedVersion, @Nullable String description, @Nullable String baseDescription,
+            @Nullable String detailedDescription, @Nullable String baseDetailedDescription, @Nullable String configDescriptionURI,
+            @Nullable String keywords, @Nullable String baseKeywords,
+            @Nullable List<@NonNull String> countries, @Nullable List<@NonNull String> baseCountries,
+            @Nullable String license, @Nullable String connection,
+            @Nullable String backgroundColor, @Nullable String imageLink,
+            @Nullable Map<@NonNull String, @NonNull Object> properties, @Nullable Map<@NonNull String, @NonNull Object> baseProperties,
+            @Nullable List<@NonNull String> loggerPackages, @Nullable List<@NonNull String> baseLoggerPackages,
+            @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions) {
         if (uid == null || uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -127,27 +148,40 @@ public class Addon {
 
         this.label = label;
         this.version = version;
+        this.baseVersion = baseVersion;
         this.maturity = maturity;
+        this.baseMaturity = baseMaturity;
         this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
+        this.baseDependsOn = baseDependsOn == null ? Set.of() : Set.copyOf(baseDependsOn);
         this.compatible = compatible;
+        this.baseCompatible = baseCompatible;
         this.contentType = contentType;
         this.description = description;
+        this.baseDescription = baseDescription;
         this.detailedDescription = detailedDescription;
+        this.baseDetailedDescription = baseDetailedDescription;
         this.configDescriptionURI = configDescriptionURI == null || configDescriptionURI.isBlank() ? "" : configDescriptionURI;
         this.keywords = keywords == null || keywords.isBlank() ? "" : keywords;
+        this.baseKeywords = baseKeywords == null || baseKeywords.isBlank() ? "" : baseKeywords;
         this.countries = countries == null ? List.of() : List.copyOf(countries);
+        this.baseCountries = baseCountries == null ? List.of() : List.copyOf(baseCountries);
         this.license = license;
         this.connection = connection == null || connection.isBlank() ? "" : connection;
         this.backgroundColor = backgroundColor;
         this.link = link;
         this.documentationLink = documentationLink;
+        this.baseDocumentationLink = baseDocumentationLink;
         this.issuesLink = issuesLink;
+        this.baseIssuesLink = baseIssuesLink;
         this.imageLink = imageLink;
         this.author = author == null || author.isBlank() ? "" : author;
         this.verifiedAuthor = verifiedAuthor;
         this.installed = installed;
+        this.installedVersion = installed ? installedVersion : null;
         this.properties = properties == null ? Map.of() : Map.copyOf(properties);
+        this.baseProperties = baseProperties == null ? Map.of() : Map.copyOf(baseProperties);
         this.loggerPackages = loggerPackages == null ? List.of() : List.copyOf(loggerPackages);
+        this.baseLoggerPackages = baseLoggerPackages == null ? List.of() : List.copyOf(baseLoggerPackages);
         if (versions == null || versions.isEmpty()) {
             this.versions = Collections.emptySortedMap();
         } else {
@@ -156,7 +190,6 @@ public class Addon {
             this.versions = Collections.unmodifiableSortedMap(locVersions);
         }
         this.defaultVersion = resolveDefaultVersion();
-        this.currentVersion = currentVersion;
     }
 
     /**
@@ -227,6 +260,13 @@ public class Addon {
      */
     public @Nullable Version getVersion() {
         return version;
+    }
+
+    /**
+     * The "base" version of the add-on if the add-on is versioned
+     */
+    public @Nullable Version getBaseVersion() {
+        return baseVersion;
     }
 
     /**
@@ -323,15 +363,31 @@ public class Addon {
     /**
      * true, if the add-on is installed, false otherwise
      */
-    public boolean isInstalled() {
+    public synchronized boolean isInstalled() {
         return installed;
     }
 
     /**
      * Sets the installed state
      */
-    public void setInstalled(boolean installed) {
+    public synchronized void setInstalled(boolean installed) {
         this.installed = installed;
+        this.installedVersion = null;
+    }
+
+    /**
+     * Sets the installed state and version
+     */
+    public synchronized void setInstalled(boolean installed, @Nullable Version version) {
+        this.installed = installed;
+        this.installedVersion = installed ? version : null;
+    }
+
+    /**
+     * the currently used {{@code versions} entry (may be null)
+     */
+    public synchronized @Nullable Version getInstalledVersion() {
+        return installedVersion;
     }
 
     /**
@@ -367,13 +423,6 @@ public class Addon {
     }
 
     /**
-     * the currently used {{@code versions} entry (may be null)
-     */
-    public @Nullable Version getCurrentVersion() {
-        return currentVersion;
-    }
-
-    /**
      * Merges the information from a specific {@link AddonVersion} with the "base information"
      * and returns a new combined {@link Addon}.
      * <p>
@@ -388,59 +437,86 @@ public class Addon {
         if (version.equals(this.version)) {
             return this;
         }
-        AddonVersion addonVersion = versions.get(version); //TODO: (Nad) Throw if currentversion is set?
+        AddonVersion addonVersion = versions.get(version);
         if (addonVersion == null) {
             throw new IllegalArgumentException("Non-existing version " + version);
         }
 
         String s;
-        Builder builder = new Builder(this);
-        builder.withCurrentVersion(version).withCompatible(addonVersion.isCompatible())
-                .withVersion(addonVersion.getVersion());
+        Builder builder = new Builder(this, false);
+        builder.withVersion(version).withCompatible(addonVersion.isCompatible());
         if (!addonVersion.getCountries().isEmpty()) {
-            List<@NonNull String> builderCountries = builder.getCountries();
-            if (builderCountries == null) {
-                builder.withCountries(addonVersion.getCountries());
-            } else {
-                List<@NonNull String> c = new ArrayList<>(builderCountries);
-                c.addAll(addonVersion.getCountries());
-                builder.withCountries(c);
+            List<@NonNull String> c = new ArrayList<>(baseCountries);
+            for (String country : addonVersion.getCountries()) {
+                if (!c.contains(country)) {
+                    c.add(country);
+                }
             }
+            builder.withCountries(c);
+        } else {
+            builder.withCountries(baseCountries);
         }
-        // TODO: (Nad) Handle description
-        if ((s = addonVersion.getDocumentationLink()) != null) {
-            builder.withDocumentationLink(s);
+
+        if ((s = addonVersion.getDescription()) != null && !s.isBlank()) {
+            s = s.trim();
+            String s2;
+            if ((s2 = baseDescription) != null && !s2.isBlank()) {
+                builder.withDescription(s + "\n\n" + s2);
+            } else {
+                // Ideally, the addonVersion description should be used as the description here. But, because the
+                // logic elsewhere is "use description if exists - otherwise use detailedDescription", care must be
+                // taken not to "override" detailedDescription.
+                builder.withDescription((s2 = baseDetailedDescription) == null || s2.isBlank() ? s : baseDescription);
+            }
+            if ((s2 = baseDetailedDescription) != null && !s2.isBlank()) {
+                int idx = DiscourseCookedUtil.findParagraphInsertionPoint(s2);
+                if (idx >= 0) {
+                    builder.withDetailedDescription(s2.substring(0, idx) + "<p>" + s + "</p>" + s2.substring(idx));
+                } else {
+                    // Didn't find the insertion point - just slap it at the very top
+                    builder.withDetailedDescription("<p>" + s + "</p>" + s2);
+                }
+            } else {
+                builder.withDetailedDescription("<p>" + s + "</p>");
+            }
+        } else {
+            builder.withDescription(baseDescription);
+            builder.withDetailedDescription(baseDetailedDescription);
         }
-        if ((s = addonVersion.getIssuesLink()) != null) {
-            builder.withIssuesLink(s);
-        }
-        if ((s = addonVersion.getKeywords()) != null) { // TODO: (Nad) Combine?
-            builder.withKeywords(s);
-        }
+
+        builder.withDocumentationLink((s = addonVersion.getDocumentationLink()) != null ? s : baseDocumentationLink);
+        builder.withIssuesLink((s = addonVersion.getIssuesLink()) != null ? s : baseIssuesLink);
+        builder.withKeywords((s = addonVersion.getKeywords()) != null ? s : baseKeywords);
+        builder.withMaturity((s = addonVersion.getMaturity()) != null && !s.isBlank() ? s : baseMaturity);
+
         if (!addonVersion.getLoggerPackages().isEmpty()) {
-            List<@NonNull String> builderLoggerPackages = builder.getLoggerPackages();
-            if (builderLoggerPackages == null) {
-                builder.withLoggerPackages(addonVersion.getLoggerPackages());
-            } else {
-                List<@NonNull String> l = new ArrayList<>(builderLoggerPackages);
-                l.addAll(addonVersion.getLoggerPackages());
-                builder.withLoggerPackages(l);
+            List<@NonNull String> l = new ArrayList<>(baseLoggerPackages);
+            for (String lPackage : addonVersion.getLoggerPackages()) {
+                if (!l.contains(lPackage)) {
+                    l.add(lPackage);
+                }
             }
+            builder.withLoggerPackages(l);
+        } else {
+            builder.withLoggerPackages(baseLoggerPackages);
         }
-        if ((s = addonVersion.getMaturity()) != null && !s.isBlank()) {
-            builder.withMaturity(s); // TODO: (Nad) Validate maturity? Elsewhere too?
-        }
+
         if (!addonVersion.getDependsOn().isEmpty()) {
             Set<@NonNull String> deps;
-            if ((deps = builder.getDependsOn()) != null) {
+            if (!(deps = baseDependsOn).isEmpty()) {
                 builder.withDependsOn(Stream.concat(deps.stream(), addonVersion.getDependsOn().stream())
-                        .collect(Collectors.toSet()));
+                        .distinct().collect(Collectors.toSet()));
             } else {
                 builder.withDependsOn(addonVersion.getDependsOn());
             }
+        } else {
+            builder.withDependsOn(baseDependsOn);
         }
 
-        Map<@NonNull String, @NonNull Object> newProperties = new HashMap<>(properties);
+        // Remove "resource" properties, they shouldn't be part of the merge
+        Map<@NonNull String, @NonNull Object> newProperties = baseProperties.entrySet().stream()
+                .filter(e -> !MARKETPLACE_RESOURCE_PROPERTIES.contains(e.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         newProperties.putAll(addonVersion.getProperties());
         builder.withProperties(newProperties);
 
@@ -504,72 +580,100 @@ public class Addon {
     }
 
     public static Builder create(Addon addon) {
-        return new Builder(addon);
+        return new Builder(addon, true);
     }
 
     public static class Builder {
+        protected boolean setBase = true;
         protected @NonNull String uid;
         protected @Nullable String id;
         protected @Nullable String label;
         protected @Nullable Version version;
+        protected @Nullable Version baseVersion;
         protected @Nullable String maturity;
+        protected @Nullable String baseMaturity;
         protected @Nullable Set<@NonNull String> dependsOn;
+        protected @Nullable Set<@NonNull String> baseDependsOn;
         protected boolean compatible = true;
+        protected boolean baseCompatible = true;
         protected @Nullable String contentType;
         protected @Nullable String link;
         protected @Nullable String documentationLink;
+        protected @Nullable String baseDocumentationLink;
         protected @Nullable String issuesLink;
+        protected @Nullable String baseIssuesLink;
         protected @Nullable String author;
         protected boolean verifiedAuthor = false;
         protected boolean installed = false;
+        protected @Nullable Version installedVersion;
         protected @Nullable String type;
         protected @Nullable String description;
+        protected @Nullable String baseDescription;
         protected @Nullable String detailedDescription;
+        protected @Nullable String baseDetailedDescription;
         protected @Nullable String configDescriptionURI;
         protected @Nullable String keywords;
-        protected @Nullable List<@NonNull String> countries = List.of();
+        protected @Nullable String baseKeywords;
+        protected @Nullable List<@NonNull String> countries;
+        protected @Nullable List<@NonNull String> baseCountries;
         protected @Nullable String license;
         protected @Nullable String connection;
         protected @Nullable String backgroundColor;
         protected @Nullable String imageLink;
         protected @Nullable Map<@NonNull String, @NonNull Object> properties;
-        protected @Nullable List<@NonNull String> loggerPackages = List.of();
+        protected @Nullable Map<@NonNull String, @NonNull Object> baseProperties;
+        protected @Nullable List<@NonNull String> loggerPackages;
+        protected @Nullable List<@NonNull String> baseLoggerPackages;
         protected @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions;
-        protected @Nullable Version currentVersion;
 
         protected Builder(@NonNull String uid) {
             this.uid = uid;
         }
 
-        protected Builder(Addon addon) {
+        protected Builder(Addon addon, boolean setBase) {
+            this.setBase = setBase;
             this.uid = addon.uid;
             this.id = addon.id;
             this.label = addon.label;
             this.version = addon.version;
+            this.baseVersion = addon.baseVersion;
             this.maturity = addon.maturity;
+            this.baseMaturity = addon.baseMaturity;
             this.dependsOn = addon.dependsOn;
+            this.baseDependsOn = addon.baseDependsOn;
             this.compatible = addon.compatible;
+            this.baseCompatible = addon.baseCompatible;
             this.contentType = addon.contentType;
             this.link = addon.link;
             this.documentationLink = addon.documentationLink;
+            this.baseDocumentationLink = addon.baseDocumentationLink;
             this.issuesLink = addon.issuesLink;
+            this.baseIssuesLink = addon.baseIssuesLink;
             this.author = addon.author;
             this.verifiedAuthor = addon.verifiedAuthor;
-            this.installed = addon.installed;
+            synchronized (addon) {
+                this.installed = addon.installed;
+                this.installedVersion = addon.installedVersion;
+            }
             this.type = addon.type;
             this.description = addon.description;
+            this.baseDescription = addon.baseDescription;
             this.detailedDescription = addon.detailedDescription;
+            this.baseDetailedDescription = addon.baseDetailedDescription;
             this.configDescriptionURI = addon.configDescriptionURI;
             this.keywords = addon.keywords;
+            this.baseKeywords = addon.baseKeywords;
             this.countries = addon.countries;
+            this.baseCountries = addon.baseCountries;
             this.license = addon.license;
             this.connection = addon.connection;
             this.backgroundColor = addon.backgroundColor;
             this.imageLink = addon.imageLink;
             this.properties = addon.properties;
+            this.baseProperties = addon.baseProperties;
             this.loggerPackages = addon.loggerPackages;
+            this.baseLoggerPackages = addon.baseLoggerPackages;
             this.versions = new HashMap<>(addon.versions);
-            this.currentVersion = addon.currentVersion;
         }
 
         public Builder withType(String type) {
@@ -589,11 +693,17 @@ public class Addon {
 
         public Builder withVersion(@Nullable Version version) {
             this.version = version;
+            if (this.setBase) {
+                this.baseVersion = version;
+            }
             return this;
         }
 
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
+            if (this.setBase) {
+                this.baseMaturity = maturity;
+            }
             return this;
         }
 
@@ -603,11 +713,17 @@ public class Addon {
 
         public Builder withDependsOn(@Nullable Set<@NonNull String> dependsOn) {
             this.dependsOn = dependsOn;
+            if (this.setBase) {
+                this.baseDependsOn = dependsOn;
+            }
             return this;
         }
 
         public Builder withCompatible(boolean compatible) {
             this.compatible = compatible;
+            if (this.setBase) {
+                this.baseCompatible = compatible;
+            }
             return this;
         }
 
@@ -623,11 +739,17 @@ public class Addon {
 
         public Builder withDocumentationLink(String documentationLink) {
             this.documentationLink = documentationLink;
+            if (this.setBase) {
+                this.baseDocumentationLink = documentationLink;
+            }
             return this;
         }
 
         public Builder withIssuesLink(String issuesLink) {
             this.issuesLink = issuesLink;
+            if (this.setBase) {
+                this.baseIssuesLink = issuesLink;
+            }
             return this;
         }
 
@@ -647,13 +769,25 @@ public class Addon {
             return this;
         }
 
+        public Builder withInstalled(boolean installed, @Nullable Version version) {
+            this.installed = installed;
+            this.installedVersion = installed ? version : null;
+            return this;
+        }
+
         public Builder withDescription(String description) {
             this.description = description;
+            if (this.setBase) {
+                this.baseDescription = description;
+            }
             return this;
         }
 
         public Builder withDetailedDescription(String detailedDescription) {
             this.detailedDescription = detailedDescription;
+            if (this.setBase) {
+                this.baseDetailedDescription = detailedDescription;
+            }
             return this;
         }
 
@@ -664,6 +798,9 @@ public class Addon {
 
         public Builder withKeywords(String keywords) {
             this.keywords = keywords;
+            if (this.setBase) {
+                this.baseKeywords = keywords;
+            }
             return this;
         }
 
@@ -673,6 +810,9 @@ public class Addon {
 
         public Builder withCountries(List<@NonNull String> countries) {
             this.countries = countries;
+            if (this.setBase) {
+                this.baseCountries = countries;
+            }
             return this;
         }
 
@@ -703,11 +843,17 @@ public class Addon {
             }
             props.put(key, value);
             this.properties = props;
+            if (this.setBase) {
+                this.baseProperties = props;
+            }
             return this;
         }
 
         public Builder withProperties(@Nullable Map<@NonNull String, @NonNull Object> properties) {
             this.properties = properties;
+            if (this.setBase) {
+                this.baseProperties = properties;
+            }
             return this;
         }
 
@@ -717,6 +863,9 @@ public class Addon {
 
         public Builder withLoggerPackages(List<@NonNull String> loggerPackages) {
             this.loggerPackages = loggerPackages;
+            if (this.setBase) {
+                this.baseLoggerPackages = loggerPackages;
+            }
             return this;
         }
 
@@ -740,16 +889,14 @@ public class Addon {
             return this;
         }
 
-        public Builder withCurrentVersion(@Nullable Version currentVersion) {
-            this.currentVersion = currentVersion;
-            return this;
-        }
-
         public Addon build() {
-            return new Addon(uid, type, id, label, version, maturity, dependsOn, compatible, contentType, link,
-                    documentationLink, issuesLink, author, verifiedAuthor, installed, description, detailedDescription,
-                    configDescriptionURI, keywords, countries, license, connection, backgroundColor, imageLink,
-                    properties, loggerPackages, versions, currentVersion);
+            return new Addon(uid, type, id, label, version, baseVersion, maturity, baseMaturity,
+                    dependsOn, baseDependsOn, compatible, baseCompatible, contentType, link,
+                    documentationLink, baseDocumentationLink, issuesLink, baseIssuesLink, author, verifiedAuthor,
+                    installed, installedVersion, description, baseDescription,
+                    detailedDescription, baseDetailedDescription, configDescriptionURI, keywords, baseKeywords,
+                    countries, baseCountries, license, connection,
+                    backgroundColor, imageLink, properties, baseProperties, loggerPackages, baseLoggerPackages, versions);
         }
     }
 }
