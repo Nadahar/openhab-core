@@ -153,18 +153,18 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                     Boolean.class, false);
             this.enabled = ConfigParser.valueAsOrElse(config.get(CONFIG_ENABLED_KEY), Boolean.class, true);
             cachedRemoteAddons.invalidateValue();
-            refreshSource();
+            scheduleRefreshSource();
         }
     }
 
     @Override
     @Reference(cardinality = ReferenceCardinality.AT_LEAST_ONE, policy = ReferencePolicy.DYNAMIC)
-    protected synchronized void addAddonHandler(MarketplaceAddonHandler handler) {
+    protected void addAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.add(handler);
     }
 
     @Override
-    protected synchronized void removeAddonHandler(MarketplaceAddonHandler handler) {
+    protected void removeAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.remove(handler);
     }
 
@@ -375,11 +375,8 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                     "tags", tags.toArray(String[]::new));
 
             // try to use a handler to determine if the add-on is installed
-            boolean installed;
-            synchronized (this) {
-                installed = addonHandlers.stream()
-                        .anyMatch(handler -> handler.supports(type, contentType) && handler.isInstalled(uid));
-            }
+            boolean installed = addonHandlers.stream().anyMatch(handler -> handler.supports(type, contentType)
+                    && handler.isInstalled(uid));
 
             return Addon.create(uid).withType(type).withId(id).withContentType(contentType)
                     .withImageLink(topic.imageUrl).withAuthor(author).withProperties(properties).withLabel(title)
@@ -415,10 +412,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         String type = (addonType != null) ? addonType.getId() : "";
         String contentType = getContentType(topic.categoryId, tags);
         Set<String> validResourceTypes = getValidResourceTypes(contentType);
-        List<MarketplaceAddonHandler> relevantHandlers;
-        synchronized (this) {
-            relevantHandlers = addonHandlers.stream().filter(handler -> handler.supports(type, contentType)).toList();
-        }
+        List<MarketplaceAddonHandler> relevantHandlers = addonHandlers.stream().filter(handler -> handler.supports(type, contentType)).toList();
 
         int likeCount = topic.likeCount;
         int views = topic.views;
