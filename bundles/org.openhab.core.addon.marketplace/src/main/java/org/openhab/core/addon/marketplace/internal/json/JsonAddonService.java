@@ -98,7 +98,7 @@ public class JsonAddonService extends AbstractRemoteAddonService {
             addonServiceUrls = Arrays.asList(urls.split("\\|")).stream().filter(this::isValidUrl).toList();
             showUnstable = ConfigParser.valueAsOrElse(config.get(CONFIG_SHOW_UNSTABLE), Boolean.class, false);
             cachedRemoteAddons.invalidateValue();
-            refreshSource();
+            scheduleRefreshSource();
         }
     }
 
@@ -117,12 +117,12 @@ public class JsonAddonService extends AbstractRemoteAddonService {
 
     @Override
     @Reference(cardinality = ReferenceCardinality.AT_LEAST_ONE, policy = ReferencePolicy.DYNAMIC)
-    protected synchronized void addAddonHandler(MarketplaceAddonHandler handler) {
+    protected void addAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.add(handler);
     }
 
     @Override
-    protected synchronized void removeAddonHandler(MarketplaceAddonHandler handler) {
+    protected void removeAddonHandler(MarketplaceAddonHandler handler) {
         this.addonHandlers.remove(handler);
     }
 
@@ -203,11 +203,8 @@ public class JsonAddonService extends AbstractRemoteAddonService {
 
     private Addon fromAddonEntry(AddonEntryDTO addonEntry) {
         String uid = ADDON_ID_PREFIX + addonEntry.uid;
-        boolean installed;
-        synchronized (this) {
-            installed = addonHandlers.stream().anyMatch(
-                    handler -> handler.supports(addonEntry.type, addonEntry.contentType) && handler.isInstalled(uid));
-        }
+        boolean installed = addonHandlers.stream().anyMatch(handler -> handler.supports(addonEntry.type,
+                addonEntry.contentType) && handler.isInstalled(uid));
 
         Map<String, Object> properties = new HashMap<>();
         if (addonEntry.url.endsWith(".jar")) {
