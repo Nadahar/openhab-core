@@ -253,19 +253,20 @@ public class AddonResource implements RESTResource {
             responseObject = addonService.getAddon(addonId, locale);
         }
         if (responseObject != null) {
-            Version v;
+            Version v = null;
             if (version != null && !version.isBlank()) {
                 try {
                     v = Version.valueOf(version);
                 } catch (IllegalArgumentException e) {
                     return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
                 }
-            } else {
-                v = null;
             }
             if (responseObject.isVersioned()) {
-                if (v == null && responseObject.getCurrentVersion() == null) {
-                    v = responseObject.getDefaultVersion();
+                if (v == null) {
+                    v = responseObject.getInstalledVersion();
+                    if (v == null) {
+                        v = responseObject.getDefaultVersion();
+                    }
                 }
                 if (v != null) { //TODO: (Nad) Make "merge" fail if current is set?
                     try {
@@ -314,7 +315,7 @@ public class AddonResource implements RESTResource {
             if (v == null) {
                 v = addon.getDefaultVersion();
             }
-            if (v != null && !v.equals(addon.getCurrentVersion())) {
+            if (v != null && !v.equals(addon.getVersion())) {
                 try {
                     addon = addon.mergeVersion(v);
                 } catch (IllegalArgumentException e) {

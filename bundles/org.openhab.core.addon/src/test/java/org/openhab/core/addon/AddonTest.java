@@ -50,36 +50,36 @@ public class AddonTest {
 
     @Test
     public void testBasics() {
-        assertThrows(IllegalArgumentException.class, () -> new Addon(null, null, null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Addon(" ", null, null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Addon("test", null, null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "\t", null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "binding", null, null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
-        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "binding", "", null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon(null, null, null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon(" ", null, null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon("test", null, null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "\t", null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "binding", null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new Addon("test", "binding", "", null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
 
-        Addon addon = new Addon("testuid", "binding", "testid", null, null, null, null, false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        Addon addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         assertTrue(addon.getDependsOn().isEmpty());
         assertTrue(addon.getProperties().isEmpty());
         assertTrue(addon.getVersions().isEmpty());
 
-        addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, Set.of("dep1", "dep2"), null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         assertEquals(2, addon.getDependsOn().size());
         assertTrue(addon.getProperties().isEmpty());
         assertTrue(addon.getVersions().isEmpty());
 
-        addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, List.of("DE", "PL", "UA") , null, null, null, null, null, null, null, null);
+        addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, Set.of("dep1", "dep2"), null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, List.of("DE", "PL", "UA"), null, null, null, null, null, null, null, null, null, null);
         assertEquals(2, addon.getDependsOn().size());
         assertEquals(3, addon.getCountries().size());
         assertTrue(addon.getProperties().isEmpty());
         assertTrue(addon.getVersions().isEmpty());
 
-        addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, List.of("DE", "PL", "UA") , null, null, null, null, Map.of("key1", "value1", "key2", "value2") , null, null, null);
+        addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, Set.of("dep1", "dep2"), null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, List.of("DE", "PL", "UA"), null, null, null, null, null, Map.of("key1", "value1", "key2", "value2"), null, null, null, null);
         assertEquals(2, addon.getDependsOn().size());
         assertEquals(3, addon.getCountries().size());
         assertEquals(2, addon.getProperties().size());
         assertTrue(addon.getVersions().isEmpty());
 
-        addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, List.of("DE", "PL", "UA") , null, null, null, null, Map.of("key1", "value1", "key2", "value2") , List.of("com.example.addon"), null, null);
+        addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, Set.of("dep1", "dep2"), null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, List.of("DE", "PL", "UA"), null, null, null, null, null, Map.of("key1", "value1", "key2", "value2"), null, List.of("com.example.addon"), null, null);
         assertEquals(2, addon.getDependsOn().size());
         assertEquals(3, addon.getCountries().size());
         assertEquals(2, addon.getProperties().size());
@@ -88,7 +88,7 @@ public class AddonTest {
 
         Map<Version, AddonVersion> versions = new HashMap<>();
         versions.put(Version.valueOf("1.0.0"), AddonVersion.create().withVersion(Version.valueOf("1.0.0")).build());
-        addon = new Addon("testuid", "binding", "testid", null, null, null, Set.of("dep1", "dep2"), false, null, null, null, null, null, false, false, null, null, null, null, List.of("DE", "PL", "UA") , null, null, null, null, Map.of("key1", "value1", "key2", "value2") , List.of("com.example.addon"), versions, null);
+        addon = new Addon("testuid", "binding", "testid", null, null, null, null, null, Set.of("dep1", "dep2"), null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, List.of("DE", "PL", "UA"), null, null, null, null, null, Map.of("key1", "value1", "key2", "value2"), null, List.of("com.example.addon"), null, versions);
         assertEquals(2, addon.getDependsOn().size());
         assertEquals(3, addon.getCountries().size());
         assertEquals(2, addon.getProperties().size());
@@ -97,11 +97,12 @@ public class AddonTest {
 
         versions.put(Version.valueOf("1.0.1"), AddonVersion.create().withVersion(Version.valueOf("1.0.1")).build());
         versions.put(Version.valueOf("1.0.2-beta"), AddonVersion.create().withVersion(Version.valueOf("1.0.2-beta")).build());
-        addon = new Addon("testuid", "automation", "testid", "Test", Version.valueOf("0.9"), "stable",
-                Set.of("ui-basic"), false, "application/x-test", "http://example.com", "http://doc.example.com",
-                "https://issues.example.com", "Santa", true, false, "None", "Still none", null, "nothing, none",
-                List.of("US"), "GPL", "none", "red", "http://image.exammple.com", null, List.of("com.example"),
-                versions, Version.valueOf("1.0.0"));
+        // null, null, null, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, false, false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null
+        addon = new Addon("testuid", "automation", "testid", "Test", Version.valueOf("0.9"), Version.valueOf("0.9"), "stable", "stable",
+                Set.of("ui-basic"), Set.of("ui-basic"), false, false, "application/x-test", "http://example.com", "http://doc.example.com", "http://doc.example.com",
+                "https://issues.example.com", "https://issues.example.com", "Santa", true, true, Version.valueOf("1.0.0"), "None", "None", "Still none", "Still none", null, "nothing, none", "nothing, none",
+                List.of("US"), List.of("US"), "GPL", "none", "red", "http://image.exammple.com", null, null, List.of("com.example"), List.of("com.example"),
+                versions);
         assertEquals(1, addon.getDependsOn().size());
         assertEquals(1, addon.getCountries().size());
         assertEquals(0, addon.getProperties().size());
@@ -121,7 +122,8 @@ public class AddonTest {
         assertEquals("https://issues.example.com", addon.getIssuesLink());
         assertEquals("Santa", addon.getAuthor());
         assertTrue(addon.isVerifiedAuthor());
-        assertFalse(addon.isInstalled());
+        assertTrue(addon.isInstalled());
+        assertEquals(Version.valueOf("1.0.0"), addon.getInstalledVersion());
         assertEquals("None", addon.getDescription());
         assertEquals("Still none", addon.getDetailedDescription());
         assertMapsEquals(Map.of(), addon.getProperties());
@@ -134,10 +136,19 @@ public class AddonTest {
         assertEquals("", addon.getConfigDescriptionURI());
         assertIterableEquals(List.of("com.example"), addon.getLoggerPackages());
         assertMapsEquals(versions, addon.getVersions());
-        assertEquals(Version.valueOf("1.0.0"), addon.getCurrentVersion());
         assertEquals(Version.valueOf("1.0.1"), addon.getDefaultVersion());
         addon.setInstalled(true);
         assertTrue(addon.isInstalled());
+        assertNull(addon.getInstalledVersion());
+        addon.setInstalled(true, Version.valueOf("1.0.2-beta"));
+        assertTrue(addon.isInstalled());
+        assertEquals(Version.valueOf("1.0.2-beta"), addon.getInstalledVersion());
+        addon.setInstalled(false);
+        assertFalse(addon.isInstalled());
+        assertNull(addon.getInstalledVersion());
+        addon.setInstalled(true, null);
+        assertTrue(addon.isInstalled());
+        assertNull(addon.getInstalledVersion());
     }
 
     @Test
@@ -189,7 +200,8 @@ public class AddonTest {
         assertThat(b.getVersions(), hasEntry(av2.getVersion(), av2));
         assertThat(b.getVersions(), hasEntry(av3.getVersion(), av3));
         assertThat(b.getVersions(), hasEntry(av4.getVersion(), av4));
-        assertEquals(Version.valueOf("0.0.9.alpha"), b.withCurrentVersion(Version.valueOf("0.0.9.alpha")).build().getCurrentVersion());
+        assertNull(b.withInstalled(false, Version.valueOf("0.0.9.alpha")).build().getInstalledVersion());
+        assertEquals(Version.valueOf("0.0.9.alpha"), b.withInstalled(true, Version.valueOf("0.0.9.alpha")).build().getInstalledVersion());
         assertEquals(Version.valueOf("0.0.9.beta"), b.build().getDefaultVersion());
 
         Addon addon = b.build();
@@ -221,7 +233,7 @@ public class AddonTest {
         assertMapsEquals(addon.getProperties(), addon2.getProperties());
         assertIterableEquals(addon.getLoggerPackages(), addon2.getLoggerPackages());
         assertMapsEquals(addon.getVersions(), addon2.getVersions());
-        assertEquals(addon.getCurrentVersion(), addon2.getCurrentVersion());
+        assertEquals(addon.getInstalledVersion(), addon2.getInstalledVersion());
         assertEquals(addon.getDefaultVersion(), addon2.getDefaultVersion());
     }
 
