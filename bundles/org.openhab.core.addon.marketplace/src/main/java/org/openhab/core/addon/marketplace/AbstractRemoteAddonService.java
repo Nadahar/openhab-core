@@ -241,6 +241,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
             postFailureEvent(id, "Add-on can't be installed because it is not known.");
             return;
         }
+        Addon mergedAddon = null;
         Version v = null;
         if (version != null) {
             try {
@@ -257,7 +258,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
             }
             if (v != null && !v.equals(addon.getVersion())) {
                 try {
-                    addon = addon.mergeVersion(v);
+                    mergedAddon = addon.mergeVersion(v);
                 } catch (IllegalArgumentException e) {
                     logger.warn("Failed to install add-on \"{}\" because the requested version \"{}\" doesn't exist", id, v);
                     postFailureEvent(addon.getUid(), "Requested version doesn't exist: " + v.toString());
@@ -269,23 +270,37 @@ public abstract class AbstractRemoteAddonService implements AddonService {
             postFailureEvent(addon.getUid(), "Requested version doesn't exist: " + v.toString());
             return;
         }
+        if (mergedAddon == null) {
+            mergedAddon = addon;
+        }
         for (MarketplaceAddonHandler handler : addonHandlers) {
-            if (handler.supports(addon.getType(), addon.getContentType())) {
-                if (!handler.isInstalled(addon.getUid())) {
-                    try {
-                        handler.install(addon);
-                        addon.setInstalled(true, v);
-                        installedAddonStorage.put(id, gson.toJson(addon));
-                        cachedRemoteAddons.invalidateValue();
-                        refreshSource();
-                        postInstalledEvent(addon.getUid());
-                    } catch (MarketplaceHandlerException e) {
-                        postFailureEvent(addon.getUid(), e.getMessage());
-                        logger.warn("Failed to install add-on \"{}\": {}", addon.getUid(), e.getMessage());
+            if (handler.supports(mergedAddon.getType(), mergedAddon.getContentType())) {
+                if (handler.isInstalled(mergedAddon.getUid())) {
+                    if (mergedAddon.isVersioned() && v != null && !v.equals(mergedAddon.getInstalledVersion())) {
+                        try {
+                            handler.uninstall(addon);
+                            installedAddonStorage.remove(id);
+                            cachedRemoteAddons.invalidateValue();
+                            postUninstalledEvent(addon.getUid());
+                        } catch (MarketplaceHandlerException e) {
+                            postFailureEvent(addon.getUid(), e.getMessage());
+                            logger.warn("Failed to uninstall add-on \"{}\": {}", addon.getUid(), e.getMessage());
+                        }
+                    } else {
+                        logger.warn("Failed to install add-on \"{}\" because it is already installed", id);
+                        postFailureEvent(mergedAddon.getUid(), "Add-on is already installed.");
                     }
-                } else {
-                    logger.warn("Failed to install add-on \"{}\" because it is already installed", id);
-                    postFailureEvent(addon.getUid(), "Add-on is already installed.");
+                }
+                try {
+                    handler.install(mergedAddon);
+                    mergedAddon.setInstalled(true, v);
+                    installedAddonStorage.put(id, gson.toJson(mergedAddon));
+                    cachedRemoteAddons.invalidateValue();
+                    refreshSource();
+                    postInstalledEvent(mergedAddon.getUid());
+                } catch (MarketplaceHandlerException e) {
+                    postFailureEvent(mergedAddon.getUid(), e.getMessage());
+                    logger.warn("Failed to install add-on \"{}\": {}", mergedAddon.getUid(), e.getMessage());
                 }
                 return;
             }
