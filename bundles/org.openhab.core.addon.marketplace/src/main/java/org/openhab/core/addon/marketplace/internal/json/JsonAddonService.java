@@ -163,11 +163,26 @@ public class JsonAddonService extends AbstractRemoteAddonService {
      */
     private boolean showAddon(AddonEntryDTO addonEntry) {
         if (addonEntry.uid.isBlank()) {
-            logger.debug("Skipping {} because the UID is not set", addonEntry);
+            if (logger.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder(addonEntry.title);
+                String s;
+                if ((s = addonEntry.version) != null && !s.isBlank()) {
+                    sb.append(' ').append(s);
+                }
+                logger.debug("Skipping {} because the UID is not set", sb.toString());
+            }
             return false;
         }
         if (!showUnstable && !"stable".equals(addonEntry.maturity)) {
-            logger.debug("Skipping {} because the the add-on is not stable and showUnstable is disabled.", addonEntry);
+            if (logger.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder(addonEntry.title);
+                String s;
+                if ((s = addonEntry.version) != null && !s.isBlank()) {
+                    sb.append(' ').append(s);
+                }
+                logger.debug("Skipping {} because the the add-on is not stable and showUnstable is disabled.",
+                        sb.toString());
+            }
             return false;
         }
         return true;
@@ -212,13 +227,15 @@ public class JsonAddonService extends AbstractRemoteAddonService {
             logger.debug("Failed to determine compatibility for addon {}: {}", addonEntry.id, e.getMessage());
         }
 
-        Version v = addonEntry.version == null || addonEntry.version.isBlank() ? null : Version.valueOf(addonEntry.version);
+        Version v = addonEntry.version == null || addonEntry.version.isBlank() ? null :
+                Version.valueOf(addonEntry.version);
         return Addon.create(uid).withType(addonEntry.type).withId(addonEntry.id).withInstalled(installed)
                 .withDetailedDescription(addonEntry.description).withContentType(addonEntry.contentType)
                 .withAuthor(addonEntry.author).withVersion(v).withLabel(addonEntry.title)
                 .withCompatible(compatible).withMaturity(addonEntry.maturity).withProperties(properties)
                 .withLink(addonEntry.link).withImageLink(addonEntry.imageUrl)
-                .withConfigDescriptionURI(addonEntry.configDescriptionURI).withLoggerPackages(addonEntry.loggerPackages)
-                .withConnection(addonEntry.connection).withCountries(addonEntry.countries).build();
+                .withConfigDescriptionURI(addonEntry.configDescriptionURI)
+                .withLoggerPackages(addonEntry.loggerPackages).withConnection(addonEntry.connection).
+                withCountries(addonEntry.countries).build();
     }
 }
