@@ -17,6 +17,7 @@ import static org.openhab.core.addon.marketplace.MarketplaceConstants.*;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
@@ -507,6 +508,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             Version version = null;
             boolean skip = false;
             boolean compatible = true;
+            URI uri;
             Map<String, Object> versionProperties = null;
             innerMatcher = KEY_VALUE_PATTERN.matcher(versionCode);
             while (!skip && innerMatcher.find()) {
@@ -576,7 +578,18 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                         if (versionProperties == null) {
                             versionProperties = new HashMap<>();
                         }
-                        s = innerMatcher.group("value").toLowerCase(Locale.ROOT);
+                        try {
+                            uri = processResourceURL(innerMatcher.group("value"));
+                            s = uri.getPath();
+                            if (s == null) {
+                                logger.debug("Ignoring invalid URL \"{}\" for Marketplace add-on \"{}\"", innerMatcher.group("value"), topic.title);
+                                break;
+                            }
+                        } catch (IllegalArgumentException e) {
+                            logger.debug("Ignoring invalid/illegal URL \"{}\" for Marketplace add-on \"{}\"", innerMatcher.group("value"), topic.title);
+                            break;
+                        }
+                        s = s.toLowerCase(Locale.ROOT);
                         int i = s.lastIndexOf('.');
                         if (i >= 0) {
                             String urlProperty;
@@ -599,7 +612,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
                             }
                             if (urlProperty != null) {
                                 if (validResourceTypes.contains(urlProperty)) {
-                                    versionProperties.put(urlProperty, innerMatcher.group("value"));
+                                    versionProperties.put(urlProperty, uri.toString());
                                 } else {
                                     logger.debug("Ignoring invalid version URL type \"{}\" for Marketplace add-on \"{}\"", urlProperty, topic.title);
                                 }
@@ -679,23 +692,35 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
         // Gather resources in the "traditional way" if none are found using version sections
         if (!resourceFound && topic.postStream.posts[0].linkCounts != null) {
+            URI uri;
+            String path;
             for (DiscoursePostLink postLink : topic.postStream.posts[0].linkCounts) {
-                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".jar") && validResourceTypes.contains(JAR_DOWNLOAD_URL_PROPERTY)) {
-                    properties.put(JAR_DOWNLOAD_URL_PROPERTY, postLink.url);
+                try {
+                    uri = processResourceURL(postLink.url);
+                    path = uri.getPath();
+                    if (path == null) {
+                        continue;
+                    }
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
+                path = path.toLowerCase(Locale.ROOT);
+                if (path.endsWith(".jar") && validResourceTypes.contains(JAR_DOWNLOAD_URL_PROPERTY)) {
+                    properties.put(JAR_DOWNLOAD_URL_PROPERTY, uri.toString());
                     id = determineIdFromUrl(postLink.url);
                     resourceFound = true;
                 }
-                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".kar") && validResourceTypes.contains(KAR_DOWNLOAD_URL_PROPERTY)) {
-                    properties.put(KAR_DOWNLOAD_URL_PROPERTY, postLink.url);
+                if (path.endsWith(".kar") && validResourceTypes.contains(KAR_DOWNLOAD_URL_PROPERTY)) {
+                    properties.put(KAR_DOWNLOAD_URL_PROPERTY, uri.toString());
                     id = determineIdFromUrl(postLink.url);
                     resourceFound = true;
                 }
-                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".json") && validResourceTypes.contains(JSON_DOWNLOAD_URL_PROPERTY)) {
-                    properties.put(JSON_DOWNLOAD_URL_PROPERTY, postLink.url);
+                if (path.endsWith(".json") && validResourceTypes.contains(JSON_DOWNLOAD_URL_PROPERTY)) {
+                    properties.put(JSON_DOWNLOAD_URL_PROPERTY, uri.toString());
                     resourceFound = true;
                 }
-                if (postLink.url.toLowerCase(Locale.ROOT).endsWith(".yaml") && validResourceTypes.contains(YAML_DOWNLOAD_URL_PROPERTY)) {
-                    properties.put(YAML_DOWNLOAD_URL_PROPERTY, postLink.url);
+                if (path.endsWith(".yaml") && validResourceTypes.contains(YAML_DOWNLOAD_URL_PROPERTY)) {
+                    properties.put(YAML_DOWNLOAD_URL_PROPERTY, uri.toString());
                     resourceFound = true;
                 }
             }
@@ -729,6 +754,43 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         builder.withLabel(title).withId(id).withCompatible(compatible).withDetailedDescription(detailedDescription).withProperties(properties);
 
         return builder.build();
+    }
+
+    private URI processResourceURL(String url) {
+        URI uri;
+        try {
+            uri = new URI(url);
+            if (uri.getFragment() != null) {
+                throw new IllegalArgumentException("Fragment not allowed in resource URLs: " + uri.getFragment());
+            }
+            String host = uri.getHost();
+            if (host == null) {
+                throw new IllegalArgumentException("Missing host in resource URL: " + url);
+            }
+            String query, path;
+            switch (host) {
+                case "github.com":
+                case "www.github.com":
+                    // Modify GitHub URLs to use their "raw" version if necessary
+                    path = uri.getPath();
+                    if (path != null && path.contains("/blob/")) {
+                        query = uri.getQuery();
+                        if (query == null) {
+                            return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), "raw=true", null);
+                        }
+                        if (!query.contains("raw=true")) {
+                            String[] parts = query.split("&");
+                            String[] newParts = new String[parts.length + 1];
+                            System.arraycopy(parts, 0, newParts, 0, parts.length);
+                            newParts[parts.length] = "raw=true";
+                            return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), String.join("&", newParts), null);
+                        }
+                    }
+            }
+            return uri;
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException("Invalid URL: " + url, e);
+        }
     }
 
     private @Nullable String determineIdFromUrl(String url) {
