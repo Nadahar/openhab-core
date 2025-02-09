@@ -256,7 +256,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             }
         } catch (Exception e) {
             logger.error("Failed to retrieve community marketplace add-on: {}", e.getMessage());
-            logger.trace("", e);
+            logger.trace("", e); // TODO: (Nad) Too much logging... or something else. Shouldn't try to get everything here...
             return null;
         }
     }
