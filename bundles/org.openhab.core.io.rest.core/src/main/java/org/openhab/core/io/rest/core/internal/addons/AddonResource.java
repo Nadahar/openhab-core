@@ -336,7 +336,7 @@ public class AddonResource implements RESTResource {
             for (String dependency : addon.getDependsOn()) {
                 ok = false;
                 for (AddonService as : getAllServices()) {
-                    dep = as.getAddon(dependency, null);
+                    dep = as.getAddon(dependency, null); //TODO: Some filtering of what to request where?
                     if (dep != null && dep.isInstalled()) {
                         ok = true;
                         break;
