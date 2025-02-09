@@ -33,6 +33,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.automation.parser.Parser;
 import org.openhab.core.automation.parser.ParsingException;
+import org.openhab.core.automation.parser.ValidationException;
 import org.openhab.core.automation.template.Template;
 import org.openhab.core.automation.template.TemplateProvider;
 import org.openhab.core.automation.type.ModuleType;
@@ -260,18 +261,40 @@ public abstract class AbstractFileProvider<@NonNull E> implements Provider<E> {
         }
     }
 
+    @SuppressWarnings("null")
     protected void updateProvidedObjectsHolder(URL url, Set<E> providedObjects) {
         if (providedObjects != null && !providedObjects.isEmpty()) {
             List<String> uids = new ArrayList<>();
             for (E providedObject : providedObjects) {
+                try {
+                    validateObject(providedObject);
+                } catch (ValidationException e) {
+                    logger.warn("Rejecting \"{}\" because the validation failed: {}", url, e.getMessage());
+                    logger.trace("", e);
+                    continue;
+                }
                 String uid = getUID(providedObject);
+                if (providerPortfolio.entrySet().stream().filter(e -> !url.equals(e.getKey())).flatMap(e -> e.getValue().stream()).anyMatch(u -> uid.equals(u))) {
+                    logger.warn("Rejecting \"{}\" from \"{}\" because the UID is already registered", uid, url);
+                    continue;
+                }
                 uids.add(uid);
                 final @Nullable E oldProvidedObject = providedObjectsHolder.put(uid, providedObject);
                 notifyListeners(oldProvidedObject, providedObject);
             }
-            providerPortfolio.put(url, uids);
+            if (!uids.isEmpty()) {
+                providerPortfolio.put(url, uids);
+            }
         }
     }
+
+    /**
+     * Validates that the parsed object is valid. For no validation, create an empty method.
+     *
+     * @param object the object to validate.
+     * @throws ValidationException If the validation failed.
+     */
+    protected abstract void validateObject(E object) throws ValidationException;
 
     protected void removeElements(@Nullable List<String> objectsForRemove) {
         if (objectsForRemove != null) {

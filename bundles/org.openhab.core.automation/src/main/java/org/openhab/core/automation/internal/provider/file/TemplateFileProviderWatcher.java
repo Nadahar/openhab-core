@@ -15,7 +15,10 @@ package org.openhab.core.automation.internal.provider.file;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.openhab.core.automation.Module;
 import org.openhab.core.automation.parser.Parser;
+import org.openhab.core.automation.parser.ValidationException;
+import org.openhab.core.automation.parser.ValidationException.ObjectType;
 import org.openhab.core.automation.template.RuleTemplate;
 import org.openhab.core.automation.template.RuleTemplateProvider;
 import org.openhab.core.automation.template.TemplateProvider;
@@ -62,5 +65,20 @@ public class TemplateFileProviderWatcher extends TemplateFileProvider {
     @Override
     public void removeParser(Parser<RuleTemplate> parser, Map<String, String> properties) {
         super.removeParser(parser, properties);
+    }
+
+    @SuppressWarnings("null")
+    @Override
+    protected void validateObject(RuleTemplate template) throws ValidationException {
+        String s;
+        if ((s = template.getUID()) == null || s.isBlank()) {
+            throw new ValidationException(ObjectType.TEMPLATE, null, "UID cannot be blank");
+        }
+        if ((s = template.getLabel()) == null || s.isBlank()) {
+            throw new ValidationException(ObjectType.TEMPLATE, template.getUID(), "Label cannot be blank");
+        }
+        if (template.getModules(Module.class).isEmpty()) {
+            throw new ValidationException(ObjectType.TEMPLATE, template.getUID(), "There must be at least one module");
+        }
     }
 }
