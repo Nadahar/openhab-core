@@ -230,7 +230,12 @@ public abstract class AbstractRegistry<@NonNull E extends Identifiable<K>, @NonN
 
     @Override
     public Stream<E> stream() {
-        return getAll().stream();
+        elementReadLock.lock();
+        try {
+            return elements.stream();
+        } finally {
+            elementReadLock.unlock();
+        }
     }
 
     @Override
