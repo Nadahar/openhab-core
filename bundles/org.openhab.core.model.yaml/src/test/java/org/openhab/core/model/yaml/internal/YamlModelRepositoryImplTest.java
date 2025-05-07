@@ -225,7 +225,8 @@ public class YamlModelRepositoryImplTest {
 
         Files.copy(SOURCE_PATH.resolve("modelFileUpdatePre.yaml"), fullModelPath, StandardCopyOption.REPLACE_EXISTING);
         modelRepository.processWatchEvent(WatchService.Kind.MODIFY, MODEL_PATH);
-        verify(firstTypeListener, times(2)).addedModel(eq(MODEL_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
+        verify(firstTypeListener, times(2)).addedModel(eq(MODEL_NAME), mapperCaptor.capture(),
+                firstTypeCaptor.capture());
         verify(firstTypeListener).updatedModel(eq(MODEL_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
         verify(firstTypeListener).removedModel(eq(MODEL_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
 
@@ -237,7 +238,8 @@ public class YamlModelRepositoryImplTest {
         Files.copy(SOURCE_PATH.resolve("modelV2FileUpdatePre.yaml"), fullModel2Path,
                 StandardCopyOption.REPLACE_EXISTING);
         modelRepository.processWatchEvent(WatchService.Kind.MODIFY, MODEL2_PATH);
-        verify(firstTypeListener, times(2)).addedModel(eq(MODEL2_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
+        verify(firstTypeListener, times(2)).addedModel(eq(MODEL2_NAME), mapperCaptor.capture(),
+                firstTypeCaptor.capture());
         verify(firstTypeListener).updatedModel(eq(MODEL2_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
         verify(firstTypeListener).removedModel(eq(MODEL2_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
 
@@ -377,7 +379,8 @@ public class YamlModelRepositoryImplTest {
         SecondTypeDTO added2 = new SecondTypeDTO("elt1", "My label");
         modelRepository.addElementToModel(MODEL_NAME, added2);
 
-        verify(firstTypeListener, times(2)).addedModel(eq(MODEL_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
+        verify(firstTypeListener, times(2)).addedModel(eq(MODEL_NAME), mapperCaptor.capture(),
+                firstTypeCaptor.capture());
         verify(firstTypeListener, never()).updatedModel(any(), mapperCaptor.capture(), any());
         verify(firstTypeListener, never()).removedModel(any(), mapperCaptor.capture(), any());
         verify(secondTypeListener1).addedModel(eq(MODEL_NAME), mapperCaptor.capture(), secondTypeCaptor1.capture());
@@ -394,7 +397,8 @@ public class YamlModelRepositoryImplTest {
         modelRepository.processWatchEvent(WatchService.Kind.CREATE, MODEL2_PATH);
         modelRepository.addElementToModel(MODEL2_NAME, added);
         modelRepository.addElementToModel(MODEL2_NAME, added2);
-        verify(firstTypeListener, times(2)).addedModel(eq(MODEL2_NAME), mapperCaptor.capture(), firstTypeCaptor.capture());
+        verify(firstTypeListener, times(2)).addedModel(eq(MODEL2_NAME), mapperCaptor.capture(),
+                firstTypeCaptor.capture());
         verify(firstTypeListener, never()).updatedModel(any(), mapperCaptor.capture(), any());
         verify(firstTypeListener, never()).removedModel(any(), mapperCaptor.capture(), any());
         verify(secondTypeListener1).addedModel(eq(MODEL2_NAME), mapperCaptor.capture(), secondTypeCaptor1.capture());
