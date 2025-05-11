@@ -268,13 +268,13 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
                         }
 
                         if (!addedElements.isEmpty()) {
-                            elementListener.addedModel(modelName, objectMapper, addedElements);
+                            elementListener.addedModel(modelName, addedElements);
                         }
                         if (!removedElements.isEmpty()) {
-                            elementListener.removedModel(modelName, objectMapper, removedElements);
+                            elementListener.removedModel(modelName, removedElements);
                         }
                         if (!updatedElements.isEmpty()) {
-                            elementListener.updatedModel(modelName, objectMapper, updatedElements);
+                            elementListener.updatedModel(modelName, updatedElements);
                         }
                     }
 
@@ -294,7 +294,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
                                 getElementListeners(removedElement, modelVersion).forEach(listener -> {
                                     List removedElements = parseJsonNodesV1(removedNodes, listener.getElementClass(),
                                             null, null);
-                                    listener.removedModel(modelName, objectMapper, removedElements);
+                                    listener.removedModel(modelName, removedElements);
                                 });
                             });
                 } else {
@@ -304,7 +304,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
                                 getElementListeners(removedElement, modelVersion).forEach(listener -> {
                                     List removedElements = parseJsonMapNode(removedNode, listener.getElementClass(),
                                             null, null);
-                                    listener.removedModel(modelName, objectMapper, removedElements);
+                                    listener.removedModel(modelName, removedElements);
                                 });
                             });
                 }
@@ -331,7 +331,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
             if (!removedNodes.isEmpty()) {
                 getElementListeners(elementName, version).forEach(listener -> {
                     List removedElements = parseJsonNodesV1(removedNodes, listener.getElementClass(), null, null);
-                    listener.removedModel(modelName, objectMapper, removedElements);
+                    listener.removedModel(modelName, removedElements);
                 });
             }
         }
@@ -341,7 +341,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
             if (removedMapNode != null) {
                 getElementListeners(elementName, version).forEach(listener -> {
                     List removedElements = parseJsonMapNode(removedMapNode, listener.getElementClass(), null, null);
-                    listener.removedModel(modelName, objectMapper, removedElements);
+                    listener.removedModel(modelName, removedElements);
                 });
             }
         }
@@ -379,7 +379,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
             warnings.forEach(warning -> {
                 logger.info("YAML model {}: {}", modelName, warning);
             });
-            listener.addedModel(modelName, objectMapper, modelElements);
+            listener.addedModel(modelName, modelElements);
             checkElementNames(modelName, model);
         });
     }
@@ -454,7 +454,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
                 logger.info("YAML model {}: {}", modelName, warning);
             });
             if (!newElements.isEmpty()) {
-                l.addedModel(modelName, objectMapper, newElements);
+                l.addedModel(modelName, newElements);
             }
         }
 
@@ -502,7 +502,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
         for (YamlModelListener<?> l : getElementListeners(elementName, model.getVersion())) {
             List oldElements = parseJsonNodes(removedNodes, mapRemovedNode, l.getElementClass(), null, null);
             if (!oldElements.isEmpty()) {
-                l.removedModel(modelName, objectMapper, oldElements);
+                l.removedModel(modelName, oldElements);
             }
         }
 
@@ -560,7 +560,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
                 logger.info("YAML model {}: {}", modelName, warning);
             });
             if (!newElements.isEmpty()) {
-                l.updatedModel(modelName, objectMapper, newElements);
+                l.updatedModel(modelName, newElements);
             }
         }
 
@@ -591,7 +591,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
             List elements = parseJsonNodes(modelNodes != null ? modelNodes : List.of(), modelMapNode, elementClass,
                     null, null);
             if (!elements.isEmpty()) {
-                listener.updatedModel(modelName, objectMapper, elements);
+                listener.updatedModel(modelName, elements);
             }
         });
     }
