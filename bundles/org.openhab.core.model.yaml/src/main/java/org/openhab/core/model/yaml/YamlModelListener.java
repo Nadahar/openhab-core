@@ -16,9 +16,6 @@ import java.util.Collection;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /**
  * The {@link YamlModelListener} interface is responsible for managing a particular model type
  * with data processed from YAML configuration files having a version that is supported by this manager.
@@ -58,10 +55,6 @@ public interface YamlModelListener<T extends YamlElement> {
      * @param elements the collection of removed elements
      */
     void removedModel(String modelName, Collection<T> elements);
-
-    default JsonNode modifyTree(JsonNode node, ObjectMapper yamlMapper) {
-        return node;
-    }
 
     /**
      * Get the DTO class to be used for each object of this model type. The DTO class MUST implement {@link YamlElement}

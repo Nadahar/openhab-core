@@ -14,7 +14,6 @@ package org.openhab.core.model.yaml.internal.rules;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,19 +43,10 @@ import org.osgi.service.component.annotations.Deactivate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
-import com.fasterxml.jackson.dataformat.yaml.YAMLParser;
 
 /**
  * {@link YamlRuleProvider} is an OSGi service, that allows definition of rules in YAML configuration files. Files can
@@ -93,46 +83,6 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     }
 
     @Override
-    public JsonNode modifyTree(JsonNode node, ObjectMapper yamlMapper) {
-        JsonNode triggersNode = node.get("triggers");
-        if (triggersNode.isArray()) {
-            boolean missingId = false;
-            Set<String> ids = new HashSet<>();
-            Iterator<JsonNode> iterator = triggersNode.elements();
-            JsonNode aNode, bNode;
-            String s;
-            while (iterator.hasNext()) {
-                aNode = iterator.next();
-                if ((bNode = aNode.get("id")) != null && (s = bNode.asText()) != null && !s.isBlank()) {
-                    ids.add(s);
-                } else {
-                    missingId |= true;
-                }
-            }
-            if (missingId) {
-                iterator = triggersNode.elements();
-                int id = 0;
-                String idStr;
-                ObjectNode oNode;
-                while (iterator.hasNext()) {
-                    aNode = iterator.next();
-                    if (aNode.isObject()) {
-                        oNode = (ObjectNode) aNode;
-                        if ((bNode = oNode.get("id")) == null || (s = bNode.asText()) == null || s.isBlank()) {
-                            while (ids.contains(idStr = Integer.toString(++id))) {}
-                            oNode.put("id", idStr);
-                        }
-                    }
-                }
-                ArrayNode arrayNode = (ArrayNode) triggersNode;
-                // TODO: (Nad) Continue here
-            }
-        }
-
-        return node;
-    }
-
-    @Override
     public boolean isVersionSupported(int version) {
         return version >= 1;
     }
@@ -143,10 +93,10 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     }
 
     @Override
-    public void addedModel(String modelName, Collection<YamlRuleDTO> elements) {
+    public void addedModel(String modelName, ObjectMapper yamlMapper, Collection<YamlRuleDTO> elements) {
         List<Rule> added = elements.stream().map(r -> {
             try {
-                return mapRule(r);
+                return mapRule(r, yamlMapper);
             } catch (JsonProcessingException e) {
                 logger.warn("Failed to add rule \"{}\" to model {}: {}", r.uid, modelName, e.getMessage());
             }
@@ -162,10 +112,10 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     }
 
     @Override
-    public void updatedModel(String modelName, Collection<YamlRuleDTO> elements) {
+    public void updatedModel(String modelName, ObjectMapper yamlMapper, Collection<YamlRuleDTO> elements) {
         List<Rule> updated = elements.stream().map(r -> {
             try {
-                return mapRule(r);
+                return mapRule(r, yamlMapper);
             } catch (JsonProcessingException e) {
                 logger.warn("Failed to update rule \"{}\" for model {}: {}", r.uid, modelName, e.getMessage());
             }
@@ -189,10 +139,10 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     }
 
     @Override
-    public void removedModel(String modelName, Collection<YamlRuleDTO> elements) {
+    public void removedModel(String modelName, ObjectMapper yamlMapper, Collection<YamlRuleDTO> elements) {
         List<Rule> removed = elements.stream().map(r -> {
             try {
-                return mapRule(r);
+                return mapRule(r, yamlMapper);
             } catch (JsonProcessingException e) {
                 logger.warn("Failed to remove rule \"{}\" from model {}: {}", r.uid, modelName, e.getMessage());
             }
@@ -212,21 +162,7 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
         }
     }
 
-    private @Nullable Rule mapRule(YamlRuleDTO ruleDto) throws JsonProcessingException {
-        YAMLFactory yamlFactory = YAMLFactory.builder() //
-            .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER) // omit "---" at file start
-            .disable(YAMLGenerator.Feature.SPLIT_LINES) // do not split long lines
-            .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR) // indent arrays
-            .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES) // use quotes only where necessary
-            .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS).build(); // do not parse ON/OFF/... as
-                                                                                     // booleans
-        ObjectMapper yamlMapper = new ObjectMapper(yamlFactory);
-        yamlMapper.findAndRegisterModules();
-        yamlMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE);
-        yamlMapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
-        yamlMapper.setSerializationInclusion(Include.NON_NULL);
-        yamlMapper.enable(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);
-
+    private @Nullable Rule mapRule(YamlRuleDTO ruleDto, ObjectMapper yamlMapper) throws JsonProcessingException {
         String s;
         JsonNode node;
         RuleBuilder ruleBuilder = RuleBuilder.create(ruleDto.uid);
