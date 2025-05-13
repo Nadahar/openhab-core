@@ -40,11 +40,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlModelListener;
 import org.openhab.core.model.yaml.test.FirstTypeDTO;
 import org.openhab.core.model.yaml.test.SecondTypeDTO;
 import org.openhab.core.service.WatchService;
 import org.yaml.snakeyaml.Yaml;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The {@link YamlModelRepositoryImplTest} contains tests for the {@link YamlModelRepositoryImpl} class.
@@ -68,13 +72,21 @@ public class YamlModelRepositoryImplTest {
     private @NonNullByDefault({}) Path fullModelPath;
     private @NonNullByDefault({}) Path fullModel2Path;
 
-    private @Mock @NonNullByDefault({}) YamlModelListener<@NonNull FirstTypeDTO> firstTypeListener;
-    private @Mock @NonNullByDefault({}) YamlModelListener<@NonNull SecondTypeDTO> secondTypeListener1;
-    private @Mock @NonNullByDefault({}) YamlModelListener<@NonNull SecondTypeDTO> secondTypeListener2;
+    private @Mock @NonNullByDefault({}) MockYamlModelListener<@NonNull FirstTypeDTO> firstTypeListener;
+    private @Mock @NonNullByDefault({}) MockYamlModelListener<@NonNull SecondTypeDTO> secondTypeListener1;
+    private @Mock @NonNullByDefault({}) MockYamlModelListener<@NonNull SecondTypeDTO> secondTypeListener2;
 
     private @Captor @NonNullByDefault({}) ArgumentCaptor<Collection<FirstTypeDTO>> firstTypeCaptor;
     private @Captor @NonNullByDefault({}) ArgumentCaptor<Collection<SecondTypeDTO>> secondTypeCaptor1;
     private @Captor @NonNullByDefault({}) ArgumentCaptor<Collection<SecondTypeDTO>> secondTypeCaptor2;
+
+    abstract class MockYamlModelListener<T extends YamlElement> implements YamlModelListener<T> {
+
+        @Override
+        public JsonNode modifyTree(JsonNode node, ObjectMapper yamlMapper) {
+            return node;
+        }
+    }
 
     @BeforeEach
     public void setup() {
@@ -85,12 +97,15 @@ public class YamlModelRepositoryImplTest {
         when(firstTypeListener.getElementClass()).thenReturn(FirstTypeDTO.class);
         when(firstTypeListener.isVersionSupported(anyInt())).thenReturn(true);
         when(firstTypeListener.isDeprecated()).thenReturn(false);
+        when(firstTypeListener.modifyTree(any(), any())).thenCallRealMethod();
         when(secondTypeListener1.getElementClass()).thenReturn(SecondTypeDTO.class);
         when(secondTypeListener1.isVersionSupported(anyInt())).thenReturn(true);
         when(secondTypeListener1.isDeprecated()).thenReturn(false);
+        when(secondTypeListener1.modifyTree(any(), any())).thenCallRealMethod();
         when(secondTypeListener2.getElementClass()).thenReturn(SecondTypeDTO.class);
         when(secondTypeListener2.isVersionSupported(anyInt())).thenReturn(true);
         when(secondTypeListener2.isDeprecated()).thenReturn(false);
+        when(secondTypeListener2.modifyTree(any(), any())).thenCallRealMethod();
     }
 
     @Test
