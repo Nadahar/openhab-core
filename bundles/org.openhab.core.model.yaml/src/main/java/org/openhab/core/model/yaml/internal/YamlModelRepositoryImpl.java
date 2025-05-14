@@ -772,7 +772,7 @@ public class YamlModelRepositoryImpl implements WatchService.WatchEventListener,
             @Nullable List<String> errors) throws SerializationException {
         T result = createElement(elementClass, errors);
         if (result != null) {
-            result = (T) ((ModularDTO<?, ?, ObjectMapper>) result).toDto(node, objectMapper);
+            result = (T) ((ModularDTO<?, ObjectMapper, JsonNode>) result).toDto(node, objectMapper);
         }
         return result;
     }

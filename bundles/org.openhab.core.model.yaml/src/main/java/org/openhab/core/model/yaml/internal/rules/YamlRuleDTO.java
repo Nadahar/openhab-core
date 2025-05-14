@@ -22,7 +22,10 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.automation.Action;
+import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Rule;
+import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
 import org.openhab.core.common.AbstractUID;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
@@ -41,11 +44,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * @author Ravi Nadahar - Initial contribution
  */
 @YamlElementName("rules")
-public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>, YamlElement, Cloneable {
+public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNode>, YamlElement, Cloneable {
 
     protected static final Pattern UID_SEGMENT_PATTERN = Pattern.compile("[a-zA-Z0-9_][a-zA-Z0-9_-]*");
 
-    public String uid;
+    public String uid; // TODO: (Nad) JavaDocs
     public String templateUid;
     public String label;
     public Set<@NonNull String> tags;
@@ -61,6 +64,41 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
      * Creates a new instance.
      */
     public YamlRuleDTO() {
+    }
+
+    public YamlRuleDTO(@NonNull Rule rule) {
+        this.uid = rule.getUID();
+        this.templateUid = rule.getTemplateUID();
+        this.label = rule.getName();
+        this.tags = rule.getTags();
+        this.description = rule.getDescription();
+        this.visibility = rule.getVisibility().name();
+        this.config = rule.getConfiguration().getProperties();
+        this.configDescriptions = rule.getConfigurationDescriptions();
+        List<@NonNull Action> actions = rule.getActions();
+        if (!actions.isEmpty()) {
+            List<YamlActionDTO> actionDtos = new ArrayList<>(actions.size());
+            for (Action action : actions) {
+                actionDtos.add(new YamlActionDTO(action));
+            }
+            this.actions = actionDtos;
+        }
+        List<@NonNull Condition> conditions = rule.getConditions();
+        if (!conditions.isEmpty()) {
+            List<YamlConditionDTO> conditionsDtos = new ArrayList<>(conditions.size());
+            for (Condition condition : conditions) {
+                conditionsDtos.add(new YamlConditionDTO(condition));
+            }
+            this.conditions = conditionsDtos;
+        }
+        List<@NonNull Trigger> triggers = rule.getTriggers();
+        if (!triggers.isEmpty()) {
+            List<YamlModuleDTO> triggerDtos = new ArrayList<>(triggers.size());
+            for (Trigger trigger : triggers) {
+                triggerDtos.add(new YamlModuleDTO(trigger));
+            }
+            this.triggers = triggerDtos;
+        }
     }
 
     @Override
@@ -86,7 +124,7 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
     }
 
     @Override
-    public YamlRuleDTO toDto(@NonNull JsonNode node, @NonNull ObjectMapper mapper) throws SerializationException {
+    public @NonNull YamlRuleDTO toDto(@NonNull JsonNode node, @NonNull ObjectMapper mapper) throws SerializationException {
         YamlPartialRuleDTO partial;
         YamlRuleDTO result = new YamlRuleDTO();
         try {
@@ -100,7 +138,7 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
             result.config = partial.config;
             result.configDescriptions = partial.configDescriptions;
 
-            if (partial.actions != null) {
+            if (partial.actions != null && !partial.actions.isEmpty()) {
                 if (!partial.actions.isArray()) {
                     throw new SerializationException("Expected actions to be an array node");
                 }
@@ -112,7 +150,7 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
                 }
                 result.actions = actions;
             }
-            if (partial.conditions != null) {
+            if (partial.conditions != null && !partial.conditions.isEmpty()) {
                 if (!partial.conditions.isArray()) {
                     throw new SerializationException("Expected conditions to be an array node");
                 }
@@ -124,7 +162,7 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
                 }
                 result.conditions = conditions;
             }
-            if (partial.triggers != null) {
+            if (partial.triggers != null && !partial.triggers.isEmpty()) {
                 if (!partial.triggers.isArray()) {
                     throw new SerializationException("Expected triggers to be an array node");
                 }
@@ -140,12 +178,6 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
             throw new SerializationException(e.getMessage(), e);
         }
         return result;
-    }
-
-    @Override
-    public JsonNode fromDto(@NonNull Rule object, @NonNull ObjectMapper mapper) throws SerializationException {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -188,7 +220,7 @@ public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>,
         // Check that the rule either has configuration (rule stub) or that it has at least one module
         if ((config == null || config.isEmpty()) && (triggers == null || triggers.isEmpty())
                 && (conditions == null || conditions.isEmpty()) && (actions == null || actions.isEmpty())) {
-            addToList(errors, "invalid rule \"%s\": the rule is empty");
+            addToList(errors, "invalid rule \"%s\": the rule is empty".formatted(uid));
             ok = false;
         }
         return ok;
