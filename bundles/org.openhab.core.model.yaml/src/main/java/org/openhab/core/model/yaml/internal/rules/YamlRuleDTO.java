@@ -12,6 +12,8 @@
  */
 package org.openhab.core.model.yaml.internal.rules;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -20,13 +22,18 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Visibility;
 import org.openhab.core.common.AbstractUID;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
+import org.openhab.core.io.dto.ModularDTO;
+import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlElementName;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * The {@link YamlRuleDTO} is a data transfer object used to serialize a rule in a YAML configuration file.
@@ -34,21 +41,21 @@ import com.fasterxml.jackson.databind.JsonNode;
  * @author Ravi Nadahar - Initial contribution
  */
 @YamlElementName("rules")
-public class YamlRuleDTO implements YamlElement, Cloneable {
+public class YamlRuleDTO implements ModularDTO<Rule, YamlRuleDTO, ObjectMapper>, YamlElement, Cloneable {
 
     protected static final Pattern UID_SEGMENT_PATTERN = Pattern.compile("[a-zA-Z0-9_][a-zA-Z0-9_-]*");
 
     public String uid;
     public String templateUid;
-    public String name;
+    public String label;
     public Set<@NonNull String> tags;
     public String description;
     public String visibility;
     public Map<@NonNull String, @NonNull Object> config;
     public List<@NonNull ConfigDescriptionParameter> configDescriptions;
-    public JsonNode conditions;
-    public JsonNode actions;
-    public JsonNode triggers;
+    public List<@NonNull YamlConditionDTO> conditions;
+    public List<@NonNull YamlActionDTO> actions;
+    public List<@NonNull YamlModuleDTO> triggers;
 
     /**
      * Creates a new instance.
@@ -76,6 +83,69 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
     public Visibility getVisibility() {
         Visibility result = Visibility.typeOf(visibility);
         return result == null ? Visibility.VISIBLE : result;
+    }
+
+    @Override
+    public YamlRuleDTO toDto(@NonNull JsonNode node, @NonNull ObjectMapper mapper) throws SerializationException {
+        YamlPartialRuleDTO partial;
+        YamlRuleDTO result = new YamlRuleDTO();
+        try {
+            partial = mapper.treeToValue(node, YamlPartialRuleDTO.class);
+            result.uid = partial.uid;
+            result.templateUid = partial.templateUid;
+            result.label = partial.label;
+            result.tags = partial.tags;
+            result.description = partial.description;
+            result.visibility = partial.visibility;
+            result.config = partial.config;
+            result.configDescriptions = partial.configDescriptions;
+
+            if (partial.actions != null) {
+                if (!partial.actions.isArray()) {
+                    throw new SerializationException("Expected actions to be an array node");
+                }
+                List<YamlActionDTO> actions = new ArrayList<>(partial.actions.size());
+                JsonNode actionNode;
+                for (Iterator<JsonNode> iterator = partial.actions.elements(); iterator.hasNext();) {
+                    actionNode = iterator.next();
+                    actions.add(mapper.treeToValue(actionNode, YamlActionDTO.class));
+                }
+                result.actions = actions;
+            }
+            if (partial.conditions != null) {
+                if (!partial.conditions.isArray()) {
+                    throw new SerializationException("Expected conditions to be an array node");
+                }
+                List<YamlConditionDTO> conditions = new ArrayList<>(partial.conditions.size());
+                JsonNode conditionNode;
+                for (Iterator<JsonNode> iterator = partial.conditions.elements(); iterator.hasNext();) {
+                    conditionNode = iterator.next();
+                    conditions.add(mapper.treeToValue(conditionNode, YamlConditionDTO.class));
+                }
+                result.conditions = conditions;
+            }
+            if (partial.triggers != null) {
+                if (!partial.triggers.isArray()) {
+                    throw new SerializationException("Expected triggers to be an array node");
+                }
+                List<YamlModuleDTO> triggers = new ArrayList<>(partial.triggers.size());
+                JsonNode triggerNode;
+                for (Iterator<JsonNode> iterator = partial.triggers.elements(); iterator.hasNext();) {
+                    triggerNode = iterator.next();
+                    triggers.add(mapper.treeToValue(triggerNode, YamlModuleDTO.class));
+                }
+                result.triggers = triggers;
+            }
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            throw new SerializationException(e.getMessage(), e);
+        }
+        return result;
+    }
+
+    @Override
+    public JsonNode fromDto(@NonNull Rule object, @NonNull ObjectMapper mapper) throws SerializationException {
+        // TODO Auto-generated method stub
+        return null;
     }
 
     @Override
@@ -110,15 +180,14 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
         }
 
         // Check that name is present
-        if (name == null || name.isBlank()) {
-            addToList(errors, "invalid rule \"%s\": name is missing".formatted(uid));
+        if (label == null || label.isBlank()) {
+            addToList(errors, "invalid rule \"%s\": label is missing".formatted(uid));
             ok = false;
         }
 
         // Check that the rule either has configuration (rule stub) or that it has at least one module
-        if ((config == null || config.isEmpty()) && (triggers == null || !triggers.elements().hasNext())
-                && (conditions == null || !conditions.elements().hasNext())
-                && (actions == null || !actions.elements().hasNext())) {
+        if ((config == null || config.isEmpty()) && (triggers == null || triggers.isEmpty())
+                && (conditions == null || conditions.isEmpty()) && (actions == null || actions.isEmpty())) {
             addToList(errors, "invalid rule \"%s\": the rule is empty");
             ok = false;
         }
@@ -133,8 +202,8 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(actions, conditions, config, configDescriptions, description, name, tags,
-                templateUid, triggers, uid, visibility);
+        return Objects.hash(actions, conditions, config, configDescriptions, description, label, tags, templateUid,
+                triggers, uid, visibility);
     }
 
     @Override
@@ -147,9 +216,8 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
         }
         YamlRuleDTO other = (YamlRuleDTO) obj;
         return Objects.equals(actions, other.actions) && Objects.equals(conditions, other.conditions)
-                && Objects.equals(config, other.config)
-                && Objects.equals(configDescriptions, other.configDescriptions)
-                && Objects.equals(description, other.description) && Objects.equals(name, other.name)
+                && Objects.equals(config, other.config) && Objects.equals(configDescriptions, other.configDescriptions)
+                && Objects.equals(description, other.description) && Objects.equals(label, other.label)
                 && Objects.equals(tags, other.tags) && Objects.equals(templateUid, other.templateUid)
                 && Objects.equals(triggers, other.triggers) && Objects.equals(uid, other.uid)
                 && visibility == other.visibility;
@@ -165,8 +233,8 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
         if (templateUid != null) {
             builder.append("templateUID=").append(templateUid).append(", ");
         }
-        if (name != null) {
-            builder.append("name=").append(name).append(", ");
+        if (label != null) {
+            builder.append("label=").append(label).append(", ");
         }
         if (tags != null) {
             builder.append("tags=").append(tags).append(", ");
@@ -194,5 +262,19 @@ public class YamlRuleDTO implements YamlElement, Cloneable {
         }
         builder.append("]");
         return builder.toString();
+    }
+
+    protected static class YamlPartialRuleDTO {
+        public String uid;
+        public String templateUid;
+        public String label;
+        public Set<@NonNull String> tags;
+        public String description;
+        public String visibility;
+        public Map<@NonNull String, @NonNull Object> config;
+        public List<@NonNull ConfigDescriptionParameter> configDescriptions;
+        public JsonNode conditions;
+        public JsonNode actions;
+        public JsonNode triggers;
     }
 }
