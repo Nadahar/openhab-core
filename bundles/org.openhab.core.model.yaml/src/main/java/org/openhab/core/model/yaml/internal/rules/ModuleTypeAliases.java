@@ -19,8 +19,8 @@ public class ModuleTypeAliases { // TODO: (Nad) Heeader + JavaDocs
     static {
         String[][] table = { //
             {"A", "EnableRule", "core.RuleEnablementAction"}, //
-            {"A", "ItemCommand", "core.ItemCommandAction"}, //
-            {"A", "ItemStateUpdate", "core.ItemStateUpdateAction"}, //
+            {"A", "SendCommand", "core.ItemCommandAction"}, //
+            {"A", "PostUpdate", "core.ItemStateUpdateAction"}, //
             {"A", "Play", "media.PlayAction"}, //
             {"A", "RunRule", "core.RunRuleAction"}, //
             {"A", "Say", "media.SayAction"}, //
@@ -38,15 +38,15 @@ public class ModuleTypeAliases { // TODO: (Nad) Heeader + JavaDocs
             {"T", "ChannelEvent", "core.ChannelEventTrigger"}, //
             {"T", "Cron", "timer.GenericCronTrigger"}, //
             {"T", "DateTime", "timer.DateTimeTrigger"}, //
-            {"T", "GroupCommand", "core.GroupCommandTrigger"}, //
-            {"T", "GroupStateChanged", "core.GroupStateChangeTrigger"}, //
-            {"T", "GroupStateUpdated", "core.GroupStateUpdateTrigger"}, //
-            {"T", "ItemCommand", "core.ItemCommandTrigger"}, //
-            {"T", "ItemStateChanged", "core.ItemStateChangeTrigger"}, //
-            {"T", "ItemStateUpdated", "core.ItemStateUpdateTrigger"}, //
+            {"T", "MemberReceivedCommand", "core.GroupCommandTrigger"}, //
+            {"T", "MemberChanged", "core.GroupStateChangeTrigger"}, //
+            {"T", "MemberUpdated", "core.GroupStateUpdateTrigger"}, //
+            {"T", "ItemReceivedCommand", "core.ItemCommandTrigger"}, //
+            {"T", "ItemChanged", "core.ItemStateChangeTrigger"}, //
+            {"T", "ItemUpdated", "core.ItemStateUpdateTrigger"}, //
             {"T", "StartLevel", "core.SystemStartlevelTrigger"}, //
-            {"T", "ThingStatusChanged", "core.ThingStatusChangeTrigger"}, //
-            {"T", "ThingStatusUpdated", "core.ThingStatusUpdateTrigger"}, //
+            {"T", "ThingChanged", "core.ThingStatusChangeTrigger"}, //
+            {"T", "ThingUpdated", "core.ThingStatusUpdateTrigger"}, //
             {"T", "TimeOfDay", "timer.TimeOfDayTrigger"} //
         };
 
@@ -81,8 +81,8 @@ public class ModuleTypeAliases { // TODO: (Nad) Heeader + JavaDocs
                 inner.put(entry[2], entry[1]);
             }
         }
-        TYPE_IDX = Collections.unmodifiableMap(typeIdx);
         ALIAS_IDX = Collections.unmodifiableMap(aliasIdx);
+        TYPE_IDX = Collections.unmodifiableMap(typeIdx);
     }
 
     /**
