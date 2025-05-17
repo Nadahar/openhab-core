@@ -1,11 +1,29 @@
+/*
+ * Copyright (c) 2010-2025 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.core.model.yaml.internal.rules;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.core.automation.Module;
 
-public class YamlModuleDTO { // TODO: (Nad) Header + JavaDocs
+/**
+ * The {@link YamlRuleDTO} is a data transfer object used to serialize a module in a YAML configuration file.
+ *
+ * @author Ravi Nadahar - Initial contribution
+ */
+public class YamlModuleDTO {
 
     public String id;
     public String label;
@@ -20,8 +38,14 @@ public class YamlModuleDTO { // TODO: (Nad) Header + JavaDocs
         this.id = module.getId();
         this.label = module.getLabel();
         this.description = module.getDescription();
-        this.config = module.getConfiguration().getProperties(); // TODO: (Nad) Translate?
-        this.type = module.getTypeUID(); // TODO: (Nad) Translate
+        this.type = ModuleTypeAliases.typeToAlias(module.getClass(), module.getTypeUID());
+        this.config = new LinkedHashMap<>(module.getConfiguration().getProperties());
+        if (this.config.containsKey("script") && this.config.get("type") instanceof String type) {
+            String typeAlias = MIMETypeAliases.mimeTypeToAlias(type);
+            if (!type.equals(typeAlias)) {
+                this.config.put("type", typeAlias);
+            }
+        }
     }
 
     @Override

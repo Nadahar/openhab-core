@@ -48,7 +48,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
 
     protected static final Pattern UID_SEGMENT_PATTERN = Pattern.compile("[a-zA-Z0-9_][a-zA-Z0-9_-]*");
 
-    public String uid; // TODO: (Nad) JavaDocs
+    public String uid;
     public String templateUid;
     public String label;
     public Set<@NonNull String> tags;
@@ -66,6 +66,11 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
     public YamlRuleDTO() {
     }
 
+    /**
+     * Creates a new instance based on the specified {@link Rule}.
+     *
+     * @param rule the {@link Rule}.
+     */
     public YamlRuleDTO(@NonNull Rule rule) {
         this.uid = rule.getUID();
         this.templateUid = rule.getTemplateUID();
@@ -326,6 +331,9 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         return builder.toString();
     }
 
+    /**
+     * A data transfer object for partial deserialization of a rule.
+     */
     protected static class YamlPartialRuleDTO {
         public String uid;
         public String templateUid;

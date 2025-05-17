@@ -58,7 +58,7 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     private final Map<String, Collection<Rule>> rulesMap = new ConcurrentHashMap<>();
 
     @Activate
-    public YamlRuleProvider() { //TODO: (Nad) Handle/Test ConfigDescriptions
+    public YamlRuleProvider() { // TODO: (Nad) Handle/Test ConfigDescriptions
     }
 
     @Deactivate
