@@ -34,6 +34,7 @@ import org.openhab.core.io.dto.ModularDTO;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlElementName;
+import org.openhab.core.model.yaml.internal.config.YamlConfigDescriptionParameterDTO;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -57,7 +58,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
     public String description;
     public Visibility visibility;
     public Map<@NonNull String, @NonNull Object> config;
-    public List<@NonNull ConfigDescriptionParameter> configDescriptions;
+    public List<@NonNull YamlConfigDescriptionParameterDTO> configDescriptions;
     public List<@NonNull YamlConditionDTO> conditions;
     public List<@NonNull YamlActionDTO> actions;
     public List<@NonNull YamlModuleDTO> triggers;
@@ -81,7 +82,14 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         this.description = rule.getDescription();
         this.visibility = rule.getVisibility();
         this.config = rule.getConfiguration().getProperties();
-        this.configDescriptions = rule.getConfigurationDescriptions();
+        List<@NonNull ConfigDescriptionParameter> configDescriptions = rule.getConfigurationDescriptions();
+        if (!configDescriptions.isEmpty()) {
+            List<YamlConfigDescriptionParameterDTO> configDescriptionDtos = new ArrayList<>(configDescriptions.size());
+            for (ConfigDescriptionParameter parameter : configDescriptions) {
+                configDescriptionDtos.add(new YamlConfigDescriptionParameterDTO(parameter));
+            }
+            this.configDescriptions = configDescriptionDtos;
+        }
         List<@NonNull Action> actions = rule.getActions();
         if (!actions.isEmpty()) {
             List<YamlActionDTO> actionDtos = new ArrayList<>(actions.size());
@@ -372,7 +380,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         public String visibility;
         @JsonAlias({ "configuration" })
         public Map<@NonNull String, @NonNull Object> config;
-        public List<@NonNull ConfigDescriptionParameter> configDescriptions;
+        public List<@NonNull YamlConfigDescriptionParameterDTO> configDescriptions;
         public JsonNode conditions;
         public JsonNode actions;
         public JsonNode triggers;
