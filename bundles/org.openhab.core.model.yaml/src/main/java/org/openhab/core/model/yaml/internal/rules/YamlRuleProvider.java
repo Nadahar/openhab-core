@@ -33,9 +33,9 @@ import org.openhab.core.automation.Visibility;
 import org.openhab.core.automation.util.ModuleBuilder;
 import org.openhab.core.automation.util.RuleBuilder;
 import org.openhab.core.common.registry.AbstractProvider;
-import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.model.yaml.YamlModelListener;
+import org.openhab.core.model.yaml.internal.config.YamlConfigDescriptionParameterDTO;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -58,7 +58,7 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
     private final Map<String, Collection<Rule>> rulesMap = new ConcurrentHashMap<>();
 
     @Activate
-    public YamlRuleProvider() { // TODO: (Nad) Handle/Test ConfigDescriptions
+    public YamlRuleProvider() {
     }
 
     @Deactivate
@@ -159,9 +159,10 @@ public class YamlRuleProvider extends AbstractProvider<Rule> implements RuleProv
         if (configuration != null) {
             ruleBuilder.withConfiguration(new Configuration(configuration));
         }
-        List<ConfigDescriptionParameter> configurationDescriptions = ruleDto.configDescriptions;
-        if (configurationDescriptions != null) {
-            ruleBuilder.withConfigurationDescriptions(configurationDescriptions);
+        List<YamlConfigDescriptionParameterDTO> configDescriptionDtos = ruleDto.configDescriptions;
+        if (configDescriptionDtos != null) {
+            ruleBuilder.withConfigurationDescriptions(
+                    YamlConfigDescriptionParameterDTO.mapConfigDescriptions(configDescriptionDtos));
         }
         List<YamlActionDTO> actionDTOs = ruleDto.actions;
         if (actionDTOs != null) {
