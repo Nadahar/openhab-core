@@ -25,7 +25,7 @@ import org.openhab.core.config.core.ParameterOption;
 import org.openhab.core.config.core.dto.FilterCriteriaDTO;
 import org.openhab.core.config.core.dto.ParameterOptionDTO;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 /**
  * This is a data transfer object used to serialize a parameter of a configuration description in a YAML configuration.
@@ -35,7 +35,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class YamlConfigDescriptionParameterDTO { // TODO: (Nad) JavaDocs
 
     public String context;
-    @JsonProperty("default")
+    @JsonAlias({ "default", "defaultValue" })
     public String defaultValue;
     public String description;
     public String label;
