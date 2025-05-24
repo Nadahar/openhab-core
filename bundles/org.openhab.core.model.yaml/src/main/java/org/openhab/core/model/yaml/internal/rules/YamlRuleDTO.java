@@ -26,6 +26,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Rule;
+import org.openhab.core.automation.Rule.TemplateState;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
 import org.openhab.core.common.AbstractUID;
@@ -36,6 +37,7 @@ import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlElementName;
 import org.openhab.core.model.yaml.internal.config.YamlConfigDescriptionParameterDTO;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,10 +54,11 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
 
     public String uid;
     public String templateUid;
+    public TemplateState templateState;
     public String label;
     public Set<@NonNull String> tags;
     public String description;
-    public String visibility;
+    public Visibility visibility;
     public Map<@NonNull String, @NonNull Object> config;
     public List<@NonNull YamlConfigDescriptionParameterDTO> configDescriptions;
     public List<@NonNull YamlConditionDTO> conditions;
@@ -76,10 +79,11 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
     public YamlRuleDTO(@NonNull Rule rule) {
         this.uid = rule.getUID();
         this.templateUid = rule.getTemplateUID();
+        this.templateState = rule.getTemplateState();
         this.label = rule.getName();
         this.tags = rule.getTags();
         this.description = rule.getDescription();
-        this.visibility = rule.getVisibility().name();
+        this.visibility = rule.getVisibility();
         this.config = rule.getConfiguration().getProperties();
         List<@NonNull ConfigDescriptionParameter> configDescriptions = rule.getConfigurationDescriptions();
         if (!configDescriptions.isEmpty()) {
@@ -125,18 +129,6 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         uid = id;
     }
 
-    /**
-     * Parses the string value in {@link #visibility} into a {@link Visibility} instance. Leading and trailing
-     * whitespace is ignored, and so is letter case. If the parsing fails, this method returns
-     * {@link Visibility#VISIBLE}.
-     *
-     * @return The resulting {@link Visibility}.
-     */
-    public Visibility getVisibility() {
-        Visibility result = Visibility.typeOf(visibility);
-        return result == null ? Visibility.VISIBLE : result;
-    }
-
     @Override
     public @NonNull YamlRuleDTO toDto(@NonNull JsonNode node, @NonNull ObjectMapper mapper)
             throws SerializationException {
@@ -146,10 +138,14 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
             partial = mapper.treeToValue(node, YamlPartialRuleDTO.class);
             result.uid = partial.uid;
             result.templateUid = partial.templateUid;
+            result.templateState = TemplateState.typeOf(partial.templateState);
             result.label = partial.label;
             result.tags = partial.tags;
             result.description = partial.description;
-            result.visibility = partial.visibility;
+            result.visibility = Visibility.typeOf(partial.visibility);
+            if (result.visibility == null) {
+                result.visibility = Visibility.VISIBLE;
+            }
             result.config = partial.config;
             result.configDescriptions = partial.configDescriptions;
 
@@ -313,8 +309,8 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
 
     @Override
     public int hashCode() {
-        return Objects.hash(actions, conditions, config, configDescriptions, description, label, tags, templateUid,
-                triggers, uid, visibility);
+        return Objects.hash(actions, conditions, config, configDescriptions, description, label, tags, templateState,
+            templateUid, triggers, uid, visibility);
     }
 
     @Override
@@ -327,11 +323,11 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         }
         YamlRuleDTO other = (YamlRuleDTO) obj;
         return Objects.equals(actions, other.actions) && Objects.equals(conditions, other.conditions)
-                && Objects.equals(config, other.config) && Objects.equals(configDescriptions, other.configDescriptions)
-                && Objects.equals(description, other.description) && Objects.equals(label, other.label)
-                && Objects.equals(tags, other.tags) && Objects.equals(templateUid, other.templateUid)
-                && Objects.equals(triggers, other.triggers) && Objects.equals(uid, other.uid)
-                && visibility == other.visibility;
+            && Objects.equals(config, other.config) && Objects.equals(configDescriptions, other.configDescriptions)
+            && Objects.equals(description, other.description) && Objects.equals(label, other.label)
+            && Objects.equals(tags, other.tags) && templateState == other.templateState
+            && Objects.equals(templateUid, other.templateUid) && Objects.equals(triggers, other.triggers)
+            && Objects.equals(uid, other.uid) && Objects.equals(visibility, other.visibility);
     }
 
     @Override
@@ -343,6 +339,9 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         }
         if (templateUid != null) {
             builder.append("templateUID=").append(templateUid).append(", ");
+        }
+        if (templateState != null) {
+            builder.append("templateState=").append(templateState).append(", ");
         }
         if (label != null) {
             builder.append("label=").append(label).append(", ");
@@ -380,11 +379,14 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
      */
     protected static class YamlPartialRuleDTO {
         public String uid;
+        @JsonAlias({ "template", "templateUID" })
         public String templateUid;
+        public String templateState;
         public String label;
         public Set<@NonNull String> tags;
         public String description;
         public String visibility;
+        @JsonAlias({ "configuration" })
         public Map<@NonNull String, @NonNull Object> config;
         public List<@NonNull YamlConfigDescriptionParameterDTO> configDescriptions;
         public JsonNode conditions;

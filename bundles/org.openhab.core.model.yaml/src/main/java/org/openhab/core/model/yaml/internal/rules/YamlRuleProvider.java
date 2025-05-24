@@ -27,7 +27,6 @@ import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleProvider;
 import org.openhab.core.automation.Trigger;
-import org.openhab.core.automation.Visibility;
 import org.openhab.core.automation.util.RuleBuilder;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.model.yaml.YamlModelListener;
@@ -141,6 +140,9 @@ public class YamlRuleProvider extends AbstractYamlRuleProvider<Rule>
         if ((s = ruleDto.templateUid) != null) {
             ruleBuilder.withTemplateUID(s);
         }
+        if (ruleDto.templateState != null) {
+            ruleBuilder.withTemplateState(ruleDto.templateState);
+        }
         Set<String> tags = ruleDto.tags;
         if (tags != null) {
             ruleBuilder.withTags(tags);
@@ -148,9 +150,8 @@ public class YamlRuleProvider extends AbstractYamlRuleProvider<Rule>
         if ((s = ruleDto.description) != null) {
             ruleBuilder.withDescription(s);
         }
-        Visibility visibility = ruleDto.getVisibility();
-        if (visibility != null) {
-            ruleBuilder.withVisibility(visibility);
+        if (ruleDto.visibility != null) {
+            ruleBuilder.withVisibility(ruleDto.visibility);
         }
         Map<String, Object> configuration = ruleDto.config;
         if (configuration != null) {
