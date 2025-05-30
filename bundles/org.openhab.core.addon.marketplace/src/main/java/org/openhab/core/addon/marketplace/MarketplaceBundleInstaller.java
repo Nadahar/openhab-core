@@ -16,22 +16,37 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.OpenHAB;
+import org.openhab.core.addon.Version;
+import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.util.UIDUtils;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
 /**
  * Handle the management of bundles related to marketplace add-ons that resists OSGi cache cleanups.
@@ -45,9 +60,15 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 public abstract class MarketplaceBundleInstaller {
+
+    protected static final String INFO_FILE_SUFFIX = "_info.json";
+
     private final Logger logger = LoggerFactory.getLogger(MarketplaceBundleInstaller.class);
 
     private static final Path BUNDLE_CACHE_PATH = Path.of(OpenHAB.getUserDataFolder(), "marketplace", "bundles");
+
+    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create(); // TODO: (Nad) Consider needed adapters
 
     /**
      * Downloads a bundle file from a remote source and puts it in the local cache with the add-on ID.
@@ -57,13 +78,35 @@ public abstract class MarketplaceBundleInstaller {
      * @throws MarketplaceHandlerException
      */
     protected void addBundleToCache(String addonId, URL sourceUrl) throws MarketplaceHandlerException {
+        addBundleToCache(addonId, sourceUrl, null);
+    }
+
+    /**
+     * Downloads a bundle file from a remote source and puts it in the local cache with the add-on ID.
+     *
+     * @param addonId the add-on ID
+     * @param sourceUrl the (online) source where the .jar file can be found
+     * @param version the add-on version if known
+     * @throws MarketplaceHandlerException
+     */
+    protected void addBundleToCache(String addonId, URL sourceUrl, @Nullable Version version) throws MarketplaceHandlerException {
         try {
             String fileName = new File(sourceUrl.toURI().getPath()).getName();
-            Path addonFile = getAddonCacheDirectory(addonId).resolve(fileName);
-            Files.createDirectories(addonFile.getParent());
+            Path cacheDir = getAddonCacheDirectory(addonId);
+            Path addonFile = cacheDir.resolve(fileName);
+            Path infoFile = cacheDir.resolve(resolveInfoFileName(fileName));
+            Files.createDirectories(cacheDir);
 
-            InputStream source = sourceUrl.openStream();
-            Files.copy(source, addonFile, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream source = sourceUrl.openStream()) {
+                Files.copy(source, addonFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            JsonObject root = new JsonObject();
+            if (version != null) {
+                root.addProperty("version", version.toString()); // TODO: (Nad) Only write if not empty, delete otherwise
+            }
+            try (OutputStream os = Files.newOutputStream(infoFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                os.write(gson.toJson(root).getBytes(StandardCharsets.UTF_8));
+            }
         } catch (IOException | URISyntaxException e) {
             throw new MarketplaceHandlerException("Cannot copy bundle to local cache: " + e.getMessage(), e);
         }
@@ -80,7 +123,16 @@ public abstract class MarketplaceBundleInstaller {
         Path addonPath = getAddonCacheDirectory(addonId);
         if (Files.isDirectory(addonPath)) {
             try (Stream<Path> files = Files.list(addonPath)) {
-                List<Path> bundleFiles = files.toList();
+                List<Path> bundleFiles = new ArrayList<>(files.toList());
+                Path infoFile;
+                for (Iterator<Path> iterator = bundleFiles.iterator(); iterator.hasNext();) {
+                    infoFile = iterator.next();
+                    infoFile = infoFile.getFileName();
+                    if (infoFile != null && infoFile.toString().endsWith(INFO_FILE_SUFFIX)) {
+                        iterator.remove();
+                        break;
+                    }
+                }
                 if (bundleFiles.size() != 1) {
                     throw new MarketplaceHandlerException(
                             "The local cache folder doesn't contain a single file: " + addonPath, null);
@@ -109,7 +161,40 @@ public abstract class MarketplaceBundleInstaller {
      * @param addonId the add-on ID
      */
     protected boolean isBundleInstalled(BundleContext bundleContext, String addonId) {
-        return bundleContext.getBundle(addonId) != null;
+        Bundle bundle = bundleContext.getBundle(addonId);
+        return bundle != null && bundle.getState() != Bundle.UNINSTALLED;
+    }
+
+    // TODO: (Nad) JavaDocs - uses cached version; can't trust bundle version
+    protected @Nullable Version getBundleVersion(String addonId) {
+        Path addonPath = getAddonCacheDirectory(addonId);
+        if (!Files.isDirectory(addonPath)) {
+            return null;
+        }
+        try {
+            Path infoFile = Files.list(addonPath).filter(p -> {
+                Path file = p.getFileName();
+                return file != null && file.toString().endsWith(INFO_FILE_SUFFIX);
+            }).findAny().orElse(null);
+            if (infoFile != null) {
+                String infoContent = new String(Files.readAllBytes(infoFile), StandardCharsets.UTF_8);
+                JsonElement element = JsonParser.parseString(infoContent);
+                if (element instanceof JsonObject object) {
+                    JsonElement versionEl = object.get("version");
+                    if (versionEl instanceof JsonPrimitive primEl) {
+                        try {
+                            return Version.valueOf(primEl.getAsString());
+                        } catch (IllegalArgumentException e) {
+                            logger.warn("An error occurred while trying to resolve the version of add-on with ID \"{}\": {}", addonId, e.getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("An error occurred while trying to resolve the version of add-on with ID \"{}\": {}", addonId, e.getMessage());
+            logger.trace("", e);
+        }
+        return null;
     }
 
     /**
@@ -132,14 +217,18 @@ public abstract class MarketplaceBundleInstaller {
         } catch (IOException e) {
             throw new MarketplaceHandlerException("Failed to delete bundle-files: " + e.getMessage(), e);
         }
-        if (isBundleInstalled(bundleContext, addonId)) {
-            Bundle bundle = bundleContext.getBundle(addonId);
-            try {
-                bundle.stop();
-                bundle.uninstall();
-            } catch (BundleException e) {
-                throw new MarketplaceHandlerException("Failed uninstalling bundle: " + e.getMessage(), e);
+        Bundle bundle = bundleContext.getBundle(addonId);
+        if (bundle != null) {
+            if (bundle.getState() != Bundle.UNINSTALLED) {
+                try {
+                    bundle.stop();
+                    bundle.uninstall();
+                } catch (BundleException e) {
+                    throw new MarketplaceHandlerException("Failed uninstalling bundle: " + e.getMessage(), e);
+                }
             }
+        } else {
+            logger.warn("Failed to uninstall add-on \"{}\" since the bundle couldn't be found", addonId);
         }
     }
 
@@ -157,13 +246,26 @@ public abstract class MarketplaceBundleInstaller {
                             try {
                                 installFromCache(bundleContext, addonId);
                             } catch (MarketplaceHandlerException e) {
-                                logger.warn("Failed reinstalling add-on from cache", e);
+                                logger.warn("Failed to reinstall add-on \"{}\" from cache: {}", addonId, e.getMessage());
+                                logger.trace("", e);
                             }
                         });
             } catch (IOException e) {
                 logger.warn("Failed to re-install bundles: {}", e.getMessage());
+                logger.trace("", e);
             }
         }
+    }
+
+    protected String resolveInfoFileName(String fileName) { // TODO: (Nad) JavaDocs
+        String result;
+        int idx = fileName.lastIndexOf('.');
+        if (idx > 0) {
+            result = fileName.substring(0, idx);
+        } else {
+            result = fileName;
+        }
+        return result + INFO_FILE_SUFFIX;
     }
 
     private String addonIdFromPath(Path path) {

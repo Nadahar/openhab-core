@@ -27,6 +27,7 @@ import java.util.Locale;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
 import org.openhab.core.ui.components.RootUIComponent;
@@ -72,6 +73,12 @@ public class CommunityBlockLibaryAddonHandler implements MarketplaceAddonHandler
     @Override
     public boolean isInstalled(String id) {
         return blocksRegistry.getAll().stream().anyMatch(w -> w.hasTag(id));
+    }
+
+    @Override
+    public @Nullable Version getVersion(String id) {
+        // TODO: (Nad) Handle version
+        return null;
     }
 
     @Override

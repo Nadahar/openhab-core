@@ -24,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceBundleInstaller;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
@@ -71,6 +72,11 @@ public class CommunityBundleAddonHandler extends MarketplaceBundleInstaller impl
     @Override
     public boolean isInstalled(String id) {
         return isBundleInstalled(bundleContext, id);
+    }
+
+    @Override
+    public @Nullable Version getVersion(String id) {
+        return getBundleVersion(id);
     }
 
     @Override
