@@ -21,6 +21,7 @@ import java.util.Set;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
 
@@ -60,6 +61,12 @@ public class TestAddonHandler implements MarketplaceAddonHandler {
         }
 
         return installedAddons.contains(id);
+    }
+
+    @Override
+    public @Nullable Version getVersion(String id) {
+        // TODO: (Nad) Handle version
+        return null;
     }
 
     @Override

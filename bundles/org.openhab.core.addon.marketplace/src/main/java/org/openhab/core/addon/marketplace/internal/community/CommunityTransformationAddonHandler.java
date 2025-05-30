@@ -31,6 +31,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
 import org.openhab.core.common.registry.ProviderChangeListener;
@@ -89,6 +90,11 @@ public class CommunityTransformationAddonHandler implements MarketplaceAddonHand
         return storage.containsKey(id);
     }
 
+    @Override
+    public @Nullable Version getVersion(String id) {
+        // TODO: (Nad) Handle version
+        return null;
+    }
     @Override
     public void install(Addon addon) throws MarketplaceHandlerException {
         try {

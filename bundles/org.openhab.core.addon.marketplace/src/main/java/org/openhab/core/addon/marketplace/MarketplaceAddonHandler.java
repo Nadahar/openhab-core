@@ -15,6 +15,7 @@ package org.openhab.core.addon.marketplace;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 
 /**
  * This interface can be implemented by services that want to register as handlers for specific marketplace add-on
@@ -49,6 +50,9 @@ public interface MarketplaceAddonHandler {
      * @return true, if the add-on is installed, false otherwise
      */
     boolean isInstalled(String id);
+
+    @Nullable
+    Version getVersion(String id); // TODO: (Nad) JavaDocs if keep
 
     /**
      * Installs a given add-on.
