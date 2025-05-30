@@ -33,6 +33,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.Version;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
 import org.openhab.core.common.ThreadPoolManager;
@@ -106,6 +107,12 @@ public class CommunityKarafAddonHandler implements MarketplaceAddonHandler {
         }
 
         return false;
+    }
+
+    @Override
+    public @Nullable Version getVersion(String id) {
+        // TODO: (Nad) Make version support
+        return null;
     }
 
     @Override
