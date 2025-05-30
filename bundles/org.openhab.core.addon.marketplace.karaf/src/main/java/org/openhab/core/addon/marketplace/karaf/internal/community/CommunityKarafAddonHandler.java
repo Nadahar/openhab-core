@@ -101,7 +101,8 @@ public class CommunityKarafAddonHandler implements MarketplaceAddonHandler {
             return karFilesStream(addonDirectory).findFirst().map(this::pathToKarRepoName).map(repositories::contains)
                     .orElse(false);
         } catch (Exception e) {
-            logger.warn("Failed to determine installation status for {}: ", addonId, e);
+            logger.warn("Failed to determine installation status for \"{}\": {}", addonId, e.getMessage());
+            logger.trace("", e);
         }
 
         return false;
@@ -133,7 +134,7 @@ public class CommunityKarafAddonHandler implements MarketplaceAddonHandler {
             }
             Files.delete(addonPath);
         } catch (Exception e) {
-            throw new MarketplaceHandlerException("Failed uninstalling KAR: " + e.getMessage(), e);
+            throw new MarketplaceHandlerException("Failed to uninstall KAR: " + e.getMessage(), e);
         }
     }
 
@@ -186,11 +187,13 @@ public class CommunityKarafAddonHandler implements MarketplaceAddonHandler {
                             try {
                                 installFromCache(addonId);
                             } catch (MarketplaceHandlerException e) {
-                                logger.warn("Failed reinstalling add-on from cache", e);
+                                logger.warn("Failed to reinstall add-on \"{}\" from cache", addonId, e.getMessage());
+                                logger.trace("", e);
                             }
                         });
             } catch (IOException e) {
-                logger.warn("Failed to re-install KARs: {}", e.getMessage());
+                logger.warn("Failed to reinstall KARs: {}", e.getMessage());
+                logger.trace("", e);
             }
         }
         isReady = true;
