@@ -148,7 +148,7 @@ public class CommunityKarafAddonHandler implements MarketplaceAddonHandler {
         try {
             String fileName = new File(sourceUrl.toURI().getPath()).getName();
             Path addonFile = getAddonCacheDirectory(addonId).resolve(fileName);
-            Files.createDirectories(addonFile.getParent());
+            Files.createDirectories(addonFile.getParent()); //TODO: (Nad) Create info file...?
             InputStream source = sourceUrl.openStream();
             Files.copy(source, addonFile, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException | URISyntaxException e) {

@@ -97,7 +97,7 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
      * @param bundle the bundle to check
      * @return <code>true</code> if bundle is considered, <code>false</code> otherwise
      */
-    public boolean isRelevant(Bundle bundle) {
+    public boolean isRelevant(Bundle bundle) { // TODO: (Nad) Isn't this too broad? KARs?
         return bundle.getLocation().startsWith("file:") && bundle.getEntry("OH-INF/addon/addon.xml") != null;
     }
 
@@ -140,7 +140,7 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
     }
 
     @Override
-    public synchronized void refreshSource() {
+    public synchronized void refreshSource() { // TODO: (Nad) Look into this refreshing....
         addons = trackedBundles.stream().map(this::toAddon).filter(Objects::nonNull).map(Objects::requireNonNull)
                 .collect(Collectors.toMap(Addon::getUid, addon -> addon));
     }
