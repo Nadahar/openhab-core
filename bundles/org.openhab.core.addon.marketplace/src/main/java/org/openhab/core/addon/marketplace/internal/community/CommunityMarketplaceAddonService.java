@@ -112,7 +112,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
         "<pre(?: data-code-wrap=\"(?i)version(?-i)\")?><code class=\"lang-(?i)version(?-i)\">(?<content>.*?)</code></pre>\\n?",
         Pattern.DOTALL);
     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
-            "^\\s*(?<key>\\w+)\\s*(?:=|:)\\s*(?<value>.*?)\\s*$", Pattern.MULTILINE);
+            "^[^\\S\\r\\n]*(?<key>\\w+)[^\\S\\r\\n]*(?:=|:)[^\\S\\r\\n]*(?<value>.*?)[^\\S\\r\\n]*$", Pattern.MULTILINE);
 
     private static final Integer BUNDLES_CATEGORY = 73;
     private static final Integer RULETEMPLATES_CATEGORY = 74;
