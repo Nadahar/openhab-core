@@ -106,9 +106,9 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
             @NonNullByDefault({}) BundleEvent event) {
         if (isRelevant(bundle) && trackedBundles.add(bundle)) {
             logger.debug("Added {} to add-on list", bundle.getSymbolicName());
+            scheduler.execute(this::refreshSource);
         }
 
-        scheduler.execute(this::refreshSource);
         return bundle;
     }
 
@@ -125,8 +125,8 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
             @NonNullByDefault({}) BundleEvent event, Bundle object) {
         if (trackedBundles.remove(bundle)) {
             logger.debug("Removed {} from add-on list", bundle.getSymbolicName());
+            scheduler.execute(this::refreshSource);
         }
-        scheduler.execute(this::refreshSource);
     }
 
     @Override
