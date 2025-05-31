@@ -669,8 +669,9 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             compatible = false;
             List<Entry<String, Object>> props = versions.values().stream().filter(a -> !a.getProperties().isEmpty())
                     .flatMap(t -> t.getProperties().entrySet().stream()).filter(e -> RESOURCE_PROPERTY_NAMES.contains(e.getKey())).toList();
+            String key;
             for (Entry<String, Object> entry : props) {
-                if (entry.getValue() instanceof String value && (JAR_DOWNLOAD_URL_PROPERTY.equals(value) || KAR_DOWNLOAD_URL_PROPERTY.equals(value))) {
+                if (entry.getValue() instanceof String value && (JAR_DOWNLOAD_URL_PROPERTY.equals(key = entry.getKey()) || KAR_DOWNLOAD_URL_PROPERTY.equals(key))) {
                     id = determineIdFromUrl(value);
                     if (id != null) {
                         break;
