@@ -670,7 +670,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             List<Entry<String, Object>> props = versions.values().stream().filter(a -> !a.getProperties().isEmpty())
                     .flatMap(t -> t.getProperties().entrySet().stream()).filter(e -> RESOURCE_PROPERTY_NAMES.contains(e.getKey())).toList();
             String key;
-            for (Entry<String, Object> entry : props) {
+            for (Entry<String, Object> entry : props) { //TODO: (Nad) Is this the best way to find the ID? "The first with result"..? Add a property for this?
                 if (entry.getValue() instanceof String value && (JAR_DOWNLOAD_URL_PROPERTY.equals(key = entry.getKey()) || KAR_DOWNLOAD_URL_PROPERTY.equals(key))) {
                     id = determineIdFromUrl(value);
                     if (id != null) {
