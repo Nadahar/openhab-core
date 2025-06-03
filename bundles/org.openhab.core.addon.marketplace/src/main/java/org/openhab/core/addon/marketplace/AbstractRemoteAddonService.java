@@ -92,6 +92,8 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     protected List<Addon> cachedAddons = List.of();
     // Guarded by "this"
     protected List<String> installedAddonIds = List.of();
+    // Guarded by "this"
+    protected boolean includeIncompatible;
 
     private final Logger logger = LoggerFactory.getLogger(AbstractRemoteAddonService.class);
     private final ScheduledExecutorService scheduler = ThreadPoolManager.getScheduledPool(THREAD_POOL_NAME_COMMON);
@@ -105,6 +107,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         this.configurationAdmin = configurationAdmin;
         this.installedAddonStorage = storageService.getStorage(servicePid);
         this.coreVersion = getCoreVersion();
+        this.includeIncompatible = includeIncompatible();
     }
 
     protected Version getCoreVersion() {
@@ -151,6 +154,11 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
     @Override
     public synchronized void refreshSource() {
+        if (includeIncompatible != includeIncompatible()) {
+            includeIncompatible = !includeIncompatible;
+            cachedRemoteAddons.invalidateValue();
+        }
+
         if (addonHandlers.isEmpty() || !addonHandlers.stream().allMatch(MarketplaceAddonHandler::isReady)) {
             logger.debug("Add-on service '{}' tried to refresh source before add-on handlers ready. Exiting.",
                     getClass().getSimpleName());
