@@ -630,7 +630,7 @@ public class Addon {
             this.uid = uid;
         }
 
-        protected Builder(Addon addon, boolean setBase) {
+        protected Builder(@NonNull Addon addon, boolean setBase) {
             this.setBase = setBase;
             this.uid = addon.uid;
             this.id = addon.id;
