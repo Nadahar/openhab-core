@@ -235,10 +235,24 @@ public class Addon {
     }
 
     /**
+     * The "base" link to the add-on documentation, if the add-on is versioned.
+     */
+    public @Nullable String getBaseDocumentationLink() {
+        return baseDocumentationLink;
+    }
+
+    /**
      * The (optional) link to the add-on issues tracker
      */
     public @Nullable String getIssuesLink() {
         return issuesLink;
+    }
+
+    /**
+     * The "base" link to the add-on issues tracker, if the add-on is versioned.
+     */
+    public @Nullable String getBaseIssuesLink() {
+        return baseIssuesLink;
     }
 
     /**
@@ -263,7 +277,7 @@ public class Addon {
     }
 
     /**
-     * The "base" version of the add-on if the add-on is versioned
+     * The "base" version of the add-on, if the add-on is versioned.
      */
     public @Nullable Version getBaseVersion() {
         return baseVersion;
@@ -277,6 +291,13 @@ public class Addon {
     }
 
     /**
+     * The "base" maturity level of this version, if the add-on is versioned.
+     */
+    public @Nullable String getBaseMaturity() {
+        return baseMaturity;
+    }
+
+    /**
      * The default version if several, prefers compatible, released and latest
      */
     public @Nullable Version getDefaultVersion() {
@@ -284,10 +305,17 @@ public class Addon {
     }
 
     /**
-     * The other add-ons this add-on depends on
+     * The other add-ons this add-on depends on.
      */
     public @NonNull Set<@NonNull String> getDependsOn() {
         return dependsOn;
+    }
+
+    /**
+     * The "base" other add-ons this add-on depends on, if the add-on is versioned.
+     */
+    public @NonNull Set<@NonNull String> getBaseDependsOn() {
+        return baseDependsOn;
     }
 
     /**
@@ -295,6 +323,13 @@ public class Addon {
      */
     public boolean getCompatible() {
         return compatible;
+    }
+
+    /**
+     * The (expected) "base" compatibility of this add-on, if the add-on is versioned.
+     */
+    public boolean getBaseCompatible() {
+        return baseCompatible;
     }
 
     /**
@@ -312,10 +347,24 @@ public class Addon {
     }
 
     /**
+     * The "base" description of the add-on, if the add-on is versioned.
+     */
+    public @Nullable String getBaseDescription() {
+        return baseDescription;
+    }
+
+    /**
      * The detailed description of the add-on
      */
     public @Nullable String getDetailedDescription() {
         return detailedDescription;
+    }
+
+    /**
+     * The "base" detailed description of the add-on, if the add-on is versioned.
+     */
+    public @Nullable String getBaseDetailedDescription() {
+        return baseDetailedDescription;
     }
 
     /**
@@ -333,10 +382,24 @@ public class Addon {
     }
 
     /**
+     * The "base" keywords for this add-on, if the add-on is versioned.
+     */
+    public @NonNull String getBaseKeywords() {
+        return baseKeywords;
+    }
+
+    /**
      * A list of ISO 3166 codes relevant to this add-on
      */
     public @NonNull List<@NonNull String> getCountries() {
         return countries;
+    }
+
+    /**
+     * The "base" list of ISO 3166 codes relevant to this add-on, if the add-on is versioned.
+     */
+    public @NonNull List<@NonNull String> getBaseCountries() {
+        return baseCountries;
     }
 
     /**
@@ -358,6 +421,13 @@ public class Addon {
      */
     public @NonNull Map<@NonNull String, @NonNull Object> getProperties() {
         return properties;
+    }
+
+    /**
+     * The "base" set of additional properties relative to this add-on, if the add-on is versioned.
+     */
+    public @NonNull Map<@NonNull String, @NonNull Object> getBaseProperties() {
+        return baseProperties;
     }
 
     /**
@@ -411,6 +481,13 @@ public class Addon {
         return loggerPackages;
     }
 
+    /**
+     * The "base" package names that are associated with this add-on, if the add-on is versioned.
+     */
+    public @NonNull List<@NonNull String> getBaseLoggerPackages() {
+        return baseLoggerPackages;
+    }
+
     public boolean isVersioned() {
         return !versions.isEmpty();
     }
@@ -425,9 +502,6 @@ public class Addon {
     /**
      * Merges the information from a specific {@link AddonVersion} with the "base information"
      * and returns a new combined {@link Addon}.
-     * <p>
-     * <b>Note:</b> This should only be called on a "base instance", not on an instance that has
-     * already been "merged" with another version.
      *
      * @param version the {@link Version} whose {@link AddonVersion} to merge
      * @return The merged {@link Addon}
@@ -570,13 +644,24 @@ public class Addon {
     }
 
     /**
-     * Create a builder for an {@link Addon}
+     * Creates a builder for an {@link Addon}.
      *
      * @param uid the UID of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
-     * @return the builder
+     * @return the builder.
      */
     public static Builder create(String uid) {
-        return new Builder(uid);
+        return new Builder(uid, true);
+    }
+
+    /**
+     * Creates a new builder for an {@link Addon} that can also set the "base" fields. This is intended for deserialization,
+     * and isn't normally the one you want.
+     *
+     * @param uid the UID of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
+     * @return the builder.
+     */
+    public static Builder createFull(String uid) {
+        return new Builder(uid, false);
     }
 
     public static Builder create(Addon addon) {
@@ -626,7 +711,8 @@ public class Addon {
         protected @Nullable List<@NonNull String> baseLoggerPackages;
         protected @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions;
 
-        protected Builder(@NonNull String uid) {
+        protected Builder(@NonNull String uid, boolean setBase) {
+            this.setBase = setBase;
             this.uid = uid;
         }
 
@@ -699,11 +785,27 @@ public class Addon {
             return this;
         }
 
+        public Builder withBaseVersion(@Nullable Version baseVersion) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseVersion = baseVersion;
+            return this;
+        }
+
         public Builder withMaturity(@Nullable String maturity) {
             this.maturity = maturity;
             if (this.setBase) {
                 this.baseMaturity = maturity;
             }
+            return this;
+        }
+
+        public Builder withBaseMaturity(@Nullable String baseMaturity) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseMaturity = baseMaturity;
             return this;
         }
 
@@ -719,11 +821,27 @@ public class Addon {
             return this;
         }
 
+        public Builder withBaseDependsOn(@Nullable Set<@NonNull String> baseDependsOn) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseDependsOn = baseDependsOn;
+            return this;
+        }
+
         public Builder withCompatible(boolean compatible) {
             this.compatible = compatible;
             if (this.setBase) {
                 this.baseCompatible = compatible;
             }
+            return this;
+        }
+
+        public Builder withBaseCompatible(boolean baseCompatible) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseCompatible = baseCompatible;
             return this;
         }
 
@@ -737,7 +855,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withDocumentationLink(String documentationLink) {
+        public Builder withDocumentationLink(@Nullable String documentationLink) {
             this.documentationLink = documentationLink;
             if (this.setBase) {
                 this.baseDocumentationLink = documentationLink;
@@ -745,11 +863,27 @@ public class Addon {
             return this;
         }
 
-        public Builder withIssuesLink(String issuesLink) {
+        public Builder withBaseDocumentationLink(@Nullable String baseDocumentationLink) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseDocumentationLink = baseDocumentationLink;
+            return this;
+        }
+
+        public Builder withIssuesLink(@Nullable String issuesLink) {
             this.issuesLink = issuesLink;
             if (this.setBase) {
                 this.baseIssuesLink = issuesLink;
             }
+            return this;
+        }
+
+        public Builder withBaseIssuesLink(@Nullable String baseIssuesLink) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseIssuesLink = baseIssuesLink;
             return this;
         }
 
@@ -775,7 +909,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withDescription(String description) {
+        public Builder withDescription(@Nullable String description) {
             this.description = description;
             if (this.setBase) {
                 this.baseDescription = description;
@@ -783,11 +917,27 @@ public class Addon {
             return this;
         }
 
-        public Builder withDetailedDescription(String detailedDescription) {
+        public Builder withBaseDescription(@Nullable String baseDescription) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseDescription = baseDescription;
+            return this;
+        }
+
+        public Builder withDetailedDescription(@Nullable String detailedDescription) {
             this.detailedDescription = detailedDescription;
             if (this.setBase) {
                 this.baseDetailedDescription = detailedDescription;
             }
+            return this;
+        }
+
+        public Builder withBaseDetailedDescription(@Nullable String baseDetailedDescription) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseDetailedDescription = baseDetailedDescription;
             return this;
         }
 
@@ -796,7 +946,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withKeywords(String keywords) {
+        public Builder withKeywords(@Nullable String keywords) {
             this.keywords = keywords;
             if (this.setBase) {
                 this.baseKeywords = keywords;
@@ -804,15 +954,31 @@ public class Addon {
             return this;
         }
 
+        public Builder withBaseKeywords(@Nullable String baseKeywords) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseKeywords = baseKeywords;
+            return this;
+        }
+
         public @Nullable List<@NonNull String> getCountries() {
             return countries;
         }
 
-        public Builder withCountries(List<@NonNull String> countries) {
+        public Builder withCountries(@Nullable List<@NonNull String> countries) {
             this.countries = countries;
             if (this.setBase) {
                 this.baseCountries = countries;
             }
+            return this;
+        }
+
+        public Builder withBaseCountries(@Nullable List<@NonNull String> baseCountries) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseCountries = baseCountries;
             return this;
         }
 
@@ -849,6 +1015,19 @@ public class Addon {
             return this;
         }
 
+        public Builder withBaseProperty(@NonNull String key, @NonNull Object value) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            Map<@NonNull String, @NonNull Object> baseProps = this.baseProperties;
+            if (baseProps == null) {
+                baseProps = new HashMap<>();
+            }
+            baseProps.put(key, value);
+            this.baseProperties = baseProps;
+            return this;
+        }
+
         public Builder withProperties(@Nullable Map<@NonNull String, @NonNull Object> properties) {
             this.properties = properties;
             if (this.setBase) {
@@ -857,15 +1036,31 @@ public class Addon {
             return this;
         }
 
+        public Builder withBaseProperties(@Nullable Map<@NonNull String, @NonNull Object> baseProperties) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseProperties = baseProperties;
+            return this;
+        }
+
         public @Nullable List<@NonNull String> getLoggerPackages() {
             return loggerPackages;
         }
 
-        public Builder withLoggerPackages(List<@NonNull String> loggerPackages) {
+        public Builder withLoggerPackages(@Nullable List<@NonNull String> loggerPackages) {
             this.loggerPackages = loggerPackages;
             if (this.setBase) {
                 this.baseLoggerPackages = loggerPackages;
             }
+            return this;
+        }
+
+        public Builder withBaseLoggerPackages(@Nullable List<@NonNull String> baseLoggerPackages) {
+            if (this.setBase) {
+                throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
+            }
+            this.baseLoggerPackages = baseLoggerPackages;
             return this;
         }
 

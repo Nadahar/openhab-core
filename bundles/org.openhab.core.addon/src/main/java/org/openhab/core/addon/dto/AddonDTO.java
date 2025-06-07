@@ -33,30 +33,42 @@ public class AddonDTO {
     public String id;
     public String label;
     public String version;
+    public String baseVersion;
     public String maturity;
+    public String baseMaturity;
     public Set<String> dependsOn;
+    public Set<String> baseDependsOn;
     public boolean compatible;
+    public Boolean baseCompatible;
     public String contentType;
     public String link;
     public String documentationLink;
+    public String baseDocumentationLink;
     public String issuesLink;
+    public String baseIssuesLink;
     public String author;
     public boolean verifiedAuthor;
     public boolean installed;
     public String installedVersion;
     public String type;
     public String description;
+    public String baseDescription;
     public String detailedDescription;
+    public String baseDetailedDescription;
     public String configDescriptionURI;
     public String keywords;
+    public String baseKeywords;
     public List<String> countries;
+    public List<String> baseCountries;
     public String license;
     public String connection;
     public String backgroundColor;
     public String imageLink;
     public Map<String, Object> properties;
+    public Map<String, Object> baseProperties;
     public List<String> loggerPackages;
-    public LinkedHashMap<String, AddonVersion> versions;
+    public List<String> baseLoggerPackages;
+    public LinkedHashMap<String, AddonVersionDTO> versions;
 
     /**
      * Creates a new {@link Addon} from this {@link AddonDTO}.
@@ -64,7 +76,7 @@ public class AddonDTO {
      * @return The new {@link Addon}.
      */
     public @NonNull Addon toAddon() {
-        Addon.Builder b = Addon.create(this.uid);
+        Addon.Builder b = Addon.createFull(this.uid);
         if (this.id != null) {
             b.withId(this.id);
         }
@@ -74,10 +86,19 @@ public class AddonDTO {
         if (this.version != null) {
             b.withVersion(Version.valueOf(this.version));
         }
+        if (this.baseVersion != null) {
+            b.withBaseVersion(Version.valueOf(this.baseVersion));
+        }
         if (this.maturity != null) {
             b.withMaturity(this.maturity);
         }
-        b.withDependsOn(this.dependsOn).withCompatible(this.compatible);
+        if (this.baseMaturity != null) {
+            b.withBaseMaturity(this.baseMaturity);
+        }
+        b.withDependsOn(this.dependsOn).withBaseDependsOn(this.baseDependsOn).withCompatible(this.compatible);
+        if (this.baseCompatible != null) {
+            b.withBaseCompatible(this.baseCompatible.booleanValue());
+        }
         if (this.contentType != null) {
             b.withContentType(this.contentType);
         }
@@ -87,8 +108,14 @@ public class AddonDTO {
         if (this.documentationLink != null) {
             b.withDocumentationLink(this.documentationLink);
         }
+        if (this.baseDocumentationLink != null) {
+            b.withBaseDocumentationLink(this.baseDocumentationLink);
+        }
         if (this.issuesLink != null) {
             b.withIssuesLink(this.issuesLink);
+        }
+        if (this.baseIssuesLink != null) {
+            b.withBaseIssuesLink(this.baseIssuesLink);
         }
         if (this.author != null) {
             b.withAuthor(this.author, this.verifiedAuthor);
@@ -104,8 +131,14 @@ public class AddonDTO {
         if (this.description != null) {
             b.withDescription(this.description);
         }
+        if (this.baseDescription != null) {
+            b.withBaseDescription(this.baseDescription);
+        }
         if (this.detailedDescription != null) {
             b.withDetailedDescription(this.detailedDescription);
+        }
+        if (this.baseDetailedDescription != null) {
+            b.withBaseDetailedDescription(this.baseDetailedDescription);
         }
         if (this.configDescriptionURI != null) {
             b.withConfigDescriptionURI(this.configDescriptionURI);
@@ -113,8 +146,14 @@ public class AddonDTO {
         if (this.keywords != null) {
             b.withKeywords(this.keywords);
         }
+        if (this.baseKeywords != null) {
+            b.withBaseKeywords(this.baseKeywords);
+        }
         if (this.countries != null) {
             b.withCountries(this.countries);
+        }
+        if (this.baseCountries != null) {
+            b.withBaseCountries(this.baseCountries);
         }
         if (this.license != null) {
             b.withLicense(this.license);
@@ -131,12 +170,18 @@ public class AddonDTO {
         if (this.properties != null) {
             b.withProperties(this.properties);
         }
+        if (this.baseProperties != null) {
+            b.withBaseProperties(this.baseProperties);
+        }
         if (this.loggerPackages != null) {
             b.withLoggerPackages(this.loggerPackages);
         }
+        if (this.baseLoggerPackages != null) {
+            b.withBaseLoggerPackages(this.baseLoggerPackages);
+        }
         if (this.versions != null) {
-            for (AddonVersion addonVersion : this.versions.values()) {
-                b.withAddonVersion(addonVersion);
+            for (AddonVersionDTO addonVersion : this.versions.values()) {
+                b.withAddonVersion(addonVersion.toAddonVersion());
             }
         }
         return b.build();
@@ -158,16 +203,28 @@ public class AddonDTO {
         if (v != null) {
             result.version = v.toString();
         }
+        v = addon.getBaseVersion();
+        if (v != null) {
+            result.baseVersion = v.toString();
+        }
         result.maturity = addon.getMaturity();
+        result.baseMaturity = addon.getBaseMaturity();
         Set<String> stringSet = addon.getDependsOn();
         if (!stringSet.isEmpty()) {
             result.dependsOn = stringSet;
         }
+        stringSet = addon.getBaseDependsOn();
+        if (!stringSet.isEmpty()) {
+            result.baseDependsOn = stringSet;
+        }
         result.compatible = addon.getCompatible();
+        result.baseCompatible = addon.getBaseCompatible();
         result.contentType = addon.getContentType();
         result.link = addon.getLink();
         result.documentationLink = addon.getDocumentationLink();
+        result.baseDocumentationLink = addon.getBaseDocumentationLink();
         result.issuesLink = addon.getIssuesLink();
+        result.baseIssuesLink = addon.getBaseIssuesLink();
         result.author = addon.getAuthor();
         result.verifiedAuthor = addon.isVerifiedAuthor();
         result.installed = addon.isInstalled();
@@ -177,12 +234,19 @@ public class AddonDTO {
         }
         result.type = addon.getType();
         result.description = addon.getDescription();
+        result.baseDescription = addon.getBaseDescription();
         result.detailedDescription = addon.getDetailedDescription();
+        result.baseDetailedDescription = addon.getBaseDetailedDescription();
         result.configDescriptionURI = addon.getConfigDescriptionURI();
         result.keywords = addon.getKeywords();
+        result.baseKeywords = addon.getBaseKeywords();
         List<String> stringList = addon.getCountries();
         if (!stringList.isEmpty()) {
             result.countries = stringList;
+        }
+        stringList = addon.getBaseCountries();
+        if (!stringList.isEmpty()) {
+            result.baseCountries = stringList;
         }
         result.license = addon.getLicense();
         result.connection = addon.getConnection();
@@ -192,14 +256,22 @@ public class AddonDTO {
         if (!map.isEmpty()) {
             result.properties = map;
         }
+        map = addon.getBaseProperties();
+        if (!map.isEmpty()) {
+            result.baseProperties = map;
+        }
         stringList = addon.getLoggerPackages();
         if (!stringList.isEmpty()) {
             result.loggerPackages = stringList;
         }
+        stringList = addon.getBaseLoggerPackages();
+        if (!stringList.isEmpty()) {
+            result.baseLoggerPackages = stringList;
+        }
         if (addon.isVersioned()) {
-            LinkedHashMap<String, AddonVersion> versions = new LinkedHashMap<String, AddonVersion>();
+            LinkedHashMap<String, AddonVersionDTO> versions = new LinkedHashMap<>();
             for (Entry<@NonNull Version, @NonNull AddonVersion> entry : addon.getVersions().entrySet()) {
-                versions.put(entry.getKey().toString(), entry.getValue());
+                versions.put(entry.getKey().toString(), AddonVersionDTO.fromAddonVersion(entry.getValue()));
             }
             result.versions = versions;
         }
