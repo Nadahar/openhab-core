@@ -22,6 +22,7 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.Version;
+import org.openhab.core.addon.dto.AddonDTO;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.MarketplaceHandlerException;
@@ -143,7 +144,7 @@ public class TestAddonService extends AbstractRemoteAddonService {
 
         addon.setInstalled(true);
         synchronized (this) {
-            installedAddonStorage.put(id, gson.toJson(addon));
+            installedAddonStorage.put(id, AddonDTO.fromAddon(addon));
         }
     }
 }

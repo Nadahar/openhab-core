@@ -40,6 +40,7 @@ import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.Version;
 import org.openhab.core.addon.VersionTypeAdapter;
+import org.openhab.core.addon.dto.AddonDTO;
 import org.openhab.core.cache.ExpiringCache;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigParser;
@@ -82,7 +83,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
     protected final CopyOnWriteArraySet<MarketplaceAddonHandler> addonHandlers = new CopyOnWriteArraySet<>();
     // Guarded by "this"
-    protected final Storage<String> installedAddonStorage;
+    protected final Storage<AddonDTO> installedAddonStorage;
     protected final EventPublisher eventPublisher;
     protected final ConfigurationAdmin configurationAdmin;
     protected final ExpiringCache<List<Addon>> cachedRemoteAddons = new ExpiringCache<>(Duration.ofMinutes(15),
@@ -105,7 +106,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         this.addonInfoRegistry = addonInfoRegistry;
         this.eventPublisher = eventPublisher;
         this.configurationAdmin = configurationAdmin;
-        this.installedAddonStorage = storageService.getStorage(servicePid);
+        this.installedAddonStorage = storageService.getStorage(servicePid, getClass().getClassLoader());
         this.coreVersion = getCoreVersion();
         this.includeIncompatible = includeIncompatible();
     }
@@ -114,17 +115,42 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         return Version.valueOf(FrameworkUtil.getBundle(OpenHAB.class).getVersion());
     }
 
-    private Addon convertFromStorage(Map.Entry<String, @Nullable String> entry) {
-        Addon storedAddon = Objects.requireNonNull(gson.fromJson(entry.getValue(), Addon.class));
-
-        // Note: The retrieved add-on must be recreated whether additional info exists or not,
-        // since GSON doesn't properly recreate all details, like the Comparator for "versions".
-        Addon.Builder builder = Addon.create(storedAddon);
-        AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(storedAddon.getType() + "-" + storedAddon.getId());
-        if (addonInfo != null && storedAddon.getConfigDescriptionURI().isBlank()) {
-            builder.withConfigDescriptionURI(addonInfo.getConfigDescriptionURI());
+    private Addon convertFromStorage(Map.Entry<String, @Nullable AddonDTO> entry) {
+        Object addonObject = entry.getValue();
+        Addon storedAddon;
+        if (addonObject instanceof AddonDTO dto) {
+            storedAddon = dto.toAddon();
+        } else if (addonObject instanceof String s) {
+            // In previous versions stored items were "double wrapped" in JSON, this is here to make sure add-ons
+            // stored by a previous version can still be read.
+            storedAddon = Objects.requireNonNull(gson.fromJson(s, Addon.class));
+        } else if (addonObject == null) {
+            throw new IllegalArgumentException("Stored addon is null");
+        } else {
+            throw new IllegalArgumentException("Invalid stored addon type: " + addonObject.getClass().getSimpleName());
         }
-        return builder.build();
+        AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(storedAddon.getType() + "-" + storedAddon.getId());
+        if (addonInfo != null) {
+            Addon.Builder builder = Addon.create(storedAddon, false);
+            String s, s2;
+            if ((s = addonInfo.getConfigDescriptionURI()) != null && storedAddon.getConfigDescriptionURI().isBlank()) {
+                builder.withConfigDescriptionURI(s);
+            }
+            if ((s = addonInfo.getConnection()) != null && storedAddon.getConnection().isBlank()) {
+                builder.withConnection(s);
+            }
+            if (!addonInfo.getCountries().isEmpty() && storedAddon.getCountries().isEmpty()) {
+                builder.withCountries(addonInfo.getCountries());
+            }
+            if (!addonInfo.getDescription().isBlank() && ((s = storedAddon.getDescription()) == null || s.isBlank()) && ((s2 = storedAddon.getDetailedDescription()) == null || s2.isBlank())) {
+                // Description overrides detaildDescription if present when presented to the user,
+                // so only set it if both are blank
+                builder.withDescription(addonInfo.getDescription());
+            }
+
+            return builder.build();
+        }
+        return storedAddon;
     }
 
     /**
@@ -330,7 +356,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
                 try {
                     handler.install(mergedAddon);
                     mergedAddon.setInstalled(true, v);
-                    installedAddonStorage.put(id, gson.toJson(mergedAddon));
+                    installedAddonStorage.put(id, AddonDTO.fromAddon(mergedAddon));
                     cachedRemoteAddons.invalidateValue();
                     refreshSource();
                     postInstalledEvent(mergedAddon.getUid());
