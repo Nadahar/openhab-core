@@ -647,25 +647,42 @@ public class Addon {
      * Creates a builder for an {@link Addon}.
      *
      * @param uid the UID of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
-     * @return the builder.
+     * @return The builder.
      */
     public static Builder create(String uid) {
         return new Builder(uid, true);
     }
 
     /**
-     * Creates a new builder for an {@link Addon} that can also set the "base" fields. This is intended for deserialization,
-     * and isn't normally the one you want.
+     * Creates a new builder for an {@link Addon}.
      *
      * @param uid the UID of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
-     * @return the builder.
+     * @param setFull if {@code true}, "base" fields will be set when the corresponding field is set. If {@code false}, "base" fields must be set explicitly.
+     * @return The builder.
      */
-    public static Builder createFull(String uid) {
-        return new Builder(uid, false);
+    public static Builder create(String uid, boolean setFull) {
+        return new Builder(uid, setFull);
     }
 
+    /**
+     * Creates a new builder for an {@link Addon} initialized to the values of the specified {@link Addon}.
+     *
+     * @param addon the {@link Addon} from which to initialize the builder
+     * @return The builder.
+     */
     public static Builder create(Addon addon) {
         return new Builder(addon, true);
+    }
+
+    /**
+     * Creates a new builder for an {@link Addon} initialized to the values of the specified {@link Addon}.
+     *
+     * @param addon the {@link Addon} from which to initialize the builder
+     * @param setFull if {@code true}, "base" fields will be set when the corresponding field is set. If {@code false}, "base" fields must be set explicitly.
+     * @return The builder.
+     */
+    public static Builder create(Addon addon, boolean setFull) {
+        return new Builder(addon, setFull);
     }
 
     public static class Builder {
