@@ -48,8 +48,9 @@ public class AddonInfo implements Identifiable<String> {
     private @Nullable String sourceBundle;
     private @Nullable List<AddonDiscoveryMethod> discoveryMethods;
 
+    @SuppressWarnings("null")
     private AddonInfo(String id, String type, @Nullable String uid, String name, String description,
-            @Nullable String connection, List<String> countries, @Nullable String configDescriptionURI,
+            @Nullable String connection, @Nullable List<String> countries, @Nullable String configDescriptionURI,
             @Nullable String serviceId, @Nullable String sourceBundle,
             @Nullable List<AddonDiscoveryMethod> discoveryMethods) throws IllegalArgumentException {
         // mandatory fields
@@ -60,10 +61,10 @@ public class AddonInfo implements Identifiable<String> {
             throw new IllegalArgumentException(
                     "The type must be one of [" + String.join(", ", SUPPORTED_ADDON_TYPES) + "]");
         }
-        if (name.isBlank()) {
+        if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("The name must neither be null nor empty!");
         }
-        if (description.isBlank()) {
+        if (description == null || description.isBlank()) {
             throw new IllegalArgumentException("The description must neither be null nor empty!");
         }
         this.id = id;
@@ -74,7 +75,7 @@ public class AddonInfo implements Identifiable<String> {
 
         // optional fields
         this.connection = connection;
-        this.countries = countries;
+        this.countries = countries == null ? List.of() : List.copyOf(countries);
         this.configDescriptionURI = configDescriptionURI;
         this.serviceId = Objects.requireNonNullElse(serviceId, type + "." + id);
         this.sourceBundle = sourceBundle;
@@ -166,10 +167,10 @@ public class AddonInfo implements Identifiable<String> {
         private final String id;
         private final String type;
         private @Nullable String uid;
-        private String name = "";
-        private String description = "";
+        private @Nullable String name;
+        private @Nullable String description;
         private @Nullable String connection;
-        private List<String> countries = List.of();
+        private @Nullable List<String> countries = List.of();
         private @Nullable String configDescriptionURI = "";
         private @Nullable String serviceId;
         private @Nullable String sourceBundle;
@@ -251,6 +252,14 @@ public class AddonInfo implements Identifiable<String> {
          * @throws IllegalArgumentException if any of the information in this builder is invalid
          */
         public AddonInfo build() throws IllegalArgumentException {
+            String name = this.name;
+            if (name == null) {
+                name = "";
+            }
+            String description = this.description;
+            if (description == null) {
+                description = "";
+            }
             return new AddonInfo(id, type, uid, name, description, connection, countries, configDescriptionURI,
                     serviceId, sourceBundle, discoveryMethods);
         }
