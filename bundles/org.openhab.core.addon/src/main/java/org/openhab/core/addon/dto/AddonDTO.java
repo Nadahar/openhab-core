@@ -76,7 +76,7 @@ public class AddonDTO {
      * @return The new {@link Addon}.
      */
     public @NonNull Addon toAddon() {
-        Addon.Builder b = Addon.createFull(this.uid);
+        Addon.Builder b = Addon.create(this.uid, false);
         if (this.id != null) {
             b.withId(this.id);
         }
