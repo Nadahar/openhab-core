@@ -169,8 +169,9 @@ public class AddonResource implements RESTResource, EventSubscriber {
         lastModified = null;
     }
 
-    private boolean lastModifiedIsValid() {
-        return (lastModified != null) && ((new Date().getTime() - lastModified.getTime()) <= 450 * 1000);
+    private boolean lastModifiedIsValid() { // TODO: (Nad) Temp disabled
+        return false;
+//        return (lastModified != null) && ((new Date().getTime() - lastModified.getTime()) <= 450 * 1000);
     }
 
     @GET
@@ -181,7 +182,8 @@ public class AddonResource implements RESTResource, EventSubscriber {
     public Response getAddon(final @Context Request request,
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
             @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId) {
-        logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
+        logger.error("Received HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        try {
         if (lastModifiedIsValid()) {
             Response.ResponseBuilder responseBuilder = request.evaluatePreconditions(lastModified);
             if (responseBuilder != null) {
@@ -204,6 +206,9 @@ public class AddonResource implements RESTResource, EventSubscriber {
             return Response.ok(new Stream2JSONInputStream(addonService.getAddons(locale).stream()))
                     .lastModified(lastModified).cacheControl(RESTConstants.CACHE_CONTROL).build();
         }
+        } finally {
+            logger.error("Replied to HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        }
     }
 
     @GET
@@ -213,7 +218,8 @@ public class AddonResource implements RESTResource, EventSubscriber {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonType.class)))) })
     public Response getServices(final @Context Request request,
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language) {
-        logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
+        logger.error("Received HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        try {
         if (lastModifiedIsValid()) {
             Response.ResponseBuilder responseBuilder = request.evaluatePreconditions(lastModified);
             if (responseBuilder != null) {
@@ -228,6 +234,9 @@ public class AddonResource implements RESTResource, EventSubscriber {
         Stream<AddonServiceDTO> addonTypeStream = addonServices.stream().map(s -> convertToAddonServiceDTO(s, locale));
         return Response.ok(new Stream2JSONInputStream(addonTypeStream)).lastModified(lastModified)
                 .cacheControl(RESTConstants.CACHE_CONTROL).build();
+        } finally {
+            logger.error("Replied to HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        }
     }
 
     @GET
