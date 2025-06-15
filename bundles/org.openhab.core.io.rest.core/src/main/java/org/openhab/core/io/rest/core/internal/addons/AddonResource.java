@@ -157,7 +157,8 @@ public class AddonResource implements RESTResource {
     public Response getAddon(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
             @QueryParam("serviceId") @Parameter(description = "service ID") @Nullable String serviceId) {
-        logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
+        logger.error("Received HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        try {
 
         final Locale locale = localeService.getLocale(language);
         if ("all".equals(serviceId)) {
@@ -169,6 +170,9 @@ public class AddonResource implements RESTResource {
             }
             return Response.ok(new Stream2JSONInputStream(addonService.getAddons(locale).stream())).build();
         }
+        } finally {
+            logger.error("Replied to HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        }
     }
 
     @GET
@@ -178,10 +182,14 @@ public class AddonResource implements RESTResource {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonType.class)))) })
     public Response getServices(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language) {
-        logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
+        logger.error("Received HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        try {
         final Locale locale = localeService.getLocale(language);
         Stream<AddonServiceDTO> addonTypeStream = addonServices.stream().map(s -> convertToAddonServiceDTO(s, locale));
         return Response.ok(new Stream2JSONInputStream(addonTypeStream)).build();
+        } finally {
+            logger.error("Replied to HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
+        }
     }
 
     @GET
