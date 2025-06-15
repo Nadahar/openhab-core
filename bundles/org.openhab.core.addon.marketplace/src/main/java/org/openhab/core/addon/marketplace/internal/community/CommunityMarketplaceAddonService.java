@@ -377,7 +377,7 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
 
             // try to use a handler to determine if the add-on is installed
             boolean installed = addonHandlers.stream().anyMatch(handler -> handler.supports(type, contentType)
-                    && handler.isInstalled(uid));
+                    && handler.isInstalled(uid)); // TODO: (Nad) Set version here..
 
             return Addon.create(uid).withType(type).withId(id).withContentType(contentType)
                     .withImageLink(topic.imageUrl).withAuthor(author).withProperties(properties).withLabel(title)
