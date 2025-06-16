@@ -44,6 +44,7 @@ import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.config.core.ConfigurableService;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.storage.StorageService;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.annotations.Activate;
@@ -86,8 +87,8 @@ public class JsonAddonService extends AbstractRemoteAddonService {
     @Activate
     public JsonAddonService(@Reference EventPublisher eventPublisher, @Reference StorageService storageService,
             @Reference ConfigurationAdmin configurationAdmin, @Reference AddonInfoRegistry addonInfoRegistry,
-            Map<String, Object> config) {
-        super(eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
+            BundleContext bundleContext, Map<String, Object> config) {
+        super(bundleContext, eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
         modified(config);
     }
 

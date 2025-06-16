@@ -14,6 +14,8 @@ package org.openhab.core.addon.internal.xml;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.addon.AddonInfo;
+import org.openhab.core.addon.xml.AddonInfoXmlResult;
+import org.openhab.core.addon.xml.XmlAddonInfoProvider;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.xml.AbstractXmlConfigDescriptionProvider;
 import org.openhab.core.config.core.xml.osgi.XmlDocumentProvider;
