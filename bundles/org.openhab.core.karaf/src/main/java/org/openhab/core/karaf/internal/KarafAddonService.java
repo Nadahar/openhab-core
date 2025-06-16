@@ -128,10 +128,11 @@ public class KarafAddonService implements AddonService {
         String type = getAddonType(feature.getName());
         String uid = type + Addon.ADDON_SEPARATOR + name;
         boolean isInstalled = featuresService.isInstalled(feature);
+        Version v = Version.valueOf(feature.getVersion());
 
         Addon.Builder addon = Addon.create(uid).withType(type).withId(name).withContentType(ADDONS_CONTENT_TYPE)
                 .withVersion(Version.valueOf(feature.getVersion())).withAuthor(ADDONS_AUTHOR, true)
-                .withInstalled(isInstalled);
+                .withInstalled(isInstalled, v);
 
         AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(uid, locale);
 
