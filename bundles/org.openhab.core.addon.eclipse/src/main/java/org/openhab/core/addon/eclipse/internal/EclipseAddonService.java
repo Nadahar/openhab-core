@@ -40,6 +40,8 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This is an implementation of an {@link AddonService} that can be used when debugging in Eclipse.
@@ -51,6 +53,7 @@ import org.osgi.service.component.annotations.Reference;
 @ConfigurableService(category = "system", label = "Add-on Management", description_uri = EclipseAddonService.CONFIG_URI)
 public class EclipseAddonService implements AddonService {
 
+    private final Logger logger = LoggerFactory.getLogger(EclipseAddonService.class);
     public static final String CONFIG_URI = "system:addons";
 
     private static final String SERVICE_ID = "eclipse";
@@ -124,8 +127,12 @@ public class EclipseAddonService implements AddonService {
         String symbolicName = bundle.getSymbolicName();
         String[] segments = symbolicName.split("\\.");
         String location = bundle.getLocation();
-        return symbolicName.startsWith(BUNDLE_SYMBOLIC_NAME_PREFIX) && bundle.getState() == Bundle.ACTIVE
+        boolean result = symbolicName.startsWith(BUNDLE_SYMBOLIC_NAME_PREFIX) && bundle.getState() == Bundle.ACTIVE
                 && segments.length >= 4 && ADDON_BUNDLE_TYPE_MAP.containsValue(segments[2]) && bundle.getEntry("OH-INF/addon/addon.xml") != null && !location.startsWith("marketplace:") && !location.startsWith("file:");
+        if (result) {
+            logger.error("EclipseAddonService: {} : {}", bundle.getLocation(), symbolicName);
+        }
+        return result;
     }
 
     private Addon getAddon(Bundle bundle, @Nullable Locale locale) {

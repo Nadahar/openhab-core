@@ -12,6 +12,7 @@
  */
 package org.openhab.core.config.core.xml;
 
+import java.lang.ref.WeakReference;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -22,6 +23,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -41,9 +43,22 @@ import org.osgi.framework.Bundle;
 @NonNullByDefault
 public abstract class AbstractXmlBasedProvider<@NonNull T_ID, @NonNull T_OBJECT extends Identifiable<@NonNull T_ID>> {
 
-    private final Map<Bundle, List<T_OBJECT>> bundleObjectMap = new ConcurrentHashMap<>();
+    private final Map<Bundle, List<T_OBJECT>> bundleObjectMap = new ConcurrentHashMap<>(); // TODO: (Nad) JavaDocs
 
     private final Map<LocalizedKey, T_OBJECT> localizedObjectCache = new ConcurrentHashMap<>();
+
+    private final List<WeakReference<@Nullable XmlBasedProviderListener<T_ID, T_OBJECT>>> listeners = new CopyOnWriteArrayList<WeakReference<@Nullable XmlBasedProviderListener<T_ID, T_OBJECT>>>();
+
+    @Nullable
+    private final ExecutorService executorService;
+
+    public AbstractXmlBasedProvider() {
+        this.executorService = null;
+    }
+
+    public AbstractXmlBasedProvider(@Nullable ExecutorService executorService) {
+        this.executorService = executorService;
+    }
 
     /**
      * Create a translated/localized copy of the given object.
@@ -63,7 +78,7 @@ public abstract class AbstractXmlBasedProvider<@NonNull T_ID, @NonNull T_OBJECT 
      * @param bundle the module to which the object is to be added
      * @param object the object to be added
      */
-    public final synchronized void add(Bundle bundle, T_OBJECT object) {
+    public final void add(Bundle bundle, T_OBJECT object) {
         addAll(bundle, List.of(object));
     }
 
@@ -75,16 +90,24 @@ public abstract class AbstractXmlBasedProvider<@NonNull T_ID, @NonNull T_OBJECT 
      * @param bundle the module to which the object is to be added
      * @param objectList the objects to be added
      */
-    public final synchronized void addAll(Bundle bundle, Collection<T_OBJECT> objectList) {
+    public final void addAll(Bundle bundle, Collection<T_OBJECT> objectList) {
         if (objectList.isEmpty()) {
             return;
         }
-        List<T_OBJECT> objects = Objects
-                .requireNonNull(bundleObjectMap.computeIfAbsent(bundle, k -> new CopyOnWriteArrayList<>()));
-        objects.addAll(objectList);
-        for (T_OBJECT object : objectList) {
-            // just make sure no old entry remains in the cache
-            removeCachedEntries(object);
+        List<T_OBJECT> objects;
+        synchronized (this) {
+            objects = Objects
+                    .requireNonNull(bundleObjectMap.computeIfAbsent(bundle, k -> new CopyOnWriteArrayList<>()));
+            objects.addAll(objectList);
+            for (T_OBJECT object : objectList) {
+                // just make sure no old entry remains in the cache
+                removeCachedEntries(object);
+            }
+        }
+        if (!listeners.isEmpty()) {
+            for (T_OBJECT object : objects) {
+                notifyListeners(bundle, object, true);
+            }
         }
     }
 
@@ -130,10 +153,68 @@ public abstract class AbstractXmlBasedProvider<@NonNull T_ID, @NonNull T_OBJECT 
      *
      * @param bundle the module for which all associated Thing types to be removed
      */
-    public final synchronized void removeAll(Bundle bundle) {
-        List<T_OBJECT> objects = bundleObjectMap.remove(bundle);
-        if (objects != null) {
-            removeCachedEntries(objects);
+    public final void removeAll(Bundle bundle) {
+        List<T_OBJECT> objects;
+        synchronized (this) {
+            objects = bundleObjectMap.remove(bundle);
+            if (objects != null) {
+                removeCachedEntries(objects);
+            }
+        }
+        if (objects != null && !listeners.isEmpty()) {
+            for (T_OBJECT object : objects) {
+                notifyListeners(bundle, object, false);
+            }
+        }
+    }
+
+    protected void addListener(XmlBasedProviderListener<T_ID, T_OBJECT> listener) {
+        if (executorService == null) {
+            throw new UnsupportedOperationException(getClass().getSimpleName() + " doesn't have an executor");
+        }
+        XmlBasedProviderListener<T_ID, T_OBJECT> tmpListener;
+        boolean found = false;
+        for (WeakReference<@Nullable XmlBasedProviderListener<T_ID, T_OBJECT>> ref : listeners) {
+            tmpListener = ref.get();
+            if (tmpListener == null) {
+                listeners.remove(ref);
+            } else if (tmpListener == listener) {
+                found = true;
+            }
+        }
+        if (!found) {
+            listeners.add(new WeakReference<@Nullable XmlBasedProviderListener<T_ID,T_OBJECT>>(listener));
+        }
+    }
+
+    protected void removeListener(XmlBasedProviderListener<T_ID, T_OBJECT> listener) {
+        XmlBasedProviderListener<T_ID, T_OBJECT> tmpListener;
+        for (WeakReference<@Nullable XmlBasedProviderListener<T_ID, T_OBJECT>> ref : listeners) {
+            tmpListener = ref.get();
+            if (tmpListener == null || tmpListener == listener) {
+                listeners.remove(ref);
+            }
+        }
+    }
+
+    protected void notifyListeners(Bundle bundle, T_OBJECT object, boolean added) {
+        ExecutorService executor = executorService;
+        if (executor == null) {
+            return;
+        }
+        for (WeakReference<@Nullable XmlBasedProviderListener<T_ID, T_OBJECT>> ref : listeners) {
+            XmlBasedProviderListener<T_ID, T_OBJECT> listener = ref.get();
+            if (listener == null) {
+                listeners.remove(ref);
+            } else if (added) {
+                executor.execute(() -> {
+                    listener.added(bundle, object);
+                });
+            } else {
+                executor.execute(() -> {
+                    listener.removed(bundle, object);
+                });
+            }
         }
     }
 

@@ -39,12 +39,15 @@ import java.util.stream.Stream;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
+import org.openhab.core.addon.AddonInfo;
 import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.AddonVersion;
 import org.openhab.core.addon.Version;
 import org.openhab.core.addon.VersionRange;
+import org.openhab.core.addon.xml.XmlAddonInfoProvider;
+import org.openhab.core.addon.xml.XmlAddonInfoProvider.XmlAddonInfoListener;
 import org.openhab.core.addon.marketplace.AbstractRemoteAddonService;
 import org.openhab.core.addon.marketplace.MarketplaceAddonHandler;
 import org.openhab.core.addon.marketplace.internal.community.model.DiscourseCategoryResponseDTO;
@@ -57,6 +60,8 @@ import org.openhab.core.config.core.ConfigParser;
 import org.openhab.core.config.core.ConfigurableService;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.storage.StorageService;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
 import org.osgi.framework.Constants;
 import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.component.annotations.Activate;
@@ -78,7 +83,7 @@ import org.slf4j.LoggerFactory;
                 + CommunityMarketplaceAddonService.SERVICE_PID, service = AddonService.class)
 @ConfigurableService(category = "system", label = CommunityMarketplaceAddonService.SERVICE_NAME, description_uri = CommunityMarketplaceAddonService.CONFIG_URI)
 @NonNullByDefault
-public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService {
+public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService implements XmlAddonInfoListener {
     public static final String CODE_CONTENT_SUFFIX = "_content";
     public static final String JSON_CONTENT_PROPERTY = "json" + CODE_CONTENT_SUFFIX;
     public static final String YAML_CONTENT_PROPERTY = "yaml" + CODE_CONTENT_SUFFIX;
@@ -141,8 +146,9 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
     @Activate
     public CommunityMarketplaceAddonService(final @Reference EventPublisher eventPublisher,
             @Reference ConfigurationAdmin configurationAdmin, @Reference StorageService storageService,
-            @Reference AddonInfoRegistry addonInfoRegistry, Map<String, Object> config) {
-        super(eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
+            @Reference AddonInfoRegistry addonInfoRegistry, @Reference XmlAddonInfoProvider xmlAddonInfoProvider, BundleContext bundleContext, Map<String, Object> config) {
+        super(bundleContext, eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
+        xmlAddonInfoProvider.addListener(this); // TODO: (Nad) Temp test
         modified(config);
     }
 
@@ -156,6 +162,16 @@ public class CommunityMarketplaceAddonService extends AbstractRemoteAddonService
             cachedRemoteAddons.invalidateValue();
             scheduleRefreshSource();
         }
+    }
+
+    @Override
+    public void added(Bundle bundle, AddonInfo object) {
+        logger.error("Community bundle added: {}, {}", bundle.getLocation(), object.getId());
+    }
+
+    @Override
+    public void removed(Bundle bundle, AddonInfo object) {
+        logger.error("Community bundle removed: {}, {}", bundle.getLocation(), object.getId());
     }
 
     @Override

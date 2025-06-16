@@ -53,7 +53,7 @@ public class TestAddonService extends AbstractRemoteAddonService {
 
     public TestAddonService(EventPublisher eventPublisher, ConfigurationAdmin configurationAdmin,
             StorageService storageService, AddonInfoRegistry addonInfoRegistry) {
-        super(eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
+        super(null, eventPublisher, configurationAdmin, storageService, addonInfoRegistry, SERVICE_PID);
     }
 
     @Override
