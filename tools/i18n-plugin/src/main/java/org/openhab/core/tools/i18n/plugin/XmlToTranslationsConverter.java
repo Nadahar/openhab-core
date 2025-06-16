@@ -30,7 +30,7 @@ import org.apache.maven.plugin.logging.Log;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.AddonInfo;
-import org.openhab.core.addon.internal.xml.AddonInfoXmlResult;
+import org.openhab.core.addon.xml.AddonInfoXmlResult;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionParameterGroup;

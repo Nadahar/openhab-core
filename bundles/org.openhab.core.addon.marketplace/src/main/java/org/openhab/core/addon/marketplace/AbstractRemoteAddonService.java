@@ -48,6 +48,10 @@ import org.openhab.core.events.Event;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.storage.Storage;
 import org.openhab.core.storage.StorageService;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.BundleEvent;
+import org.osgi.framework.BundleListener;
 import org.osgi.framework.FrameworkUtil;
 import org.osgi.service.cm.Configuration;
 import org.osgi.service.cm.ConfigurationAdmin;
@@ -64,7 +68,7 @@ import com.google.gson.JsonSyntaxException;
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
-public abstract class AbstractRemoteAddonService implements AddonService {
+public abstract class AbstractRemoteAddonService implements AddonService, BundleListener {
     static final String CONFIG_REMOTE_ENABLED = "remote";
     static final String CONFIG_INCLUDE_INCOMPATIBLE = "includeIncompatible";
     static final Comparator<Addon> BY_COMPATIBLE_AND_VERSION = (addon1, addon2) -> {
@@ -101,7 +105,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     // Guarded by "scheduler"
     private @Nullable ScheduledFuture<?> scheduledRefresh;
 
-    protected AbstractRemoteAddonService(EventPublisher eventPublisher, ConfigurationAdmin configurationAdmin,
+    protected AbstractRemoteAddonService(@Nullable BundleContext bundleContext, EventPublisher eventPublisher, ConfigurationAdmin configurationAdmin,
             StorageService storageService, AddonInfoRegistry addonInfoRegistry, String servicePid) {
         this.addonInfoRegistry = addonInfoRegistry;
         this.eventPublisher = eventPublisher;
@@ -109,6 +113,14 @@ public abstract class AbstractRemoteAddonService implements AddonService {
         this.installedAddonStorage = storageService.getStorage(servicePid, getClass().getClassLoader());
         this.coreVersion = getCoreVersion();
         this.includeIncompatible = includeIncompatible();
+        if (bundleContext != null) {
+            bundleContext.addBundleListener(this);
+            for (Bundle bundle : bundleContext.getBundles()) {
+                if (isBundleRelevant(bundle)) {
+                    logger.error("Marketplace bundle found: {} {}", bundle.getLocation(), bundle.getSymbolicName());
+                }
+            }
+        }
     }
 
     protected Version getCoreVersion() {
@@ -232,7 +244,7 @@ public abstract class AbstractRemoteAddonService implements AddonService {
 
         // check and remove duplicate uids
         Map<String, List<Addon>> addonMap = new HashMap<>();
-        addons.forEach(a -> addonMap.computeIfAbsent(a.getUid(), k -> new ArrayList<>()).add(a));
+        addons.forEach(a -> Objects.requireNonNull(addonMap.computeIfAbsent(a.getUid(), k -> new ArrayList<>())).add(a));
         for (List<Addon> partialAddonList : addonMap.values()) {
             if (partialAddonList.size() > 1) {
                 partialAddonList.stream().sorted(BY_COMPATIBLE_AND_VERSION).skip(1).forEach(addons::remove);
@@ -447,5 +459,18 @@ public abstract class AbstractRemoteAddonService implements AddonService {
     private void postFailureEvent(String extensionId, @Nullable String msg) {
         Event event = AddonEventFactory.createAddonFailureEvent(extensionId, msg);
         eventPublisher.post(event);
+    }
+
+    @Override
+    public void bundleChanged(@Nullable BundleEvent event) {
+        if (event != null && (event.getType() == BundleEvent.INSTALLED || event.getType() == BundleEvent.UPDATED) && isBundleRelevant(event.getBundle())) {
+            String location = event.getBundle().getLocation();
+            logger.error("bundleChanged: {} {}", location, event.getBundle().getSymbolicName());
+        }
+    }
+
+    public boolean isBundleRelevant(Bundle bundle) {
+        String location = bundle.getLocation();
+        return location.startsWith("marketplace:");
     }
 }

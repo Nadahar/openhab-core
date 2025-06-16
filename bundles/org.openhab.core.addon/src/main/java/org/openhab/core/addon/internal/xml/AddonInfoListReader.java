@@ -19,6 +19,7 @@ import org.openhab.core.addon.AddonDiscoveryMethod;
 import org.openhab.core.addon.AddonInfoList;
 import org.openhab.core.addon.AddonMatchProperty;
 import org.openhab.core.addon.AddonParameter;
+import org.openhab.core.addon.xml.AddonInfoXmlResult;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionParameterGroup;

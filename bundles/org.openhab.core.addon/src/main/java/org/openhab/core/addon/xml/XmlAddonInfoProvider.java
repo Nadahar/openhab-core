@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.addon.internal.xml;
+package org.openhab.core.addon.xml;
 
 import java.util.HashSet;
 import java.util.Locale;
@@ -23,10 +23,13 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.AddonI18nLocalizationService;
 import org.openhab.core.addon.AddonInfo;
 import org.openhab.core.addon.AddonInfoProvider;
+import org.openhab.core.addon.internal.xml.AddonInfoReader;
+import org.openhab.core.addon.internal.xml.AddonInfoXmlProvider;
 import org.openhab.core.common.ThreadPoolManager;
 import org.openhab.core.config.core.ConfigDescriptionProvider;
 import org.openhab.core.config.core.xml.AbstractXmlBasedProvider;
 import org.openhab.core.config.core.xml.AbstractXmlConfigDescriptionProvider;
+import org.openhab.core.config.core.xml.XmlBasedProviderListener;
 import org.openhab.core.config.core.xml.osgi.XmlDocumentBundleTracker;
 import org.openhab.core.config.core.xml.osgi.XmlDocumentProvider;
 import org.openhab.core.config.core.xml.osgi.XmlDocumentProviderFactory;
@@ -51,12 +54,13 @@ import org.osgi.service.component.annotations.Reference;
  * @author Jan N. Klug - Refactored to cover all add-ons
  */
 @NonNullByDefault
-@Component
+@Component(service = XmlAddonInfoProvider.class)
 public class XmlAddonInfoProvider extends AbstractXmlBasedProvider<String, AddonInfo>
         implements AddonInfoProvider, XmlDocumentProviderFactory<AddonInfoXmlResult> {
 
     private static final String XML_DIRECTORY = "/OH-INF/addon/";
     public static final String READY_MARKER = "openhab.xmlAddonInfo";
+    public static final String THREAD_POOL_NAME = "xml-addon-info-provider";
 
     private final AddonI18nLocalizationService addonI18nService;
     private final AbstractXmlConfigDescriptionProvider configDescriptionProvider;
@@ -67,6 +71,7 @@ public class XmlAddonInfoProvider extends AbstractXmlBasedProvider<String, Addon
     public XmlAddonInfoProvider(final @Reference AddonI18nLocalizationService addonI18nService,
             final @Reference(target = "(openhab.scope=core.xml.addon)") ConfigDescriptionProvider configDescriptionProvider,
             final @Reference ReadyService readyService, ComponentContext componentContext) {
+        super(ThreadPoolManager.getPool(THREAD_POOL_NAME));
         this.addonI18nService = addonI18nService;
         this.configDescriptionProvider = (AbstractXmlConfigDescriptionProvider) configDescriptionProvider;
 
@@ -103,5 +108,16 @@ public class XmlAddonInfoProvider extends AbstractXmlBasedProvider<String, Addon
     @Override
     public XmlDocumentProvider<AddonInfoXmlResult> createDocumentProvider(Bundle bundle) {
         return new AddonInfoXmlProvider(bundle, this, configDescriptionProvider);
+    }
+
+    public void addListener(XmlAddonInfoListener listener) { // TODO: (Nad) JavaDocs
+        super.addListener(listener);
+    }
+
+    public void removeListener(XmlAddonInfoListener listener) {
+        super.removeListener(listener);
+    }
+
+    public interface XmlAddonInfoListener extends XmlBasedProviderListener<String, AddonInfo> {
     }
 }

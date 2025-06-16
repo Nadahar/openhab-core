@@ -31,6 +31,7 @@ import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.Version;
+import org.openhab.core.addon.xml.XmlAddonInfoProvider.XmlAddonInfoListener;
 import org.openhab.core.common.ThreadPoolManager;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 @NonNullByDefault
 @Component(immediate = true, service = AddonService.class, name = JarFileAddonService.SERVICE_NAME)
-public class JarFileAddonService extends BundleTracker<Bundle> implements AddonService {
+public class JarFileAddonService extends BundleTracker<Bundle> implements AddonService, XmlAddonInfoListener {
     public static final String SERVICE_ID = "jar";
     public static final String SERVICE_NAME = "jar-file-add-on-service";
     private static final String ADDONS_CONTENT_TYPE = "application/vnd.openhab.bundle";
@@ -98,7 +99,19 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
      * @return <code>true</code> if bundle is considered, <code>false</code> otherwise
      */
     public boolean isRelevant(Bundle bundle) { // TODO: (Nad) Isn't this too broad? KARs?
+        if (bundle.getEntry("OH-INF/addon/addon.xml") != null) {
+            logger.error("JarFileAddonService: {}: {}", bundle.getLocation(), bundle.getSymbolicName());
+        }
         return bundle.getLocation().startsWith("file:") && bundle.getEntry("OH-INF/addon/addon.xml") != null;
+    }
+
+    @Override
+    public void added(Bundle bundle, AddonInfo object) {
+        logger.error("JarFileBundleAdded: {}", bundle);
+        if (isRelevant(bundle)) {
+            synchronized (this) {
+            }
+        }
     }
 
     @Override
@@ -118,6 +131,13 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
         if (isRelevant(bundle)) {
             scheduler.execute(this::refreshSource);
         }
+    }
+
+    @Override
+    public void removed(Bundle bundle, AddonInfo object) {
+        logger.error("JarFileBundleRemoved: {}", bundle);
+        // TODO Auto-generated method stub
+
     }
 
     @Override
