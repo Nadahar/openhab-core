@@ -123,8 +123,9 @@ public class EclipseAddonService implements AddonService {
     private boolean isAddon(Bundle bundle) {
         String symbolicName = bundle.getSymbolicName();
         String[] segments = symbolicName.split("\\.");
+        String location = bundle.getLocation();
         return symbolicName.startsWith(BUNDLE_SYMBOLIC_NAME_PREFIX) && bundle.getState() == Bundle.ACTIVE
-                && segments.length >= 4 && ADDON_BUNDLE_TYPE_MAP.containsValue(segments[2]);
+                && segments.length >= 4 && ADDON_BUNDLE_TYPE_MAP.containsValue(segments[2]) && bundle.getEntry("OH-INF/addon/addon.xml") != null && !location.startsWith("marketplace:") && !location.startsWith("file:");
     }
 
     private Addon getAddon(Bundle bundle, @Nullable Locale locale) {
@@ -136,9 +137,10 @@ public class EclipseAddonService implements AddonService {
 
         String uid = type + Addon.ADDON_SEPARATOR + name;
 
+        Version v = Version.valueOf(bundle.getVersion());
         Addon.Builder addon = Addon.create(ADDON_ID_PREFIX + uid).withType(type).withId(name)
-                .withContentType(ADDONS_CONTENT_TYPE).withVersion(Version.valueOf(bundle.getVersion()))
-                .withAuthor(ADDONS_AUTHOR, true).withInstalled(true);
+                .withContentType(ADDONS_CONTENT_TYPE).withVersion(v)
+                .withAuthor(ADDONS_AUTHOR, true).withInstalled(true, v);
 
         AddonInfo addonInfo = addonInfoRegistry.getAddonInfo(uid, locale);
 
