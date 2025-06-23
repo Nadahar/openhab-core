@@ -54,6 +54,10 @@ import org.slf4j.LoggerFactory;
  * processing. For each module an own {@link XmlDocumentProvider} is created by
  * using the specified {@link XmlDocumentProviderFactory}.
  *
+ * Note: Since this class only monitors one state, {@link Bundle#ACTIVE},
+ * modifiedBundle() will never be called, as a bundle is only considered modified
+ * when its state changes. Implementation of modifiedBundle() is therefore moot.
+ *
  * @author Michael Grammling - Initial contribution
  * @author Benedikt Niehues - Changed resource handling so that resources can be
  *         patched by fragments.
