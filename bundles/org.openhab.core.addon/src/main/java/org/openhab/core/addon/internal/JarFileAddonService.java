@@ -13,34 +13,29 @@
 package org.openhab.core.addon.internal;
 
 import java.net.URI;
-import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.stream.Collectors;
-
+import java.util.Map.Entry;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.addon.Addon;
 import org.openhab.core.addon.AddonInfo;
-import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.Version;
+import org.openhab.core.addon.xml.XmlAddonInfoProvider;
 import org.openhab.core.addon.xml.XmlAddonInfoProvider.XmlAddonInfoListener;
-import org.openhab.core.common.ThreadPoolManager;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.BundleEvent;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
-import org.osgi.util.tracker.BundleTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,10 +44,11 @@ import org.slf4j.LoggerFactory;
  * openHAB addons folder
  *
  * @author Jan N. Klug - Initial contribution
+ * @author Ravi Nadahar - Refactored as XmlAddonInfoListener
  */
 @NonNullByDefault
 @Component(immediate = true, service = AddonService.class, name = JarFileAddonService.SERVICE_NAME)
-public class JarFileAddonService extends BundleTracker<Bundle> implements AddonService, XmlAddonInfoListener {
+public class JarFileAddonService implements AddonService, XmlAddonInfoListener {
     public static final String SERVICE_ID = "jar";
     public static final String SERVICE_NAME = "jar-file-add-on-service";
     private static final String ADDONS_CONTENT_TYPE = "application/vnd.openhab.bundle";
@@ -68,85 +64,83 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
     private static final String ADDON_ID_PREFIX = SERVICE_ID + ":";
     private final Logger logger = LoggerFactory.getLogger(JarFileAddonService.class);
 
-    private final AddonInfoRegistry addonInfoRegistry;
-    private final ScheduledExecutorService scheduler;
+    private final XmlAddonInfoProvider xmlAddonInfoProvider;
 
-    private final Set<Bundle> trackedBundles = ConcurrentHashMap.newKeySet();
-    private Map<String, Addon> addons = Map.of();
+    // Guarded by "this"
+    private final Map<Locale, Map<String, Addon>> addons = new HashMap<>();
+
+    // Guarded by "this"
+    private final Map<Bundle, String> addonsIdx = new HashMap<>();
 
     @Activate
-    public JarFileAddonService(final @Reference AddonInfoRegistry addonInfoRegistry, BundleContext context) {
-        super(context, Bundle.ACTIVE, null);
-
-        this.addonInfoRegistry = addonInfoRegistry;
-        this.scheduler = ThreadPoolManager.getScheduledPool(ThreadPoolManager.THREAD_POOL_NAME_COMMON);
-
-        open();
-
-        Arrays.stream(context.getBundles()).filter(this::isRelevant).forEach(trackedBundles::add);
-        scheduler.execute(this::refreshSource);
+    public JarFileAddonService(@Reference XmlAddonInfoProvider xmlAddonInfoProvider, BundleContext context) {
+        this.xmlAddonInfoProvider = xmlAddonInfoProvider;
+        xmlAddonInfoProvider.addListener(this);
     }
 
     @Deactivate
     public void deactivate() {
-        close();
+        xmlAddonInfoProvider.removeListener(this);
     }
 
     /**
-     * Checks if a bundle is loaded from a file and add-on information is available
+     * Checks if a bundle is loaded from a JAR file.
      *
-     * @param bundle the bundle to check
-     * @return <code>true</code> if bundle is considered, <code>false</code> otherwise
+     * @param bundle the {@link Bundle} to check.
+     * @return <code>true</code> if bundle is considered relevant, <code>false</code> otherwise.
      */
     public boolean isRelevant(Bundle bundle) { // TODO: (Nad) Isn't this too broad? KARs?
-        if (bundle.getEntry("OH-INF/addon/addon.xml") != null) {
-            logger.error("JarFileAddonService: {}: {}", bundle.getLocation(), bundle.getSymbolicName());
+        String loc = bundle.getLocation();
+        if (loc == null) {
+            return false;
         }
-        return bundle.getLocation().startsWith("file:") && bundle.getEntry("OH-INF/addon/addon.xml") != null;
+        loc = loc.toLowerCase(Locale.ROOT);
+        return (loc.startsWith("file:") || loc.startsWith("http:") || loc.startsWith("https:")) && loc.endsWith(".jar");
     }
 
     @Override
     public void added(Bundle bundle, AddonInfo object) {
-        logger.error("JarFileBundleAdded: {}", bundle);
         if (isRelevant(bundle)) {
+            Addon addon = toAddon(bundle, object);
+            String addonUid = addon.getUid();
             synchronized (this) {
+                String oldUid = addonsIdx.put(bundle, addonUid);
+                if (oldUid != null) {
+                    // This shouldn't happen, but in case it still does, remove cached entries
+                    for (Map<String, Addon> localeAddons : addons.values()) {
+                        localeAddons.remove(oldUid);
+                    }
+                }
+                Map<String, Addon> rootAddons = addons.get(Locale.ROOT);
+                if (rootAddons == null) {
+                    rootAddons = new HashMap<>();
+                    addons.put(Locale.ROOT, rootAddons);
+                }
+                rootAddons.put(addonUid, addon);
             }
-        }
-    }
-
-    @Override
-    public final synchronized Bundle addingBundle(@NonNullByDefault({}) Bundle bundle,
-            @NonNullByDefault({}) BundleEvent event) {
-        if (isRelevant(bundle) && trackedBundles.add(bundle)) {
-            logger.debug("Added {} to add-on list", bundle.getSymbolicName());
-            scheduler.execute(this::refreshSource);
-        }
-
-        return bundle;
-    }
-
-    @Override
-    public final synchronized void modifiedBundle(@NonNullByDefault({}) Bundle bundle, @Nullable BundleEvent event,
-            @NonNullByDefault({}) Bundle object) {
-        if (isRelevant(bundle)) {
-            scheduler.execute(this::refreshSource);
+            logger.debug("Added {} to JAR add-on list", bundle.getSymbolicName());
         }
     }
 
     @Override
     public void removed(Bundle bundle, AddonInfo object) {
-        logger.error("JarFileBundleRemoved: {}", bundle);
-        // TODO Auto-generated method stub
-
-    }
-
-    @Override
-    public final synchronized void removedBundle(@NonNullByDefault({}) Bundle bundle,
-            @NonNullByDefault({}) BundleEvent event, Bundle object) {
-        if (trackedBundles.remove(bundle)) {
-            logger.debug("Removed {} from add-on list", bundle.getSymbolicName());
-            scheduler.execute(this::refreshSource);
+        synchronized (this) {
+            String addonUid = addonsIdx.get(bundle);
+            if (addonUid == null) {
+                return;
+            }
+            Entry<Locale, Map<String, Addon>> entry;
+            Map<String, Addon> localeAddons;
+            for (Iterator<Entry<Locale, Map<String, Addon>>> iterator = addons.entrySet().iterator(); iterator.hasNext();) {
+                entry = iterator.next();
+                localeAddons = entry.getValue();
+                localeAddons.remove(addonUid);
+                if (localeAddons.isEmpty()) {
+                    iterator.remove();
+                }
+            }
         }
+        logger.debug("Removed {} from JAR add-on list", bundle.getSymbolicName());
     }
 
     @Override
@@ -160,21 +154,15 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
     }
 
     @Override
-    public synchronized void refreshSource() { // TODO: (Nad) Look into this refreshing....
-        addons = trackedBundles.stream().map(this::toAddon).filter(Objects::nonNull).map(Objects::requireNonNull)
-                .collect(Collectors.toMap(Addon::getUid, addon -> addon));
-    }
-
-    private @Nullable Addon toAddon(Bundle bundle) {
-        return addonInfoRegistry.getAddonInfos().stream()
-                .filter(info -> bundle.getSymbolicName().equals(info.getSourceBundle())).findAny()
-                .map(info -> toAddon(bundle, info)).orElse(null);
+    public void refreshSource() {
+        // This is event based, no refreshing required
     }
 
     private Addon toAddon(Bundle bundle, AddonInfo addonInfo) {
         String uid = ADDON_ID_PREFIX + addonInfo.getUID();
-        return Addon.create(uid).withId(addonInfo.getId()).withType(addonInfo.getType()).withInstalled(true)
-                .withVersion(Version.valueOf(bundle.getVersion())).withLabel(addonInfo.getName())
+        Version v = Version.valueOf(bundle.getVersion());
+        return Addon.create(uid).withId(addonInfo.getId()).withType(addonInfo.getType()).withInstalled(true, v)
+                .withVersion(v).withLabel(addonInfo.getName())
                 .withConnection(addonInfo.getConnection()).withCountries(addonInfo.getCountries())
                 .withConfigDescriptionURI(addonInfo.getConfigDescriptionURI())
                 .withDescription(Objects.requireNonNullElse(addonInfo.getDescription(), bundle.getSymbolicName()))
@@ -183,16 +171,62 @@ public class JarFileAddonService extends BundleTracker<Bundle> implements AddonS
 
     @Override
     public List<Addon> getAddons(@Nullable Locale locale) {
-        if (trackedBundles.size() != addons.size()) {
-            refreshSource();
+        Locale l = locale == null ? Locale.ROOT : locale;
+        synchronized (this) {
+            if (addonsIdx.isEmpty()) {
+                return List.of();
+            }
+            Map<String, Addon> localeAddons = addons.get(l);
+            if (localeAddons == null) {
+                localeAddons = new HashMap<>();
+                addons.put(l, localeAddons);
+            }
+            if (localeAddons.size() < addonsIdx.size()) {
+                // At least one isn't cached, update the cache
+                AddonInfo info;
+                for (Entry<Bundle, String> entry : addonsIdx.entrySet()) {
+                    info = xmlAddonInfoProvider.getAddonInfo(entry.getValue().substring(ADDON_ID_PREFIX.length()), locale);
+                    if (info == null) {
+                        logger.warn("AddonInfo is null for addon {} ({}), this shouldn't happen", entry.getKey().getSymbolicName(), entry.getValue());
+                    } else {
+                        localeAddons.put(entry.getValue(), toAddon(entry.getKey(), info));
+                    }
+                }
+            }
+            return localeAddons.values().stream().sorted(Comparator.comparing(Addon::getLabel)).toList();
         }
-        return List.copyOf(addons.values());
     }
 
     @Override
     public @Nullable Addon getAddon(String id, @Nullable Locale locale) {
-        String queryId = id.startsWith(ADDON_ID_PREFIX) ? id : ADDON_ID_PREFIX + id;
-        return addons.get(queryId);
+        final String queryId = id.startsWith(ADDON_ID_PREFIX) ? id : ADDON_ID_PREFIX + id;
+        Locale l = locale == null ? Locale.ROOT : locale;
+        synchronized (this) {
+            if (addonsIdx.isEmpty()) {
+                return null;
+            }
+            Map<String, Addon> localeAddons = addons.get(l);
+            if (localeAddons == null) {
+                localeAddons = new HashMap<>();
+                addons.put(l, localeAddons);
+            }
+            Addon result = localeAddons.get(queryId);
+            if (result != null) {
+                return result;
+            }
+            Bundle bundle = addonsIdx.entrySet().stream().filter((e) -> queryId.equals(e.getValue())).map((e) -> e.getKey()).findAny().orElse(null);
+            if (bundle == null) {
+                return null;
+            }
+            AddonInfo info = xmlAddonInfoProvider.getAddonInfo(queryId.substring(ADDON_ID_PREFIX.length()), locale);
+            if (info == null) {
+                logger.warn("AddonInfo is null for addon {} ({}), this shouldn't happen", bundle.getSymbolicName(), queryId);
+                return null;
+            }
+            result = toAddon(bundle, info);
+            localeAddons.put(queryId, result);
+            return result;
+        }
     }
 
     @Override
