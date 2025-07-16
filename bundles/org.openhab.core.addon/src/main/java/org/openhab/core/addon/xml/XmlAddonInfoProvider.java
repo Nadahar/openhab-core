@@ -60,7 +60,7 @@ public class XmlAddonInfoProvider extends AbstractXmlBasedProvider<String, Addon
 
     private static final String XML_DIRECTORY = "/OH-INF/addon/";
     public static final String READY_MARKER = "openhab.xmlAddonInfo";
-    public static final String THREAD_POOL_NAME = "xml-addon-info-provider";
+    public static final String THREAD_POOL_NAME = "XmlAddonInfoProvider";
 
     private final AddonI18nLocalizationService addonI18nService;
     private final AbstractXmlConfigDescriptionProvider configDescriptionProvider;

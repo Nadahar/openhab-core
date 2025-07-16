@@ -14,6 +14,7 @@ package org.openhab.core.config.core.xml;
 
 import java.lang.ref.WeakReference;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -198,7 +199,22 @@ public abstract class AbstractXmlBasedProvider<@NonNull T_ID, @NonNull T_OBJECT 
         }
         if (!found) {
             listeners.add(new WeakReference<@Nullable XmlBasedProviderListener<T_ID,T_OBJECT>>(listener));
-            // TODO: (Nad) Notify of existing objects - figure out localization
+            Map<Bundle, List<T_OBJECT>> bundlesSnapShot = new HashMap<>();
+            synchronized (this) {
+                for (Entry<Bundle, List<T_OBJECT>> entry : bundleObjectMap.entrySet()) {
+                    bundlesSnapShot.put(entry.getKey(), List.copyOf(entry.getValue()));
+                }
+            }
+            ExecutorService executor = executorService;
+            if (executor != null) {
+                for (Entry<Bundle, List<T_OBJECT>> entry : bundlesSnapShot.entrySet()) {
+                    for (T_OBJECT object : entry.getValue()) {
+                        executor.execute(() -> {
+                            listener.added(entry.getKey(), object);
+                        });
+                    }
+                }
+            }
         }
     }
 
