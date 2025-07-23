@@ -56,7 +56,7 @@ public class YamlRuleTemplateDTO
     public String label;
     public Set<@NonNull String> tags;
     public String description;
-    public String visibility;
+    public Visibility visibility;
     public List<@NonNull YamlConfigDescriptionParameterDTO> configDescriptions;
     public List<@NonNull YamlConditionDTO> conditions;
     public List<@NonNull YamlActionDTO> actions;
@@ -78,7 +78,7 @@ public class YamlRuleTemplateDTO
         this.label = template.getLabel();
         this.tags = template.getTags();
         this.description = template.getDescription();
-        this.visibility = template.getVisibility().name();
+        this.visibility = template.getVisibility();
         List<@NonNull ConfigDescriptionParameter> configDescriptions = template.getConfigurationDescriptions();
         if (!configDescriptions.isEmpty()) {
             List<YamlConfigDescriptionParameterDTO> configDescriptionDtos = new ArrayList<>(configDescriptions.size());
@@ -123,18 +123,6 @@ public class YamlRuleTemplateDTO
         uid = id;
     }
 
-    /**
-     * Parses the string value in {@link #visibility} into a {@link Visibility} instance. Leading and trailing
-     * whitespace is ignored, and so is letter case. If the parsing fails, this method returns
-     * {@link Visibility#VISIBLE}.
-     *
-     * @return The resulting {@link Visibility}.
-     */
-    public Visibility getVisibility() {
-        Visibility result = Visibility.typeOf(visibility);
-        return result == null ? Visibility.VISIBLE : result;
-    }
-
     @Override
     public @NonNull YamlRuleTemplateDTO toDto(@NonNull JsonNode node, @NonNull ObjectMapper mapper)
             throws SerializationException {
@@ -146,7 +134,10 @@ public class YamlRuleTemplateDTO
             result.label = partial.label;
             result.tags = partial.tags;
             result.description = partial.description;
-            result.visibility = partial.visibility;
+            result.visibility = Visibility.typeOf(partial.visibility);
+            if (result.visibility == null) {
+                result.visibility = Visibility.VISIBLE;
+            }
             result.configDescriptions = partial.configDescriptions;
 
             Map<@NonNull String, @NonNull Object> config;
@@ -162,12 +153,7 @@ public class YamlRuleTemplateDTO
                     actionNode = iterator.next();
                     action = mapper.treeToValue(actionNode, YamlActionDTO.class);
                     action.type = ModuleTypeAliases.aliasToType(Action.class, action.type);
-                    if ((config = action.config) != null && config.containsKey("script")
-                            && config.get("type") instanceof String type) {
-                        if (!type.equals(translatedType = MIMETypeAliases.aliasToType(type))) {
-                            config.put("type", translatedType);
-                        }
-                    }
+                    translateMIMETypeAliases(action);
                     actions.add(action);
                 }
                 result.actions = actions;
@@ -183,12 +169,7 @@ public class YamlRuleTemplateDTO
                     conditionNode = iterator.next();
                     condition = mapper.treeToValue(conditionNode, YamlConditionDTO.class);
                     condition.type = ModuleTypeAliases.aliasToType(Condition.class, condition.type);
-                    if ((config = condition.config) != null && config.containsKey("script")
-                            && config.get("type") instanceof String type) {
-                        if (!type.equals(translatedType = MIMETypeAliases.aliasToType(type))) {
-                            config.put("type", translatedType);
-                        }
-                    }
+                    translateMIMETypeAliases(condition);
                     conditions.add(condition);
                 }
                 result.conditions = conditions;
@@ -204,12 +185,7 @@ public class YamlRuleTemplateDTO
                     triggerNode = iterator.next();
                     trigger = mapper.treeToValue(triggerNode, YamlModuleDTO.class);
                     trigger.type = ModuleTypeAliases.aliasToType(Trigger.class, trigger.type);
-                    if ((config = trigger.config) != null && config.containsKey("script")
-                            && config.get("type") instanceof String type) {
-                        if (!type.equals(translatedType = MIMETypeAliases.aliasToType(type))) {
-                            config.put("type", translatedType);
-                        }
-                    }
+                    translateMIMETypeAliases(trigger);
                     triggers.add(trigger);
                 }
                 result.triggers = triggers;
@@ -218,6 +194,17 @@ public class YamlRuleTemplateDTO
             throw new SerializationException(e.getMessage(), e);
         }
         return result;
+    }
+
+    private void translateMIMETypeAliases(YamlModuleDTO module) {
+        Map<@NonNull String, @NonNull Object> config;
+        String translatedType;
+        if ((config = module.config) != null && config.containsKey("script")
+                && config.get("type") instanceof String type) {
+            if (!type.equals(translatedType = MIMETypeAliases.aliasToType(type))) {
+                config.put("type", translatedType);
+            }
+        }
     }
 
     @Override
@@ -237,7 +224,7 @@ public class YamlRuleTemplateDTO
     public boolean isValid(@Nullable List<@NonNull String> errors, @Nullable List<@NonNull String> warnings) {
         // Check that uid is present
         if (uid == null || uid.isBlank()) {
-            addToList(errors, "invalid rule template: uid is missing");
+            addToList(errors, "invalid rule template: uid is missing while mandatory");
             return false;
         }
         boolean ok = true;
@@ -254,7 +241,7 @@ public class YamlRuleTemplateDTO
 
         // Check that label is present
         if (label == null || label.isBlank()) {
-            addToList(errors, "invalid rule template \"%s\": label is missing".formatted(uid));
+            addToList(errors, "invalid rule template \"%s\": label is missing while mandatory".formatted(uid));
             ok = false;
         }
 
@@ -293,8 +280,9 @@ public class YamlRuleTemplateDTO
                 } else {
                     moduleType = "trigger";
                 }
-                addToList(errors, "illegal " + moduleType + " ID '" + id
-                        + "' - IDs must be unique across all modules in the rule template");
+                addToList(errors,
+                        "invalid rule template \"%s\": Illegal %s ID \"%s\" - IDs must be unique across all modules in the rule template"
+                                .formatted(uid, moduleType, id));
                 return false;
             }
             ids.add(id);

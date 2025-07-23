@@ -186,7 +186,6 @@ public class YamlRuleTemplateProvider extends AbstractYamlRuleProvider<RuleTempl
         }
 
         return new RuleTemplate(ruleTemplateDto.uid, ruleTemplateDto.label, ruleTemplateDto.description,
-                ruleTemplateDto.tags, triggers, conditions, actions, configDescriptions,
-                ruleTemplateDto.getVisibility());
+                ruleTemplateDto.tags, triggers, conditions, actions, configDescriptions, ruleTemplateDto.visibility);
     }
 }

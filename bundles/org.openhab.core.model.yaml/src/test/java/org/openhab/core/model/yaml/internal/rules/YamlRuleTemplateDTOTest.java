@@ -166,13 +166,13 @@ public class YamlRuleTemplateDTOTest {
         template2.description = "A description";
         assertTrue(template1.equals(template2));
 
-        template1.visibility = Visibility.VISIBLE.name();
+        template1.visibility = Visibility.VISIBLE;
         assertFalse(template1.equals(template2));
 
-        template2.visibility = Visibility.EXPERT.name();
+        template2.visibility = Visibility.EXPERT;
         assertFalse(template1.equals(template2));
 
-        template1.visibility = Visibility.EXPERT.name();
+        template1.visibility = Visibility.EXPERT;
         assertTrue(template1.equals(template2));
 
         template1.tags = new HashSet<>();
