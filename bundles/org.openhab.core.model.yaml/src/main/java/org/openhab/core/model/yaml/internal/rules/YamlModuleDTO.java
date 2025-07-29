@@ -18,7 +18,6 @@ import java.util.Objects;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.core.automation.Module;
-import org.openhab.core.model.yaml.internal.util.YamlElementUtils;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 
@@ -67,7 +66,7 @@ public class YamlModuleDTO {
             return false;
         }
         YamlModuleDTO other = (YamlModuleDTO) obj;
-        return YamlElementUtils.equalsConfig(config, other.config) && Objects.equals(description, other.description)
+        return Objects.equals(config, other.config) && Objects.equals(description, other.description)
                 && Objects.equals(id, other.id) && Objects.equals(label, other.label)
                 && Objects.equals(type, other.type);
     }
