@@ -29,11 +29,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.openhab.core.common.PoolBasedSequentialScheduledExecutorService.BasePoolExecutor;
+import org.openhab.core.internal.common.CompositeExecutorService;
 import org.openhab.core.internal.common.WrappedScheduledExecutorService;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.ComponentConstants;
@@ -165,14 +167,15 @@ public class ThreadPoolManager {
      */
     public static ScheduledExecutorService getScheduledPool(String poolName) {
         ExecutorService pool = pools.computeIfAbsent(poolName, name -> {
-            int cfg = getConfig(name);
-            ScheduledThreadPoolExecutor executor = new WrappedScheduledExecutorService(cfg,
-                    new NamedThreadFactory(name, true, Thread.NORM_PRIORITY));
+            ScheduledThreadPoolExecutor executor = new WrappedScheduledExecutorService(2,
+                    new NamedThreadFactory(name + "-scheduler", true, Thread.NORM_PRIORITY));
             executor.setKeepAliveTime(THREAD_TIMEOUT, TimeUnit.SECONDS);
             executor.allowCoreThreadTimeOut(true);
             executor.setRemoveOnCancelPolicy(true);
-            LOGGER.debug("Created scheduled thread pool '{}' of size {}", name, cfg);
-            return executor;
+            CompositeExecutorService compositeExecutor = new CompositeExecutorService(executor,
+                    Executors.newCachedThreadPool(new NamedThreadFactory(name, true, Thread.NORM_PRIORITY)));
+            LOGGER.debug("Created scheduled thread pool '{}' of unlimited size", name);
+            return compositeExecutor;
         });
 
         if (pool instanceof ScheduledExecutorService service) {
@@ -191,11 +194,11 @@ public class ThreadPoolManager {
      */
     public static ExecutorService getPool(String poolName) {
         ExecutorService pool = pools.computeIfAbsent(poolName, name -> {
-            int cfg = getConfig(name);
-            ThreadPoolExecutor executor = QueueingThreadPoolExecutor.createInstance(name, cfg);
-            executor.setKeepAliveTime(THREAD_TIMEOUT, TimeUnit.SECONDS);
+            ThreadPoolExecutor executor = new ThreadPoolExecutor(1, Integer.MAX_VALUE, THREAD_TIMEOUT, TimeUnit.SECONDS,
+                    new SynchronousQueue<Runnable>(),
+                    ThreadFactoryBuilder.create().withNamePrefix("OH").withName(name).withDaemonThreads(false).build());
             executor.allowCoreThreadTimeOut(true);
-            LOGGER.debug("Created thread pool '{}' with size {}", name, cfg);
+            LOGGER.debug("Created thread pool '{}' with unlimited size", name);
             return executor;
         });
 
@@ -355,11 +358,13 @@ public class ThreadPoolManager {
         @Override
         public BlockingQueue<Runnable> getQueue() {
             return new ArrayBlockingQueue<Runnable>(1) {
+                @Override
                 public int remainingCapacity() {
                     // executor_queue_remaining_tasks
                     return ((ThreadPoolExecutor) delegate).getQueue().remainingCapacity();
                 }
 
+                @Override
                 public int size() {
                     // executor_queued_tasks
                     return ((ThreadPoolExecutor) delegate).getQueue().size();
