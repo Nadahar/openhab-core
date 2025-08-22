@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.openhab.core.common.PoolBasedSequentialScheduledExecutorService.BasePoolExecutor;
+import org.openhab.core.internal.common.CompositeExecutorService;
 import org.openhab.core.internal.common.WrappedScheduledExecutorService;
 import org.osgi.framework.Constants;
 import org.osgi.service.component.ComponentConstants;
@@ -167,12 +168,13 @@ public class ThreadPoolManager {
         ExecutorService pool = pools.computeIfAbsent(poolName, name -> {
             int cfg = getConfig(name);
             ScheduledThreadPoolExecutor executor = new WrappedScheduledExecutorService(cfg,
-                    new NamedThreadFactory(name, true, Thread.NORM_PRIORITY));
+                    new NamedThreadFactory(name + "-scheduler", true, Thread.NORM_PRIORITY));
             executor.setKeepAliveTime(THREAD_TIMEOUT, TimeUnit.SECONDS);
             executor.allowCoreThreadTimeOut(true);
             executor.setRemoveOnCancelPolicy(true);
+            CompositeExecutorService compositeExecutor = new CompositeExecutorService(executor, Executors.newCachedThreadPool(new NamedThreadFactory(name, true, Thread.NORM_PRIORITY)));
             LOGGER.debug("Created scheduled thread pool '{}' of size {}", name, cfg);
-            return executor;
+            return compositeExecutor;
         });
 
         if (pool instanceof ScheduledExecutorService service) {
@@ -355,11 +357,13 @@ public class ThreadPoolManager {
         @Override
         public BlockingQueue<Runnable> getQueue() {
             return new ArrayBlockingQueue<Runnable>(1) {
+                @Override
                 public int remainingCapacity() {
                     // executor_queue_remaining_tasks
                     return ((ThreadPoolExecutor) delegate).getQueue().remainingCapacity();
                 }
 
+                @Override
                 public int size() {
                     // executor_queued_tasks
                     return ((ThreadPoolExecutor) delegate).getQueue().size();
