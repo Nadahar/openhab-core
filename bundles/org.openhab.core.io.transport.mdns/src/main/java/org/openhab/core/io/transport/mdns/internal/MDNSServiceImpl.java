@@ -12,7 +12,6 @@
  */
 package org.openhab.core.io.transport.mdns.internal;
 
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
@@ -58,8 +57,6 @@ public class MDNSServiceImpl implements MDNSService {
                         } else {
                             break;
                         }
-                    } catch (IOException e) {
-                        logger.error("{}", e.getMessage());
                     } catch (IllegalStateException e) {
                         logger.debug("Not registering service {}, because service is already deactivated!",
                                 description.serviceType);
@@ -85,8 +82,6 @@ public class MDNSServiceImpl implements MDNSService {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     localClient.registerService(description);
-                } catch (IOException e) {
-                    logger.error("{}", e.getMessage());
                 } catch (IllegalStateException e) {
                     logger.debug("Not registering service {}, because service is already deactivated!",
                             description.serviceType);

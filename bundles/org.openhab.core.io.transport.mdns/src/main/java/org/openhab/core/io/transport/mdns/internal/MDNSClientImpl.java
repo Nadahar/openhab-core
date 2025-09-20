@@ -172,9 +172,15 @@ public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener 
     }
 
     @Override
-    public void registerService(ServiceDescription description) throws IOException {
+    public boolean registerService(ServiceDescription description) {
         activeServices.add(description);
-        registerServiceInternal(description);
+        try {
+            registerServiceInternal(description);
+        } catch (IOException e) {
+            logger.error("Failed to register mDNS service \"{}\": {}", description, e.getMessage());
+            return false;
+        }
+        return true;
     }
 
     private void registerServiceInternal(ServiceDescription description) throws IOException {

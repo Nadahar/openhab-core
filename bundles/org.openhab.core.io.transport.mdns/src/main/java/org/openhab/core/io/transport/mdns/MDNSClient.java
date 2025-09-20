@@ -12,7 +12,6 @@
  */
 package org.openhab.core.io.transport.mdns;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Set;
 
@@ -55,8 +54,9 @@ public interface MDNSClient {
      * Register a service
      *
      * @param description service to register, described by (@link ServiceDescription)
+     * @return Whether service registration was successful.
      */
-    void registerService(ServiceDescription description) throws IOException;
+    boolean registerService(ServiceDescription description);
 
     /**
      * Unregister a service. The service should have been registered.

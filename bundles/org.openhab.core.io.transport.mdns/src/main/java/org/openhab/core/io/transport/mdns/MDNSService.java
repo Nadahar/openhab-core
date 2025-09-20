@@ -18,7 +18,10 @@ package org.openhab.core.io.transport.mdns;
  *
  * @author Victor Belov - Initial contribution
  * @author Kai Kreuzer - Initial contribution
+ *
+ * @deprecated Use {@link MDNSClient} instead.
  */
+@Deprecated
 public interface MDNSService {
 
     /**

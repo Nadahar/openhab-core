@@ -16,7 +16,7 @@ import java.util.Hashtable;
 import java.util.Map;
 
 import org.openhab.core.io.rest.RESTConstants;
-import org.openhab.core.io.transport.mdns.MDNSService;
+import org.openhab.core.io.transport.mdns.MDNSClient;
 import org.openhab.core.io.transport.mdns.ServiceDescription;
 import org.openhab.core.net.HttpServiceUtil;
 import org.osgi.framework.BundleContext;
@@ -45,21 +45,21 @@ public class MDNSAnnouncer {
 
     private String mdnsName;
 
-    private MDNSService mdnsService;
+    private MDNSClient mdnsClient;
 
     @Reference(policy = ReferencePolicy.DYNAMIC)
-    public void setMDNSService(MDNSService mdnsService) {
-        this.mdnsService = mdnsService;
+    public void setMDNSClient(MDNSClient mdnsClient) {
+        this.mdnsClient = mdnsClient;
     }
 
-    public void unsetMDNSService(MDNSService mdnsService) {
-        this.mdnsService = null;
+    public void unsetMDNSClient(MDNSClient mdnsClient) {
+        this.mdnsClient = null;
     }
 
     @Activate
     public void activate(BundleContext bundleContext, Map<String, Object> properties) {
         if (!"false".equalsIgnoreCase((String) properties.get("enabled"))) {
-            if (mdnsService != null) {
+            if (mdnsClient != null) {
                 mdnsName = bundleContext.getProperty("mdnsName");
                 if (mdnsName == null) {
                     mdnsName = "openhab";
@@ -67,14 +67,14 @@ public class MDNSAnnouncer {
                 try {
                     httpPort = HttpServiceUtil.getHttpServicePort(bundleContext);
                     if (httpPort != -1) {
-                        mdnsService.registerService(getDefaultServiceDescription());
+                        mdnsClient.registerService(getDefaultServiceDescription());
                     }
                 } catch (NumberFormatException e) {
                 }
                 try {
                     httpSSLPort = HttpServiceUtil.getHttpServicePortSecure(bundleContext);
                     if (httpSSLPort != -1) {
-                        mdnsService.registerService(getSSLServiceDescription());
+                        mdnsClient.registerService(getSSLServiceDescription());
                     }
                 } catch (NumberFormatException e) {
                 }
@@ -84,9 +84,9 @@ public class MDNSAnnouncer {
 
     @Deactivate
     public void deactivate() {
-        if (mdnsService != null) {
-            mdnsService.unregisterService(getDefaultServiceDescription());
-            mdnsService.unregisterService(getSSLServiceDescription());
+        if (mdnsClient != null) {
+            mdnsClient.unregisterService(getDefaultServiceDescription());
+            mdnsClient.unregisterService(getSSLServiceDescription());
         }
     }
 
