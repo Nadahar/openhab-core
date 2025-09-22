@@ -308,7 +308,7 @@ public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener 
             }
         }
         if (!changeRequired) {
-            logger.debug("mDNS services already OK for these ip addresses");
+            logger.debug("mDNS services already OK for these IP addresses (added: {}, removed: {})", added, removed);
             return;
         }
 
