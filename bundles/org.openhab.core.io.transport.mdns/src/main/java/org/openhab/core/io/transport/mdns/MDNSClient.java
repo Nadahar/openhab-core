@@ -66,12 +66,6 @@ public interface MDNSClient {
     void unregisterService(ServiceDescription description);
 
     /**
-     * Unregister all services
-     *
-     */
-    void unregisterAllServices();
-
-    /**
      * Returns a list of service infos of the specified type
      *
      * @param type service type name

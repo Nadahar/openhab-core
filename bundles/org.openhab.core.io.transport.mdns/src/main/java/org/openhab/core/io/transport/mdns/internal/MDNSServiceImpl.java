@@ -42,6 +42,8 @@ public class MDNSServiceImpl implements MDNSService {
 
     private final Set<ServiceDescription> servicesToRegisterQueue = new CopyOnWriteArraySet<>();
 
+    private final Set<ServiceDescription> registeredServices = new CopyOnWriteArraySet<>();
+
     @Reference(cardinality = ReferenceCardinality.OPTIONAL, policy = ReferencePolicy.DYNAMIC)
     protected void setMDNSClient(MDNSClient client) {
         this.mdnsClient = client;
@@ -54,6 +56,7 @@ public class MDNSServiceImpl implements MDNSService {
                         MDNSClient localClient = mdnsClient;
                         if (localClient != null) {
                             localClient.registerService(description);
+                            registeredServices.add(description);
                         } else {
                             break;
                         }
@@ -68,8 +71,8 @@ public class MDNSServiceImpl implements MDNSService {
     }
 
     protected void unsetMDNSClient(MDNSClient mdnsClient) {
+        unregisterAllServices();
         this.mdnsClient = null;
-        mdnsClient.unregisterAllServices();
     }
 
     @Override
@@ -82,6 +85,7 @@ public class MDNSServiceImpl implements MDNSService {
             Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     localClient.registerService(description);
+                    registeredServices.add(description);
                 } catch (IllegalStateException e) {
                     logger.debug("Not registering service {}, because service is already deactivated!",
                             description.serviceType);
@@ -94,6 +98,7 @@ public class MDNSServiceImpl implements MDNSService {
     public void unregisterService(ServiceDescription description) {
         if (mdnsClient != null) {
             mdnsClient.unregisterService(description);
+            registeredServices.remove(description);
         }
     }
 
@@ -101,8 +106,12 @@ public class MDNSServiceImpl implements MDNSService {
      * This method unregisters all services from Bonjour/MDNS
      */
     protected void unregisterAllServices() {
-        if (mdnsClient != null) {
-            mdnsClient.unregisterAllServices();
+        MDNSClient localClient = mdnsClient;
+        if (localClient != null) {
+            for (ServiceDescription desciption : registeredServices) {
+                localClient.unregisterService(desciption);
+            }
+            registeredServices.clear();
         }
     }
 
