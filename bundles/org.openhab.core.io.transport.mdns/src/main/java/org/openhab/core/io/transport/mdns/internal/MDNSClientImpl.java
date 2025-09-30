@@ -13,23 +13,29 @@
 package org.openhab.core.io.transport.mdns.internal;
 
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
 import javax.jmdns.JmDNS;
+import javax.jmdns.ServiceEvent;
 import javax.jmdns.ServiceInfo;
 import javax.jmdns.ServiceListener;
 
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.io.transport.mdns.MDNSClient;
 import org.openhab.core.io.transport.mdns.ServiceDescription;
 import org.openhab.core.net.CidrAddress;
@@ -49,7 +55,7 @@ import org.slf4j.LoggerFactory;
  * @author Gary Tse - Add NetworkAddressChangeListener to handle interface changes
  */
 @Component(immediate = true, service = MDNSClient.class)
-public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener {
+public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener, ServiceListener {
     private final Logger logger = LoggerFactory.getLogger(MDNSClientImpl.class);
 
     private final Map<InetAddress, JmDNS> jmdnsInstances = new ConcurrentHashMap<>();
@@ -57,6 +63,11 @@ public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener 
     private final Set<ServiceDescription> activeServices = ConcurrentHashMap.newKeySet();
 
     private final NetworkAddressService networkAddressService;
+
+    private final Map<String, ServiceInfo> nameCache = new HashMap<>();
+    private final Map<String, Map<String, ServiceInfo>> serviceCache = new HashMap<>();
+
+    private final List<WeakReference<MDNSListener>> listeners = new ArrayList<>();
 
     @Activate
     public MDNSClientImpl(final @Reference NetworkAddressService networkAddressService) {
@@ -333,5 +344,131 @@ public class MDNSClientImpl implements MDNSClient, NetworkAddressChangeListener 
                 logger.warn("Exception while registering service {}", description, e);
             }
         }
+    }
+
+    protected List<MDNSListener> getListeners() {
+        List<MDNSListener> result = new ArrayList<>();
+        WeakReference<MDNSListener> ref;
+        MDNSListener listener;
+        for (Iterator<WeakReference<MDNSListener>> iterator = listeners.iterator(); iterator.hasNext();) {
+            ref = iterator.next();
+            listener = ref.get();
+            if (listener == null) {
+                iterator.remove();
+            } else {
+                result.add(listener);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public void serviceAdded(ServiceEvent event) {
+        // Don't use them until they are resolved
+    }
+
+    @Override
+    public void serviceRemoved(ServiceEvent event) {
+        String name = event.getName();
+        String type = event.getType();
+        if (nameCache.remove(name) == null) {
+            return;
+        }
+        Map<String, ServiceInfo> typeCache = serviceCache.get(type);
+        if (typeCache != null) {
+            typeCache.remove(name);
+            if (typeCache.isEmpty()) {
+                serviceCache.remove(event.getType());
+            }
+        }
+
+        List<MDNSListener> listeners = getListeners();
+        if (!listeners.isEmpty()) {
+            for (MDNSListener listener : listeners) { //TODO: (Nad) Executor
+                    listener.onRemoved(type, event.getInfo());
+            }
+        }
+    }
+
+    @Override
+    public void serviceResolved(ServiceEvent event) {
+        String name = event.getName();
+        String type = event.getType();
+        ServiceInfo cachedEntry = nameCache.get(name);
+        ServiceInfo newEntry = event.getInfo();
+        if (serviceInfoEquals(cachedEntry, newEntry)) {
+            return;
+        }
+        nameCache.put(name, newEntry);
+        Map<String, ServiceInfo> typeCache = Objects.requireNonNull(serviceCache.computeIfAbsent(type, k -> new HashMap<>()));
+        typeCache.put(name, newEntry);
+
+        List<MDNSListener> listeners = getListeners();
+        if (!listeners.isEmpty()) {
+            for (MDNSListener listener : listeners) { //TODO: (Nad) Executor
+                if (cachedEntry == null) {
+                    listener.onAdded(type, newEntry);
+                } else {
+                    listener.onModified(type, newEntry);
+                }
+            }
+        }
+    }
+
+    /**
+     * Compares two {@link ServiceInfo} instances for equality be comparing all their fields.
+     *
+     * @param info1 the first {@link ServiceInfo} to compare.
+     * @param info2 the second {@link ServiceInfo} to compare.
+     * @return {@code true} if all fields are equal, {@code false} otherwise.
+     */
+    public static boolean serviceInfoEquals(@Nullable ServiceInfo info1, @Nullable ServiceInfo info2) {
+        if (info1 == null || info2 == null) {
+            return info1 == null && info2 == null ? true : false;
+        }
+
+        if (!(Objects.equals(info1.getName(), info2.getName()) &&
+                Objects.equals(info1.getDomain(), info2.getDomain()) &&
+                Objects.equals(info1.getProtocol(), info2.getProtocol()) &&
+                Objects.equals(info1.getApplication(), info2.getApplication()) &&
+                Objects.equals(info1.getSubtype(), info2.getSubtype()) &&
+                Objects.equals(info1.getServer(), info2.getServer()) &&
+                info1.getPort() == info2.getPort() &&
+                info1.getWeight() == info2.getWeight() &&
+                info1.getPriority() == info2.getPriority() &&
+                Objects.equals(info1.getTextBytes(), info2.getTextBytes()) &&
+                Objects.equals(info1.getInet4Addresses(), info2.getInet4Addresses()) &&
+                Objects.equals(info1.getInet6Addresses(), info2.getInet6Addresses()))) {
+            return false;
+        }
+        Enumeration<String> enumeration = info1.getPropertyNames();
+        List<String> names1 = new ArrayList<String>();
+        while (enumeration.hasMoreElements()) {
+            names1.add(enumeration.nextElement());
+        }
+        enumeration = info2.getPropertyNames();
+        List<String> names2 = new ArrayList<String>();
+        while (enumeration.hasMoreElements()) {
+            names2.add(enumeration.nextElement());
+        }
+        if (!Objects.equals(names1, names2)) {
+            return false;
+        }
+        for (String name : names1) {
+            if (!Objects.equals(info1.getPropertyBytes(name), info2.getPropertyBytes(name))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public interface MDNSListener {
+
+        void onAdded(String serviceType, ServiceInfo serviceInfo);
+
+        void onModified(String serviceType, ServiceInfo serviceInfo);
+
+        void onRemoved(String serviceType, ServiceInfo serviceInfo);
     }
 }
