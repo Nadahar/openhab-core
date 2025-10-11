@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import com.sun.jna.Platform;
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.SetupApi;
 import com.sun.jna.platform.win32.Win32Exception;
 
 /**
@@ -140,6 +141,9 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
         if (!Platform.isWindows()) {
             return new HashSet<>();
         }
+
+        SetupApi setupApi = SetupApi.INSTANCE;
+//        setupApi.SetupDiEnumDeviceInfo(HKEY_LOCAL_MACHINE, 0, null)
 
         Set<UsbSerialDeviceInformation> result = new HashSet<>();
         String[] deviceKeys;
