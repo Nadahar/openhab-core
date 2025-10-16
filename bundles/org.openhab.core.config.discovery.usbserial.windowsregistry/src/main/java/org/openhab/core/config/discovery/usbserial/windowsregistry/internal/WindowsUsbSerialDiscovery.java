@@ -15,7 +15,10 @@ package org.openhab.core.config.discovery.usbserial.windowsregistry.internal;
 import static com.sun.jna.platform.win32.WinReg.HKEY_LOCAL_MACHINE;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
@@ -24,6 +27,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -37,10 +42,22 @@ import org.osgi.service.component.annotations.Deactivate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.sun.jna.LastErrorException;
+import com.sun.jna.Memory;
+import com.sun.jna.Native;
 import com.sun.jna.Platform;
+import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.SetupApi;
+import com.sun.jna.platform.win32.SetupApi.SP_DEVINFO_DATA;
+import com.sun.jna.platform.win32.SetupApi.SP_DEVICE_INTERFACE_DATA;
 import com.sun.jna.platform.win32.Win32Exception;
+import com.sun.jna.platform.win32.WinBase;
+import com.sun.jna.platform.win32.WinError;
+import com.sun.jna.platform.win32.WinReg;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.platform.win32.Guid.GUID;
 
 /**
  * This is a {@link UsbSerialDiscovery} implementation component for Windows.
@@ -53,6 +70,9 @@ import com.sun.jna.platform.win32.Win32Exception;
 public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
 
     protected static final String SERVICE_NAME = "usb-serial-discovery-windows";
+
+    private static final boolean IS_64_BIT = Platform.is64Bit();
+    private static final int ERROR_NO_SUCH_DEVINST = 0xe000020b;
 
     // registry accessor strings
     private static final String USB_REGISTRY_ROOT = "SYSTEM\\CurrentControlSet\\Enum\\USB";
@@ -142,8 +162,92 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             return new HashSet<>();
         }
 
-        SetupApi setupApi = SetupApi.INSTANCE;
-//        setupApi.SetupDiEnumDeviceInfo(HKEY_LOCAL_MACHINE, 0, null)
+        GUID GUID_DEVINTERFACE_USB_DEVICE = new GUID("A5DCBF10-6530-11D2-901F-00C04FB951ED");
+        int SPDRP_SERVICE = 0x00000004;
+        int SPDRP_CLASS = 0x00000007;
+        int SPDRP_COMPATIBLEIDS = 0x00000002;
+        int SPDRP_HARDWAREID = 0x00000001;
+        int SPDRP_ENUMERATOR_NAME = 0x00000016;
+        int SPDRP_FRIENDLYNAME = 0x0000000C;
+        int SPDRP_MFG = 0x0000000B;
+        int SPDRP_PHYSICAL_DEVICE_OBJECT_NAME = 0x0000000E;
+
+        SetupApi apiInst = SetupApi.INSTANCE;
+
+        WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE/* | SetupApi.DIGCF_PRESENT*/); //TODO: (Nad) Temp disabled
+        if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
+            try {
+                SP_DEVINFO_DATA deviceInfoData = new SP_DEVINFO_DATA();
+                SP_DEVICE_INTERFACE_DATA deviceInterfaceData = new SP_DEVICE_INTERFACE_DATA();
+
+                int devIdx = 0;
+                int intIdx;
+                while (apiInst.SetupDiEnumDeviceInfo(deviceInfoSet, devIdx, deviceInfoData)) {
+
+                    Memory propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
+                    String name = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
+                    String friemdlyName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_ENUMERATOR_NAME, deviceInfoData);
+                    String enumName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_MFG, deviceInfoData);
+                    String mfg = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_PHYSICAL_DEVICE_OBJECT_NAME, deviceInfoData);
+                    String pdoName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_SERVICE, deviceInfoData);
+                    String service = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_CLASS, deviceInfoData);
+                    String clazz = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_COMPATIBLEIDS, deviceInfoData);
+                    String compIds = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_HARDWAREID, deviceInfoData);
+                    if (propertyBuffer != null) {
+                        List<String> ids = readRegMultiSz(propertyBuffer);
+                        logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friemdlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
+                    }
+                    //TODO: (Nad) Handle LasetErrorException
+
+                    intIdx = 0;
+                    while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
+                        List<String> devicePaths = getDeviceInterfaceDetails(apiInst, deviceInfoSet, deviceInfoData, deviceInterfaceData);
+                        logger.error("devicePaths: {}", devicePaths);
+                        DevicePathData data;
+                        for (String devicePath : devicePaths) {
+                            data = parseDevicePath(devicePath);
+                            if (data != null) {
+                                logger.error("parsed details: {}", data);
+
+                                WinReg.HKEY hKey = apiInst.SetupDiOpenDevRegKey(deviceInfoSet, deviceInfoData, SetupApi.DICS_FLAG_GLOBAL, 0, SetupApi.DIREG_DEV, WinNT.KEY_READ);
+                                if (hKey != WinBase.INVALID_HANDLE_VALUE) {
+                                    String s;
+                                    try {
+                                        s = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
+                                    } catch (Win32Exception e) {
+                                        s = null;
+                                    } finally {
+                                        Advapi32.INSTANCE.RegCloseKey(hKey);
+                                    }
+                                    logger.error("PortName: {}", s);
+                                }
+                            }
+                        }
+
+
+                        intIdx++;
+                    }
+                    //TODO: GetLastError / ERROR_NO_MORE_ITEMS
+
+                    devIdx++;
+                }
+                //TODO: GetLastError / ERROR_NO_MORE_ITEMS
+
+                SetupApi.SP_DEVICE_INTERFACE_DATA did;
+            } finally {
+                apiInst.SetupDiDestroyDeviceInfoList(deviceInfoSet);
+            }
+        } else {
+            //TODO: Log error
+        }
 
         Set<UsbSerialDeviceInformation> result = new HashSet<>();
         String[] deviceKeys;
@@ -274,6 +378,92 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
         return result;
     }
 
+    // TODO: Doc: LastErrorException
+    @Nullable
+    protected Memory getDeviceRegistryProperty(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
+        IntByReference size = new IntByReference();
+        int lastError;
+        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, null, 0, size) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+            if (lastError == WinError.ERROR_INVALID_DATA || lastError == ERROR_NO_SUCH_DEVINST) {
+                return null;
+            }
+            throw new LastErrorException(lastError);
+        }
+        int sizeValue = size.getValue();
+        if (sizeValue == 0) {
+            return null;
+        }
+        Memory buffer = new Memory(sizeValue);
+        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, buffer, sizeValue, null)) {
+            lastError = Native.getLastError();
+            if (lastError == WinError.ERROR_INVALID_DATA) {
+                return null;
+            }
+            throw new LastErrorException(lastError);
+        }
+        return buffer;
+    }
+
+    // TODO: Doc: LastErrorException
+    protected List<String> getDeviceInterfaceDetails(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, SP_DEVINFO_DATA deviceInfoData, SP_DEVICE_INTERFACE_DATA deviceInterfaceData) {
+        IntByReference size = new IntByReference();
+        int lastError;
+        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, null, 0, size, deviceInfoData) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+            if (lastError == WinError.ERROR_INVALID_DATA) {
+                return List.of();
+            }
+            throw new LastErrorException(lastError);
+        }
+        int sizeValue = size.getValue();
+        if (sizeValue == 0) {
+            return List.of();
+        }
+        Memory result = new Memory(sizeValue);
+
+        /*
+         *  The DWORD (uint) must contain the "size of the structure", which is only logical for those that
+         *  know how C compilers handle padding (64-bit pads where 32-bit doesn't).
+         *
+         *  The 32-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) = 4 + 2
+         *  The 64-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) + padding = 4 + 2 + 2
+         *
+         *  See https://stackoverflow.com/a/10729517 for further details.
+         */
+        result.setInt(0L, IS_64_BIT ? 8 : 6);
+        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, result, sizeValue, null, deviceInfoData)) {
+            lastError = Native.getLastError();
+            if (lastError == WinError.ERROR_INVALID_DATA) {
+                return List.of();
+            }
+            throw new LastErrorException(lastError);
+        }
+        return readRegMultiSz(result, 4L);
+    }
+
+    public final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
+    protected final Pattern devicePathPattern = Pattern.compile(DEVICE_PATH_PATTERN);
+    protected record DevicePathData (int vendorId, int productId, String id, int interfaceNumber) {}
+
+    @Nullable
+    protected DevicePathData parseDevicePath(String devicePath) {
+        Matcher m = devicePathPattern.matcher(devicePath.toLowerCase(Locale.ROOT));
+        if (m.find()) {
+            try {
+                int vendorId = Integer.valueOf(m.group("vid"), 16);
+                int productId = Integer.valueOf(m.group("pid"), 16);
+                String s = m.group("mi");
+                int interfaceNumber = s == null || s.isBlank() ? 0 : Integer.valueOf(s, 10);
+                s = m.group("id");
+                return new DevicePathData(vendorId, productId, s, interfaceNumber);
+            } catch (NumberFormatException e) {
+                // TODO: (Nad) LOg?
+                return null;
+            }
+        }
+        return null;
+    }
+
+
     @Override
     public synchronized void startBackgroundScanning() {
         if (Platform.isWindows()) {
@@ -292,5 +482,40 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             scanTask.cancel(false);
         }
         this.scanTask = null;
+    }
+
+    public static List<String> readRegMultiSz(Memory buffer) {
+        int size = (int) buffer.size() / 2;
+        if (size == 0) {
+            return List.of();
+        }
+        return readRegMultiSz(buffer.getCharArray(0L, size));
+    }
+
+    public static List<String> readRegMultiSz(Memory buffer, long offset) {
+        long bufferSize = buffer.size();
+        if (offset >= bufferSize) {
+            throw new IllegalArgumentException("Invalid offset " + offset + "for buffer of size " + bufferSize);
+        }
+        int size = (int) (bufferSize - offset) / 2;
+        if (size == 0) {
+            return List.of();
+        }
+        return readRegMultiSz(buffer.getCharArray(offset, size));
+    }
+
+    public static List<String> readRegMultiSz(char[] chars) {
+        List<String> result = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < chars.length; i++) {
+            if (chars[i] != 0) {
+                continue;
+            }
+            if (start < i) {
+                result.add(String.valueOf(chars, start, i - start));
+            }
+            start = i + 1;
+        }
+        return result;
     }
 }

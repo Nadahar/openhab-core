@@ -68,8 +68,8 @@ public class UsbAddonFinder extends BaseAddonFinder implements UsbSerialDiscover
     public static final Set<String> SUPPORTED_PROPERTIES = Set.of(PRODUCT, MANUFACTURER, CHIP_ID, REMOTE);
 
     private final Logger logger = LoggerFactory.getLogger(UsbAddonFinder.class);
-    private final Set<UsbSerialDiscovery> usbSerialDiscoveries = new CopyOnWriteArraySet<>();
-    private final Map<Long, UsbSerialDeviceInformation> usbDeviceInformations = new ConcurrentHashMap<>();
+    private final Set<UsbSerialDiscovery> usbSerialDiscoveries = new CopyOnWriteArraySet<>(); //TODO: (Nad) Not used
+    private final Map<Long, UsbSerialDeviceInformation> usbDeviceInformations = new ConcurrentHashMap<>();//TODO: (Nad) update bug
 
     @Reference(cardinality = ReferenceCardinality.MULTIPLE, policy = ReferencePolicy.DYNAMIC)
     protected void addUsbSerialDiscovery(UsbSerialDiscovery usbSerialDiscovery) {
@@ -141,7 +141,7 @@ public class UsbAddonFinder extends BaseAddonFinder implements UsbSerialDiscover
     /**
      * Add the discovered USB device information record to our internal map. If there is already an entry in the map
      * then merge the two sets of data.
-     * 
+     *
      * @param discoveredInfo the newly discovered USB device information.
      */
     @Override
