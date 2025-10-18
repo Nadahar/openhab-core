@@ -26,7 +26,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -469,8 +468,9 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
         if (Platform.isWindows()) {
             ScheduledFuture<?> scanTask = this.scanTask;
             if (scanTask == null || scanTask.isDone()) {
-                this.scanTask = scheduler.scheduleWithFixedDelay(this::doSingleScan, 0, scanInterval.toSeconds(),
-                        TimeUnit.SECONDS);
+                scheduler.submit(new WindowMessageHandler()); //TODO: (Nad) Temp test
+//                this.scanTask = scheduler.scheduleWithFixedDelay(this::doSingleScan, 0, scanInterval.toSeconds(),
+//                        TimeUnit.SECONDS);
             }
         }
     }
