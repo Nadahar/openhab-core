@@ -13,7 +13,7 @@
 package org.openhab.core.config.discovery.usbserial.windowsregistry.internal;
 
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -58,7 +58,7 @@ public class WindowMessageHandler implements Runnable, WindowProc {
 
     private final AtomicInteger threadCounter = new AtomicInteger(0);
 
-    private final Set<WindowMessageListener> listeners = ConcurrentHashMap.newKeySet();
+    private final Set<WindowMessageListener> listeners = new CopyOnWriteArraySet<>();
 
     /** A Windows event that can be used to stop the message loop */
     private final HANDLE terminateEvent = Kernel32.INSTANCE.CreateEvent(null, false, false, null);

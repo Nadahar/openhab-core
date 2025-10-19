@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -42,6 +43,7 @@ import org.openhab.core.config.discovery.usbserial.windowsregistry.internal.Wind
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Modified;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,6 +127,43 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 ThreadFactoryBuilder.create().withName(SERVICE_NAME).withDaemonThreads(true).build());
     }
 
+    @Modified
+    protected void modified(Map<String, Object> config) {
+        Object value = config.get(SCAN_INTERVAL_PROPERTY);
+        Duration newScanInterval = null;
+        if (value instanceof String s) {
+            try {
+                newScanInterval = Duration.ofSeconds(parseLong(s));
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid configuration value for '{}': {}", SCAN_INTERVAL_PROPERTY, s);
+            }
+        } else if (value instanceof Number n) {
+            newScanInterval = Duration.ofSeconds(n.longValue());
+        }
+
+        synchronized (this) {
+            if (!Objects.equals(newScanInterval, scanInterval)) {
+                if (newScanInterval == null) {
+                    scanInterval = Duration.ofSeconds(DEFAULT_SCAN_INTERVAL_SECONDS);
+                } else {
+                    scanInterval = newScanInterval;
+                }
+                if (scanTask != null) {
+                    stopBackgroundScanning();
+                    startBackgroundScanning();
+                }
+            }
+        }
+    }
+
+    @Deactivate
+    public void deactivate() {
+        synchronized (this) {
+            stopBackgroundScanning();
+            lastScanResult.clear();
+        }
+    }
+
     private void announceAddedDevice(UsbSerialDeviceInformation deviceInfo) {
         for (UsbSerialDiscoveryListener listener : discoveryListeners) {
             listener.usbSerialDeviceDiscovered(deviceInfo);
@@ -137,22 +176,24 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         }
     }
 
-    @Deactivate
-    public void deactivate() {
-        synchronized (this) {
-            stopBackgroundScanning();
-            lastScanResult.clear();
-        }
+    @Override
+    public void doSingleScan() {
+        doSingleScanInternal(true);
     }
 
-    @Override
-    public synchronized void doSingleScan() {
-        Set<UsbSerialDeviceInformation> scanResult = scanAllUsbDevicesInformation();
-        Set<UsbSerialDeviceInformation> added = setDifference(scanResult, lastScanResult);
-        Set<UsbSerialDeviceInformation> removed = setDifference(lastScanResult, scanResult);
-        Set<UsbSerialDeviceInformation> unchanged = setDifference(scanResult, added);
+    protected void doSingleScanInternal(boolean includeExisting) {
+        Set<UsbSerialDeviceInformation> scanResult;
+        Set<UsbSerialDeviceInformation> added;
+        Set<UsbSerialDeviceInformation> removed;
+        Set<UsbSerialDeviceInformation> unchanged;
+        synchronized (this) {
+            scanResult = scanAllUsbDevicesInformation();
+            added = setDifference(scanResult, lastScanResult);
+            removed = setDifference(lastScanResult, scanResult);
+            unchanged = includeExisting ? setDifference(scanResult, added) :  Set.of();
 
-        lastScanResult = scanResult;
+            lastScanResult = scanResult;
+        }
 
         removed.forEach(this::announceRemovedDevice);
         added.forEach(this::announceAddedDevice);
@@ -170,12 +211,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         discoveryListeners.add(listener);
         Set<UsbSerialDeviceInformation> lastScanResult;
         synchronized (this) {
-             lastScanResult = this.lastScanResult;
+             lastScanResult = Set.copyOf(this.lastScanResult);
         }
-        if (!lastScanResult.isEmpty()) {
-            for (UsbSerialDeviceInformation deviceInfo : lastScanResult) {
-                listener.usbSerialDeviceDiscovered(deviceInfo);
-            }
+        for (UsbSerialDeviceInformation deviceInfo : lastScanResult) {
+            listener.usbSerialDeviceDiscovered(deviceInfo);
         }
     }
 
@@ -273,7 +312,6 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 }
                 //TODO: GetLastError / ERROR_NO_MORE_ITEMS
 
-                SetupApi.SP_DEVICE_INTERFACE_DATA did;
             } finally {
                 apiInst.SetupDiDestroyDeviceInfoList(deviceInfoSet);
             }
@@ -509,7 +547,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     this.windowMessageHandler = null;
                 }
                 if (scanTask == null || scanTask.isDone()) {
-                    this.scanTask = scheduler.scheduleWithFixedDelay(this::doSingleScan, 0, scanInterval.toSeconds(),
+                    this.scanTask = scheduler.scheduleWithFixedDelay(() -> {
+                        doSingleScanInternal(false);
+                    },
+                            0, scanInterval.toSeconds(),
                             TimeUnit.SECONDS);
                 }
             } else {
