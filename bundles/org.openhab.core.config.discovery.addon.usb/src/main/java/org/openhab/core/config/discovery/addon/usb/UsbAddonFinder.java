@@ -75,7 +75,6 @@ public class UsbAddonFinder extends BaseAddonFinder implements UsbSerialDiscover
     protected void addUsbSerialDiscovery(UsbSerialDiscovery usbSerialDiscovery) {
         usbSerialDiscoveries.add(usbSerialDiscovery);
         usbSerialDiscovery.registerDiscoveryListener(this);
-        usbSerialDiscovery.doSingleScan();
     }
 
     protected synchronized void removeUsbSerialDiscovery(UsbSerialDiscovery usbSerialDiscovery) {
