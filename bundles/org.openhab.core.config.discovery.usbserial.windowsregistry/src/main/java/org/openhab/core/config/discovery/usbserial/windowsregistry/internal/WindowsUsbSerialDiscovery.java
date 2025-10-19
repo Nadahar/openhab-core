@@ -13,12 +13,14 @@
 package org.openhab.core.config.discovery.usbserial.windowsregistry.internal;
 
 import static com.sun.jna.platform.win32.WinReg.HKEY_LOCAL_MACHINE;
+import static java.lang.Long.parseLong;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
@@ -26,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,13 +38,13 @@ import org.openhab.core.common.ThreadFactoryBuilder;
 import org.openhab.core.config.discovery.usbserial.UsbSerialDeviceInformation;
 import org.openhab.core.config.discovery.usbserial.UsbSerialDiscovery;
 import org.openhab.core.config.discovery.usbserial.UsbSerialDiscoveryListener;
+import org.openhab.core.config.discovery.usbserial.windowsregistry.internal.WindowMessageHandler.WindowMessageListener;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.sun.jna.LastErrorException;
 import com.sun.jna.Memory;
 import com.sun.jna.Native;
 import com.sun.jna.Platform;
@@ -65,10 +68,12 @@ import com.sun.jna.platform.win32.Guid.GUID;
  * @author Andrew Fiddian-Green - Initial contribution
  */
 @NonNullByDefault
-@Component(service = UsbSerialDiscovery.class, name = WindowsUsbSerialDiscovery.SERVICE_NAME)
-public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
+@Component(service = UsbSerialDiscovery.class, name = WindowsUsbSerialDiscovery.SERVICE_NAME, configurationPid = "discovery.usbserial.windows")
+public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMessageListener {
 
     protected static final String SERVICE_NAME = "usb-serial-discovery-windows";
+    public static final String SCAN_INTERVAL_PROPERTY = "scanInterval";
+    public static final int DEFAULT_SCAN_INTERVAL_SECONDS = 15;
 
     private static final boolean IS_64_BIT = Platform.is64Bit();
     private static final int ERROR_NO_SUCH_DEVINST = 0xe000020b;
@@ -88,14 +93,34 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
 
     private final Logger logger = LoggerFactory.getLogger(WindowsUsbSerialDiscovery.class);
     private final Set<UsbSerialDiscoveryListener> discoveryListeners = new CopyOnWriteArraySet<>();
-    private final Duration scanInterval = Duration.ofSeconds(15);
+    private volatile Duration scanInterval = Duration.ofSeconds(DEFAULT_SCAN_INTERVAL_SECONDS);
     private final ScheduledExecutorService scheduler;
 
+    // All access must be guarded by "this"
     private Set<UsbSerialDeviceInformation> lastScanResult = new HashSet<>();
+
+    // All access must be guarded by "this"
     private @Nullable ScheduledFuture<?> scanTask;
 
+    // All access must be guarded by "this"
+    private @Nullable WindowMessageHandler windowMessageHandler;
+
+    /** Indicated that listening for device changes using window messages failed */
+    private volatile boolean windowMessageFailed;
+
     @Activate
-    public WindowsUsbSerialDiscovery() {
+    public WindowsUsbSerialDiscovery(Map<String, Object> config) {
+        Object value = config.get(SCAN_INTERVAL_PROPERTY);
+        if (value instanceof String s) {
+            try {
+                scanInterval = Duration.ofSeconds(parseLong(s));
+            } catch (NumberFormatException e) {
+                logger.warn("Invalid configuration value for '{}': {}", SCAN_INTERVAL_PROPERTY, s);
+            }
+        } else if (value instanceof Number n) {
+            scanInterval = Duration.ofSeconds(n.longValue());
+        }
+
         scheduler = Executors.newSingleThreadScheduledExecutor(
                 ThreadFactoryBuilder.create().withName(SERVICE_NAME).withDaemonThreads(true).build());
     }
@@ -114,8 +139,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
 
     @Deactivate
     public void deactivate() {
-        stopBackgroundScanning();
-        lastScanResult.clear();
+        synchronized (this) {
+            stopBackgroundScanning();
+            lastScanResult.clear();
+        }
     }
 
     @Override
@@ -141,8 +168,14 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
     @Override
     public void registerDiscoveryListener(UsbSerialDiscoveryListener listener) {
         discoveryListeners.add(listener);
-        for (UsbSerialDeviceInformation deviceInfo : lastScanResult) {
-            listener.usbSerialDeviceDiscovered(deviceInfo);
+        Set<UsbSerialDeviceInformation> lastScanResult;
+        synchronized (this) {
+             lastScanResult = this.lastScanResult;
+        }
+        if (!lastScanResult.isEmpty()) {
+            for (UsbSerialDeviceInformation deviceInfo : lastScanResult) {
+                listener.usbSerialDeviceDiscovered(deviceInfo);
+            }
         }
     }
 
@@ -158,7 +191,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
      */
     public Set<UsbSerialDeviceInformation> scanAllUsbDevicesInformation() {
         if (!Platform.isWindows()) {
-            return new HashSet<>();
+            return Set.of();
         }
 
         GUID GUID_DEVINTERFACE_USB_DEVICE = new GUID("A5DCBF10-6530-11D2-901F-00C04FB951ED");
@@ -173,7 +206,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
 
         SetupApi apiInst = SetupApi.INSTANCE;
 
-        WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE/* | SetupApi.DIGCF_PRESENT*/); //TODO: (Nad) Temp disabled
+        WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
         if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
             try {
                 SP_DEVINFO_DATA deviceInfoData = new SP_DEVINFO_DATA();
@@ -204,7 +237,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
                         List<String> ids = readRegMultiSz(propertyBuffer);
                         logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friemdlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
                     }
-                    //TODO: (Nad) Handle LasetErrorException
+                    //TODO: (Nad) Handle Win32Exception
 
                     intIdx = 0;
                     while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
@@ -377,7 +410,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
         return result;
     }
 
-    // TODO: Doc: LastErrorException
+    // TODO: Doc: Win32Exception
     @Nullable
     protected Memory getDeviceRegistryProperty(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
         IntByReference size = new IntByReference();
@@ -386,7 +419,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             if (lastError == WinError.ERROR_INVALID_DATA || lastError == ERROR_NO_SUCH_DEVINST) {
                 return null;
             }
-            throw new LastErrorException(lastError);
+            throw new Win32Exception(lastError);
         }
         int sizeValue = size.getValue();
         if (sizeValue == 0) {
@@ -398,12 +431,12 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return null;
             }
-            throw new LastErrorException(lastError);
+            throw new Win32Exception(lastError);
         }
         return buffer;
     }
 
-    // TODO: Doc: LastErrorException
+    // TODO: Doc: Win32Exception
     protected List<String> getDeviceInterfaceDetails(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, SP_DEVINFO_DATA deviceInfoData, SP_DEVICE_INTERFACE_DATA deviceInterfaceData) {
         IntByReference size = new IntByReference();
         int lastError;
@@ -411,7 +444,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return List.of();
             }
-            throw new LastErrorException(lastError);
+            throw new Win32Exception(lastError);
         }
         int sizeValue = size.getValue();
         if (sizeValue == 0) {
@@ -434,7 +467,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return List.of();
             }
-            throw new LastErrorException(lastError);
+            throw new Win32Exception(lastError);
         }
         return readRegMultiSz(result, 4L);
     }
@@ -467,21 +500,46 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
     public synchronized void startBackgroundScanning() {
         if (Platform.isWindows()) {
             ScheduledFuture<?> scanTask = this.scanTask;
-            if (scanTask == null || scanTask.isDone()) {
-                scheduler.submit(new WindowMessageHandler()); //TODO: (Nad) Temp test
-//                this.scanTask = scheduler.scheduleWithFixedDelay(this::doSingleScan, 0, scanInterval.toSeconds(),
-//                        TimeUnit.SECONDS);
+            WindowMessageHandler messageHandler = this.windowMessageHandler;
+            if (windowMessageFailed) {
+                if (messageHandler != null) {
+                    messageHandler.removeListener(this);
+                    // Should not be necessary, but it doesn't hurt to make sure
+                    messageHandler.terminate();
+                    this.windowMessageHandler = null;
+                }
+                if (scanTask == null || scanTask.isDone()) {
+                    this.scanTask = scheduler.scheduleWithFixedDelay(this::doSingleScan, 0, scanInterval.toSeconds(),
+                            TimeUnit.SECONDS);
+                }
+            } else {
+                if (scanTask != null) {
+                    scanTask.cancel(true);
+                    this.scanTask = null;
+                }
+                if (messageHandler == null) {
+                     messageHandler = new WindowMessageHandler();
+                     messageHandler.addListener(this);
+                     this.windowMessageHandler = messageHandler;
+                     scheduler.submit(messageHandler);
+                }
             }
         }
     }
 
     @Override
     public synchronized void stopBackgroundScanning() {
+        WindowMessageHandler messageHandler = this.windowMessageHandler;
+        if (messageHandler != null) {
+            messageHandler.removeListener(this);
+            messageHandler.terminate();
+            this.windowMessageHandler = null;
+        }
         ScheduledFuture<?> scanTask = this.scanTask;
         if (scanTask != null) {
-            scanTask.cancel(false);
+            scanTask.cancel(true);
+            this.scanTask = null;
         }
-        this.scanTask = null;
     }
 
     public static List<String> readRegMultiSz(Memory buffer) {
@@ -517,5 +575,37 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery {
             start = i + 1;
         }
         return result;
+    }
+
+    @Override
+    public void deviceAdded(String devicePath) {
+        logger.debug("New USB device discovered: {}", devicePath);
+        doSingleScan();
+    }
+
+    @Override
+    public void deviceRemoved(String devicePath) {
+        logger.debug("USB device removed: {}", devicePath);
+        doSingleScan();
+    }
+
+    @Override
+    public void portAdded(String portName) {
+        logger.debug("New serial port discovered: {}", portName);
+    }
+
+    @Override
+    public void portRemoved(String portName) {
+        logger.debug("Serial port removed: {}", portName);
+    }
+
+    @Override
+    public void serviceTerminated() {
+        logger.debug("Listening for window messages failed, falling back to interval scanning");
+        synchronized (this) {
+            if (windowMessageHandler != null) {
+                startBackgroundScanning();
+            }
+        }
     }
 }

@@ -16,6 +16,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +42,16 @@ import com.sun.jna.platform.win32.WinUser.MSG;
 import com.sun.jna.platform.win32.WinUser.WNDCLASSEX;
 import com.sun.jna.platform.win32.WinUser.WindowProc;
 
+/**
+ * This class, when run as a {@link Runnable}, creates an invisible window and uses that to listen for device change
+ * events for USB devices and serial ports. It listens in a blocking message loop, so it's necessary to call
+ * {@link #terminate()} for the loop to exit and the {@link #run()} method to exit.
+ * <p>
+ * The results of the device change events are delivered to subscribing {@link WindowMessageListener}s.
+ *
+ * @author Ravi Nadahar - Initial contribution.
+ */
+@NonNullByDefault
 public class WindowMessageHandler implements Runnable, WindowProc {
 
     private final Logger logger = LoggerFactory.getLogger(WindowMessageHandler.class);
@@ -51,10 +63,22 @@ public class WindowMessageHandler implements Runnable, WindowProc {
     /** A Windows event that can be used to stop the message loop */
     private final HANDLE terminateEvent = Kernel32.INSTANCE.CreateEvent(null, false, false, null);
 
+    /**
+     * Registers a {@link WindowMessageListener} that will receive USB device and serial port events.
+     *
+     * @param listener the {@link WindowMessageListener} to register.
+     * @return {@code true} if the listener was added, {@code false} if it was already registered.
+     */
     public boolean addListener(WindowMessageListener listener) {
         return listeners.add(listener);
     }
 
+    /**
+     * Unregisters a {@link WindowMessageListener} so that it will no longer receive USB device and serial port events.
+     *
+     * @param listener the {@link WindowMessageListener} to unregister.
+     * @return {@code true} if the listener was removed, {@code false} if it wasn't registered.
+     */
     public boolean removeListener(WindowMessageListener listener) {
         return listeners.remove(listener);
     }
@@ -182,6 +206,7 @@ public class WindowMessageHandler implements Runnable, WindowProc {
     }
 
     @Override
+    @NonNullByDefault({})
     public LRESULT callback(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam) {
         switch (uMsg) {
             case WinUser.WM_CREATE:
@@ -200,6 +225,7 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         }
     }
 
+    @Nullable
     private LRESULT onDeviceChange(WPARAM wParam, LPARAM lParam) {
         switch (wParam.intValue()) {
             case DBT.DBT_DEVICEARRIVAL:
@@ -215,6 +241,7 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         }
     }
 
+    @Nullable
     private LRESULT onDeviceAddedOrRemoved(LPARAM lParam, boolean added) {
         DEV_BROADCAST_HDR bhdr = new DEV_BROADCAST_HDR(lParam.longValue());
         Set<WindowMessageListener> listeners;
