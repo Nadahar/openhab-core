@@ -26,7 +26,7 @@ import com.sun.jna.win32.W32APIOptions;
 public interface User32Ex extends User32 {
 
     /** The instance. */
-    User32 INSTANCE = Native.load("user32", User32Ex.class, W32APIOptions.DEFAULT_OPTIONS);
+    User32Ex INSTANCE = Native.load("user32", User32Ex.class, W32APIOptions.DEFAULT_OPTIONS);
 
     int WAIT_OBJECT_0 = NTStatus.STATUS_WAIT_0 + 0;
     int WAIT_ABANDONED_0 = NTStatus.STATUS_ABANDONED_WAIT_0 + 0;
@@ -34,6 +34,10 @@ public interface User32Ex extends User32 {
     int WAIT_TIMEOUT = 258;
     int WAIT_FAILED = 0xFFFFFFFF;
     int MAXIMUM_WAIT_OBJECTS = 64;
+
+    int PM_NOREMOVE = 0;
+    int PM_REMOVE = 1;
+    int PM_NOYIELD = 2;
 
     /**
      * A {@code WM_KEYUP}, {@code WM_KEYDOWN}, {@code WM_SYSKEYUP}, or {@code WM_SYSKEYDOWN} message is in the queue.
