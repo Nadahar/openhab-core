@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.sun.jna.Native;
 import com.sun.jna.platform.win32.DBT;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_DEVICEINTERFACE;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_HANDLE;
@@ -27,6 +28,7 @@ import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_OEM;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_PORT;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_VOLUME;
 import com.sun.jna.platform.win32.Kernel32;
+import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.User32;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef.HMODULE;
@@ -69,13 +71,13 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         // Create and register window class
         String windowClass = "OHMessageHandlerWindowClass";
         User32Ex user32 = User32Ex.INSTANCE;
-        HMODULE hInst = Kernel32.INSTANCE.GetModuleHandle("");
-//        if (hInst == null) {
-//            logger.debug("Failed to get module handle, aborting message window creation");
-//            notifyTerminate();
-//            currentThread.setName(threadName);
-//            return;
-//        }
+        HMODULE hInst = Kernel32.INSTANCE.GetModuleHandle(null);
+        if (hInst == null) {
+            logger.debug("Failed to get module handle, aborting message window creation");
+            notifyTerminate();
+            currentThread.setName(threadName);
+            return;
+        }
         WNDCLASSEX wClass = new WNDCLASSEX();
         wClass.hInstance = hInst;
         wClass.lpfnWndProc = WindowMessageHandler.this;
@@ -100,7 +102,6 @@ public class WindowMessageHandler implements Runnable, WindowProc {
                         null, null, hInst, null);
             if (hWnd == null) {
                 logger.debug("Failed to create window, aborting message window creation");
-                notifyTerminate();
                 return;
             }
 
@@ -110,24 +111,24 @@ public class WindowMessageHandler implements Runnable, WindowProc {
             notificationFilter.dbcc_classguid = DBT.GUID_DEVINTERFACE_USB_DEVICE;
 
             hDevNotify = user32.RegisterDeviceNotification(hWnd, notificationFilter, User32.DEVICE_NOTIFY_WINDOW_HANDLE);
-            if (hDevNotify != null) {
-                System.out.println("RegisterDeviceNotification was sucessfully!");
+            if (hDevNotify == null) {
+                logger.debug("Failed to register for device notification, terminating message window");
+                return;
             }
 
             MSG msg = new MSG();
             HANDLE[] handles = new HANDLE[] {terminateEvent};
             boolean running = true;
-            int waitResult;
             while (running) {
-                switch (waitResult = user32.MsgWaitForMultipleObjects(handles.length, handles, false, WinBase.INFINITE, User32Ex.QS_ALLINPUT)) {
+                switch (user32.MsgWaitForMultipleObjects(handles.length, handles, false, WinBase.INFINITE, User32Ex.QS_ALLINPUT)) {
                     case User32Ex.WAIT_OBJECT_0:
-                        // Terminate
+                        // terminateEvent was triggered, terminate
                         logger.debug("Terminate event received, terminating message loop");
-                        user32.PostQuitMessage(0);
                         running = false;
+                        user32.PostQuitMessage(0);
                         break;
                     case User32Ex.WAIT_OBJECT_0 + 1:
-                        // Process the message queue
+                        // A window message has been queued, process the message queue
                         while (user32.PeekMessage(msg, hWnd, 0, 0, User32Ex.PM_REMOVE)) {
                             if (msg.message == WinUser.WM_QUIT) {
                                 user32.PostQuitMessage(msg.wParam.intValue());
@@ -139,9 +140,11 @@ public class WindowMessageHandler implements Runnable, WindowProc {
                         }
                         break;
                     default:
-                        // TODO: (Nad) Error..
-                        logger.error("Unexpected return value: {}", waitResult);
+                        // This should not happen, something is very wrong
+                        int lastError = Native.getLastError();
+                        logger.warn("An error ({}) occurred while waiting for a window message, terminating message loop: {}", lastError, Kernel32Util.formatMessage(lastError));
                         running = false;
+                        user32.PostQuitMessage(0);
                         break;
                 }
             }
@@ -154,6 +157,7 @@ public class WindowMessageHandler implements Runnable, WindowProc {
                 user32.DestroyWindow(hWnd);
             }
 
+            notifyTerminate();
             currentThread.setName(threadName);
         }
     }
@@ -181,11 +185,13 @@ public class WindowMessageHandler implements Runnable, WindowProc {
     }
 
     @Override
-    public LRESULT callback(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam) {// WM_DEVICECHANGE
+    public LRESULT callback(HWND hWnd, int uMsg, WPARAM wParam, LPARAM lParam) {
         switch (uMsg) {
             case WinUser.WM_CREATE:
+                logger.trace("Window message handler created");
                 return new LRESULT(0);
             case WinUser.WM_DESTROY:
+                logger.trace("Window message handler destroyed");
                 User32Ex.INSTANCE.PostQuitMessage(0);
                 return new LRESULT(0);
             case WinUser.WM_DEVICECHANGE: {
