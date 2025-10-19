@@ -22,11 +22,8 @@ import org.slf4j.LoggerFactory;
 import com.sun.jna.Native;
 import com.sun.jna.platform.win32.DBT;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_DEVICEINTERFACE;
-import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_HANDLE;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_HDR;
-import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_OEM;
 import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_PORT;
-import com.sun.jna.platform.win32.DBT.DEV_BROADCAST_VOLUME;
 import com.sun.jna.platform.win32.Kernel32;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.User32;
@@ -203,12 +200,12 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         }
     }
 
-    protected LRESULT onDeviceChange(WPARAM wParam, LPARAM lParam) {
+    private LRESULT onDeviceChange(WPARAM wParam, LPARAM lParam) {
         switch (wParam.intValue()) {
             case DBT.DBT_DEVICEARRIVAL:
-                return onDeviceChangeArrivalOrRemoveComplete(lParam, "Arrival");
+                return onDeviceAddedOrRemoved(lParam, true);
             case DBT.DBT_DEVICEREMOVECOMPLETE:
-                return onDeviceChangeArrivalOrRemoveComplete(lParam, "Remove Complete");
+                return onDeviceAddedOrRemoved(lParam, false);
             case DBT.DBT_DEVNODES_CHANGED:
                 // LRESULT(1) aka TRUE means that the message was processed. This message is non-specific
                 // (basically means "something changed"), so we don't want to take any action.
@@ -218,78 +215,89 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         }
     }
 
-    protected LRESULT onDeviceChangeArrivalOrRemoveComplete(LPARAM lParam, String action) {
+    private LRESULT onDeviceAddedOrRemoved(LPARAM lParam, boolean added) {
         DEV_BROADCAST_HDR bhdr = new DEV_BROADCAST_HDR(lParam.longValue());
+        Set<WindowMessageListener> listeners;
         switch (bhdr.dbch_devicetype) {
-            case DBT.DBT_DEVTYP_DEVICEINTERFACE: {
-                // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363244.aspx
+            case DBT.DBT_DEVTYP_DEVICEINTERFACE:
                 DEV_BROADCAST_DEVICEINTERFACE bdif = new DEV_BROADCAST_DEVICEINTERFACE(bhdr.getPointer());
-                System.out.println("BROADCAST_DEVICEINTERFACE: " + action);
-                System.out.println("dbcc_devicetype: " + bdif.dbcc_devicetype);
-                System.out.println("dbcc_name:       " + bdif.getDbcc_name());
-                System.out.println("dbcc_classguid:  " + bdif.dbcc_classguid.toGuidString());
-                break;
-            }
-            case DBT.DBT_DEVTYP_HANDLE: {
-                // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363245.aspx
-                DEV_BROADCAST_HANDLE bhd = new DEV_BROADCAST_HANDLE(bhdr.getPointer());
-                System.out.println("BROADCAST_HANDLE: " + action);
-                break;
-            }
-            case DBT.DBT_DEVTYP_OEM: {
-                // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363247.aspx
-                DEV_BROADCAST_OEM boem = new DEV_BROADCAST_OEM(bhdr.getPointer());
-                System.out.println("BROADCAST_OEM: " + action);
-                break;
-            }
-            case DBT.DBT_DEVTYP_PORT: {
-                // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363248.aspx
-                DEV_BROADCAST_PORT bpt = new DEV_BROADCAST_PORT(bhdr.getPointer());
-                System.out.println("BROADCAST_PORT:  " + action);
-                System.out.println("dbcp_devicetype: " + bpt.dbcp_devicetype);
-                System.out.println("dbcp_name:       " + bpt.getDbcpName());
-                break;
-            }
-            case DBT.DBT_DEVTYP_VOLUME: {
-                // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363249.aspx
-                DEV_BROADCAST_VOLUME bvl = new DEV_BROADCAST_VOLUME(bhdr.getPointer());
-                int logicalDriveAffected = bvl.dbcv_unitmask;
-                short flag = bvl.dbcv_flags;
-                boolean isMediaNotPhysical = 0 != (flag & DBT.DBTF_MEDIA/*value is 1*/);
-                boolean isNet = 0 != (flag & DBT.DBTF_NET/*value is 2*/);
-                System.out.println(action);
-                int driveLetterIndex = 0;
-                while (logicalDriveAffected != 0) {
-                    if (0 != (logicalDriveAffected & 1)) {
-                        System.out.println("Logical Drive Letter: " +
-                            ((char) ('A' + driveLetterIndex)));
-                    }
-                    logicalDriveAffected >>>= 1;
-                    driveLetterIndex++;
+                listeners = Set.copyOf(this.listeners);
+                if (!listeners.isEmpty()) {
+                    createNotificationThread(() -> {
+                        for (WindowMessageListener listener : listeners) {
+                            if (added) {
+                                listener.deviceAdded(bdif.getDbcc_name());
+                            } else {
+                                listener.deviceRemoved(bdif.getDbcc_name());
+                            }
+                        }
+                    }).start();
                 }
-                System.out.println("isMediaNotPhysical:"+isMediaNotPhysical);
-                System.out.println("isNet:"+isNet);
                 break;
-            }
+            case DBT.DBT_DEVTYP_PORT:
+                DEV_BROADCAST_PORT bpt = new DEV_BROADCAST_PORT(bhdr.getPointer());
+                listeners = Set.copyOf(this.listeners);
+                if (!listeners.isEmpty()) {
+                    createNotificationThread(() -> {
+                        for (WindowMessageListener listener : listeners) {
+                            if (added) {
+                                listener.portAdded(bpt.getDbcpName());
+                            } else {
+                                listener.portRemoved(bpt.getDbcpName());
+                            }
+                        }
+                    }).start();
+                }
+                break;
+            // Don't process the remaining types
+            case DBT.DBT_DEVTYP_HANDLE:
+            case DBT.DBT_DEVTYP_OEM:
+            case DBT.DBT_DEVTYP_VOLUME:
             default:
                 return null;
         }
-        // return TRUE means processed message for this wParam.
-        // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363205.aspx
-        // see http://msdn.microsoft.com/en-us/library/windows/desktop/aa363208.aspx
+        // LRESULT(1) aka TRUE means that the message was processed.
         return new LRESULT(1);
     }
 
+    /**
+     * A listener that listens for {@link WindowMessageHandler} events.
+     *
+     * @author Ravi Nadahar - Initial contribution.
+     */
     public interface WindowMessageListener {
 
+        /**
+         * A USB device was added.
+         *
+         * @param devicePath the device path of the added device.
+         */
         void deviceAdded(String devicePath);
 
+        /**
+         * A USB device was removed.
+         *
+         * @param devicePath the device path of the added device.
+         */
         void deviceRemoved(String devicePath);
 
+        /**
+         * A serial port was added.
+         *
+         * @param portName the name of the port, e.g. {@code COM3}.
+         */
         void portAdded(String portName);
 
+        /**
+         * A serial port was removed.
+         *
+         * @param portName the name of the port, e.g. {@code COM3}.
+         */
         void portRemoved(String portName);
 
+        /**
+         * {@link WindowMessageHandler} was terminated, no more events will be sent.
+         */
         void serviceTerminated();
     }
 }
