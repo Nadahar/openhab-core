@@ -77,6 +77,9 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
     public static final String SCAN_INTERVAL_PROPERTY = "scanInterval";
     public static final int DEFAULT_SCAN_INTERVAL_SECONDS = 15;
 
+    private final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
+    private final Pattern devicePathPattern = Pattern.compile(DEVICE_PATH_PATTERN);
+    private record DevicePathData (int vendorId, int productId, String id, int interfaceNumber) {}
     private static final boolean IS_64_BIT = Platform.is64Bit();
     private static final int ERROR_NO_SUCH_DEVINST = 0xe000020b;
 
@@ -243,9 +246,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         int SPDRP_MFG = 0x0000000B;
         int SPDRP_PHYSICAL_DEVICE_OBJECT_NAME = 0x0000000E;
 
-        SetupApi apiInst = SetupApi.INSTANCE;
+        SetupApiEx apiInst = SetupApiEx.INSTANCE;
 
         WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
+        String serialPort;
         if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
             try {
                 SP_DEVINFO_DATA deviceInfoData = new SP_DEVINFO_DATA();
@@ -258,7 +262,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     Memory propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
                     String name = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
                     propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
-                    String friemdlyName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
+                    String friendlyName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
                     propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_ENUMERATOR_NAME, deviceInfoData);
                     String enumName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
                     propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_MFG, deviceInfoData);
@@ -274,9 +278,12 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_HARDWAREID, deviceInfoData);
                     if (propertyBuffer != null) {
                         List<String> ids = readRegMultiSz(propertyBuffer);
-                        logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friemdlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
+                        logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friendlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
                     }
                     //TODO: (Nad) Handle Win32Exception
+//                    String instanceId = getDeviceInstanceId(apiInst, deviceInfoSet, deviceInfoData);
+//                    logger.error("InstanceId: {}", instanceId);
+
 
                     intIdx = 0;
                     while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
@@ -290,19 +297,26 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
 
                                 WinReg.HKEY hKey = apiInst.SetupDiOpenDevRegKey(deviceInfoSet, deviceInfoData, SetupApi.DICS_FLAG_GLOBAL, 0, SetupApi.DIREG_DEV, WinNT.KEY_READ);
                                 if (hKey != WinBase.INVALID_HANDLE_VALUE) {
-                                    String s;
                                     try {
-                                        s = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
+                                        serialPort = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
                                     } catch (Win32Exception e) {
-                                        s = null;
+                                        serialPort = null;
                                     } finally {
                                         Advapi32.INSTANCE.RegCloseKey(hKey);
                                     }
-                                    logger.error("PortName: {}", s);
+                                    logger.error("PortName: {}", serialPort);
+                                } else {
+                                    serialPort = null;
                                 }
+
+                                UsbSerialDeviceInformation usbSerialDeviceInformation = new UsbSerialDeviceInformation(
+                                    data.vendorId, data.productId, data.id, mfg, friendlyName == null || friendlyName.isBlank() ? name : friendlyName,
+                                    data.interfaceNumber, data.id, serialPort == null ? "" : serialPort);
+
+                                logger.debug("Ndd {}", usbSerialDeviceInformation);
+
                             }
                         }
-
 
                         intIdx++;
                     }
@@ -407,7 +421,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     continue;
                 }
 
-                String serialPort = "";
+                serialPort = "";
                 String[] interfaceSubKeys;
                 try {
                     interfaceSubKeys = Advapi32Util.registryGetKeys(HKEY_LOCAL_MACHINE, interfacePath);
@@ -510,9 +524,31 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         return readRegMultiSz(result, 4L);
     }
 
-    public final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
-    protected final Pattern devicePathPattern = Pattern.compile(DEVICE_PATH_PATTERN);
-    protected record DevicePathData (int vendorId, int productId, String id, int interfaceNumber) {}
+    // TODO: Doc: Win32Exception
+    @Nullable
+    protected String getDeviceInstanceId(SetupApiEx apiInst, WinNT.HANDLE deviceInfoSet, SP_DEVINFO_DATA deviceInfoData) {
+        IntByReference size = new IntByReference();
+        int lastError;
+        if (!apiInst.SetupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData, null, 0, size) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+            if (lastError == WinError.ERROR_INVALID_DATA || lastError == ERROR_NO_SUCH_DEVINST) {
+                return null;
+            }
+            throw new Win32Exception(lastError);
+        }
+        int sizeValue = size.getValue();
+        if (sizeValue == 0) {
+            return null;
+        }
+        Memory buffer = new Memory(sizeValue);
+        if (!apiInst.SetupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData, buffer, sizeValue, null)) {
+            lastError = Native.getLastError();
+            if (lastError == WinError.ERROR_INVALID_DATA) {
+                return null;
+            }
+            throw new Win32Exception(lastError);
+        }
+        return buffer.getWideString(0L);
+    }
 
     @Nullable
     protected DevicePathData parseDevicePath(String devicePath) {
@@ -535,35 +571,42 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
 
 
     @Override
-    public synchronized void startBackgroundScanning() {
+    public void startBackgroundScanning() {
         if (Platform.isWindows()) {
-            ScheduledFuture<?> scanTask = this.scanTask;
-            WindowMessageHandler messageHandler = this.windowMessageHandler;
-            if (windowMessageFailed) {
-                if (messageHandler != null) {
-                    messageHandler.removeListener(this);
-                    // Should not be necessary, but it doesn't hurt to make sure
-                    messageHandler.terminate();
-                    this.windowMessageHandler = null;
+            boolean initScan = false;
+            synchronized (this) {
+                ScheduledFuture<?> scanTask = this.scanTask;
+                WindowMessageHandler messageHandler = this.windowMessageHandler;
+                if (windowMessageFailed) {
+                    if (messageHandler != null) {
+                        messageHandler.removeListener(this);
+                        // Should not be necessary, but it doesn't hurt to make sure
+                        messageHandler.terminate();
+                        this.windowMessageHandler = null;
+                    }
+                    if (scanTask == null || scanTask.isDone()) {
+                        this.scanTask = scheduler.scheduleWithFixedDelay(() -> {
+                            doSingleScanInternal(false);
+                        },
+                                0, scanInterval.toSeconds(),
+                                TimeUnit.SECONDS);
+                    }
+                } else {
+                    if (scanTask != null) {
+                        scanTask.cancel(true);
+                        this.scanTask = null;
+                    }
+                    if (messageHandler == null) {
+                         messageHandler = new WindowMessageHandler();
+                         messageHandler.addListener(this);
+                         this.windowMessageHandler = messageHandler;
+                         scheduler.submit(messageHandler);
+                         initScan = true;
+                    }
                 }
-                if (scanTask == null || scanTask.isDone()) {
-                    this.scanTask = scheduler.scheduleWithFixedDelay(() -> {
-                        doSingleScanInternal(false);
-                    },
-                            0, scanInterval.toSeconds(),
-                            TimeUnit.SECONDS);
-                }
-            } else {
-                if (scanTask != null) {
-                    scanTask.cancel(true);
-                    this.scanTask = null;
-                }
-                if (messageHandler == null) {
-                     messageHandler = new WindowMessageHandler();
-                     messageHandler.addListener(this);
-                     this.windowMessageHandler = messageHandler;
-                     scheduler.submit(messageHandler);
-                }
+            }
+            if (initScan) {
+                doSingleScanInternal(false);
             }
         }
     }
