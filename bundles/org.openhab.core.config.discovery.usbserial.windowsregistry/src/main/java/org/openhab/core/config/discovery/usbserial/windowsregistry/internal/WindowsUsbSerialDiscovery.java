@@ -12,7 +12,6 @@
  */
 package org.openhab.core.config.discovery.usbserial.windowsregistry.internal;
 
-import static com.sun.jna.platform.win32.WinReg.HKEY_LOCAL_MACHINE;
 import static java.lang.Long.parseLong;
 
 import java.time.Duration;
@@ -21,10 +20,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -60,14 +57,16 @@ import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinError;
 import com.sun.jna.platform.win32.WinReg;
 import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.WinNT.HANDLE;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.platform.win32.Guid.GUID;
 
 /**
  * This is a {@link UsbSerialDiscovery} implementation component for Windows.
- * It parses the Windows registry for USB device entries.
+ * It uses the Windows API to query for and be notified of USB devices.
  *
  * @author Andrew Fiddian-Green - Initial contribution
+ * @author Ravi Nadahar - Refactor to use SetupApi
  */
 @NonNullByDefault
 @Component(service = UsbSerialDiscovery.class, name = WindowsUsbSerialDiscovery.SERVICE_NAME, configurationPid = "discovery.usbserial.windows")
@@ -76,24 +75,14 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
     protected static final String SERVICE_NAME = "usb-serial-discovery-windows";
     public static final String SCAN_INTERVAL_PROPERTY = "scanInterval";
     public static final int DEFAULT_SCAN_INTERVAL_SECONDS = 15;
+    private static final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
 
-    private final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
     private final Pattern devicePathPattern = Pattern.compile(DEVICE_PATH_PATTERN);
     private record DevicePathData (int vendorId, int productId, String id, int interfaceNumber) {}
     private static final boolean IS_64_BIT = Platform.is64Bit();
     private static final int ERROR_NO_SUCH_DEVINST = 0xe000020b;
 
     // registry accessor strings
-    private static final String USB_REGISTRY_ROOT = "SYSTEM\\CurrentControlSet\\Enum\\USB";
-    private static final String BACKSLASH = "\\";
-    private static final String PREFIX_PID = "PID_";
-    private static final String PREFIX_VID = "VID_";
-    private static final String PREFIX_HEX = "0x";
-    private static final String SPLIT_IDS = "&";
-    private static final String SPLIT_VALUES = ";";
-    private static final String KEY_MANUFACTURER = "Mfg";
-    private static final String KEY_PRODUCT = "DeviceDesc";
-    private static final String KEY_DEVICE_PARAMETERS = "Device Parameters";
     private static final String KEY_SERIAL_PORT = "PortName";
 
     private final Logger logger = LoggerFactory.getLogger(WindowsUsbSerialDiscovery.class);
@@ -237,18 +226,13 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         }
 
         GUID GUID_DEVINTERFACE_USB_DEVICE = new GUID("A5DCBF10-6530-11D2-901F-00C04FB951ED");
-        int SPDRP_SERVICE = 0x00000004;
-        int SPDRP_CLASS = 0x00000007;
-        int SPDRP_COMPATIBLEIDS = 0x00000002;
-        int SPDRP_HARDWAREID = 0x00000001;
-        int SPDRP_ENUMERATOR_NAME = 0x00000016;
         int SPDRP_FRIENDLYNAME = 0x0000000C;
         int SPDRP_MFG = 0x0000000B;
-        int SPDRP_PHYSICAL_DEVICE_OBJECT_NAME = 0x0000000E;
 
         SetupApi apiInst = SetupApi.INSTANCE;
 
-        WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
+        Set<UsbSerialDeviceInformation> result = new HashSet<>();
+        HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
         String serialPort;
         if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
             try {
@@ -259,59 +243,39 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 int intIdx;
                 while (apiInst.SetupDiEnumDeviceInfo(deviceInfoSet, devIdx, deviceInfoData)) {
 
-                    Memory propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
-                    String name = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
-                    String friendlyName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_ENUMERATOR_NAME, deviceInfoData);
-                    String enumName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_MFG, deviceInfoData);
-                    String mfg = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_PHYSICAL_DEVICE_OBJECT_NAME, deviceInfoData);
-                    String pdoName = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_SERVICE, deviceInfoData);
-                    String service = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_CLASS, deviceInfoData);
-                    String clazz = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_COMPATIBLEIDS, deviceInfoData);
-                    String compIds = propertyBuffer == null ? null : propertyBuffer.getWideString(0L);
-                    propertyBuffer = getDeviceRegistryProperty(apiInst, deviceInfoSet, SPDRP_HARDWAREID, deviceInfoData);
-                    if (propertyBuffer != null) {
-                        List<String> ids = readRegMultiSz(propertyBuffer);
-                        logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friendlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
-                    }
+                    String name = getDeviceRegistryPropertyString(deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
+                    String friendlyName = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
+                    String mfg = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_MFG, deviceInfoData);
                     //TODO: (Nad) Handle Win32Exception
 
                     intIdx = 0;
                     while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
-                        List<String> devicePaths = getDeviceInterfaceDetails(apiInst, deviceInfoSet, deviceInfoData, deviceInterfaceData);
-                        logger.error("devicePaths: {}", devicePaths);
+                        List<String> devicePaths = getDeviceInterfaceDetails(deviceInfoSet, deviceInterfaceData, null);
                         DevicePathData data;
                         for (String devicePath : devicePaths) {
                             data = parseDevicePath(devicePath);
                             if (data != null) {
-                                logger.error("parsed details: {}", data);
-
                                 WinReg.HKEY hKey = apiInst.SetupDiOpenDevRegKey(deviceInfoSet, deviceInfoData, SetupApi.DICS_FLAG_GLOBAL, 0, SetupApi.DIREG_DEV, WinNT.KEY_READ);
                                 if (hKey != WinBase.INVALID_HANDLE_VALUE) {
                                     try {
                                         serialPort = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
-                                    } catch (Win32Exception e) {
-                                        serialPort = null;
+                                    } catch (RuntimeException e) {
+                                        if (!(e instanceof Win32Exception we) || we.getErrorCode() != WinError.ERROR_FILE_NOT_FOUND) {
+                                            logger.debug("Failed to read serial port for USB device \"{}\": {} {}", name, e.getClass().getSimpleName(), e.getMessage());
+                                        }
+                                        serialPort = "";
                                     } finally {
                                         Advapi32.INSTANCE.RegCloseKey(hKey);
                                     }
-                                    logger.error("PortName: {}", serialPort);
                                 } else {
-                                    serialPort = null;
+                                    serialPort = "";
                                 }
 
                                 UsbSerialDeviceInformation usbSerialDeviceInformation = new UsbSerialDeviceInformation(
                                     data.vendorId, data.productId, data.id, mfg, friendlyName == null || friendlyName.isBlank() ? name : friendlyName,
-                                    data.interfaceNumber, data.id, serialPort == null ? "" : serialPort);
-
-                                logger.debug("Ndd {}", usbSerialDeviceInformation);
-
+                                    data.interfaceNumber, data.id, serialPort);
+                                logger.debug("Parsed {}", usbSerialDeviceInformation);
+                                result.add(usbSerialDeviceInformation);
                             }
                         }
 
@@ -330,138 +294,41 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
             //TODO: Log error
         }
 
-        Set<UsbSerialDeviceInformation> result = new HashSet<>();
-        String[] deviceKeys;
-        try {
-            deviceKeys = Advapi32Util.registryGetKeys(HKEY_LOCAL_MACHINE, USB_REGISTRY_ROOT);
-        } catch (Win32Exception e) {
-            logger.debug("registryGetKeys failed for {}", USB_REGISTRY_ROOT, e);
-            return result;
-        }
-
-        for (String deviceKey : deviceKeys) {
-            logger.trace("{}", deviceKey);
-
-            if (!deviceKey.startsWith(PREFIX_VID)) {
-                continue;
-            }
-
-            String[] ids = deviceKey.split(SPLIT_IDS);
-            if (ids.length < 2) {
-                continue;
-            }
-
-            if (!ids[1].startsWith(PREFIX_PID)) {
-                continue;
-            }
-
-            int vendorId;
-            int productId;
-            try {
-                vendorId = Integer.decode(PREFIX_HEX + ids[0].substring(4));
-                productId = Integer.decode(PREFIX_HEX + ids[1].substring(4));
-            } catch (NumberFormatException e) {
-                continue;
-            }
-
-            String serialNumber = ids.length > 2 ? ids[2] : null;
-
-            String devicePath = USB_REGISTRY_ROOT + BACKSLASH + deviceKey;
-            String[] interfaceNames;
-            try {
-                interfaceNames = Advapi32Util.registryGetKeys(HKEY_LOCAL_MACHINE, devicePath);
-            } catch (Win32Exception e) {
-                logger.debug("registryGetKeys failed for {}", devicePath, e);
-                continue;
-            }
-
-            int interfaceId = 0;
-            for (String interfaceName : interfaceNames) {
-                logger.trace("  interfaceId:{}, interfaceName:{}", interfaceId, interfaceName);
-
-                String interfacePath = devicePath + BACKSLASH + interfaceName;
-                TreeMap<String, Object> values;
-                try {
-                    values = Advapi32Util.registryGetValues(HKEY_LOCAL_MACHINE, interfacePath);
-                } catch (Win32Exception e) {
-                    logger.debug("registryGetValues failed for {}", interfacePath, e);
-                    continue;
-                }
-
-                if (logger.isTraceEnabled()) {
-                    for (Entry<String, Object> value : values.entrySet()) {
-                        logger.trace("    {}={}", value.getKey(), value.getValue());
-                    }
-                }
-
-                String manufacturer;
-                Object manufacturerValue = values.get(KEY_MANUFACTURER);
-                if (manufacturerValue instanceof String manufacturerString) {
-                    String[] manufacturerData = manufacturerString.split(SPLIT_VALUES);
-                    if (manufacturerData.length < 2) {
-                        continue;
-                    }
-                    manufacturer = manufacturerData[1];
-                } else {
-                    continue;
-                }
-
-                String product;
-                Object productValue = values.get(KEY_PRODUCT);
-                if (productValue instanceof String productString) {
-                    String[] productData = productString.split(SPLIT_VALUES);
-                    if (productData.length < 2) {
-                        continue;
-                    }
-                    product = productData[1];
-                } else {
-                    continue;
-                }
-
-                serialPort = "";
-                String[] interfaceSubKeys;
-                try {
-                    interfaceSubKeys = Advapi32Util.registryGetKeys(HKEY_LOCAL_MACHINE, interfacePath);
-                } catch (Win32Exception e) {
-                    logger.debug("registryGetKeys failed for {}", interfacePath, e);
-                    continue;
-                }
-
-                for (String interfaceSubKey : interfaceSubKeys) {
-                    if (!KEY_DEVICE_PARAMETERS.equals(interfaceSubKey)) {
-                        continue;
-                    }
-                    String deviceParametersPath = interfacePath + BACKSLASH + interfaceSubKey;
-                    TreeMap<String, Object> deviceParameterValues;
-                    try {
-                        deviceParameterValues = Advapi32Util.registryGetValues(HKEY_LOCAL_MACHINE,
-                                deviceParametersPath);
-                    } catch (Win32Exception e) {
-                        logger.debug("registryGetValues failed for {}", deviceParametersPath, e);
-                        continue;
-                    }
-                    Object serialPortValue = deviceParameterValues.get(KEY_SERIAL_PORT);
-                    if (serialPortValue instanceof String serialPortString) {
-                        serialPort = serialPortString;
-                    }
-                    break;
-                }
-
-                UsbSerialDeviceInformation usbSerialDeviceInformation = new UsbSerialDeviceInformation(vendorId,
-                        productId, serialNumber, manufacturer, product, interfaceId, interfaceName, serialPort);
-
-                logger.debug("Add {}", usbSerialDeviceInformation);
-                result.add(usbSerialDeviceInformation);
-
-                interfaceId++;
-            }
-        }
         return result;
     }
 
-    // TODO: Doc: Win32Exception
+    /**
+     * Retrieves the specified device registry property using {@code SetupDiGetDeviceRegistryProperty} and returns
+     * the result as a {@link String}. Might fail in an unpredictable way if the property value isn't a valid string.
+     *
+     * @param deviceInfoSet the handle to the {@code DeviceInfoSet} to read from.
+     * @param property the code for the property to retrieve.
+     * @param deviceInfoData the {@code DeviceInfoData} that identifies the element to retrieve the property from.
+     * @return The resulting {@link String}.
+     *
+     * @throws Win32Exception If {@code SetupDiGetDeviceRegistryProperty} returns an unexpected status.
+     */
     @Nullable
-    protected Memory getDeviceRegistryProperty(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
+    protected String getDeviceRegistryPropertyString(HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
+        Memory buffer = getDeviceRegistryProperty(deviceInfoSet, property, deviceInfoData);
+        return buffer == null ? null : buffer.getWideString(0L);
+    }
+
+    /**
+     * Retrieves the specified device registry property using {@code SetupDiGetDeviceRegistryProperty} and returns
+     * the result as a raw {@link Memory} buffer. The reason is that various properties can have different types/
+     * data structures.
+     *
+     * @param deviceInfoSet the handle to the {@code DeviceInfoSet} to read from.
+     * @param property the code for the property to retrieve.
+     * @param deviceInfoData the {@code DeviceInfoData} that identifies the element to retrieve the property from.
+     * @return The resulting {@link Memory} buffer.
+     *
+     * @throws Win32Exception If {@code SetupDiGetDeviceRegistryProperty} returns an unexpected status.
+     */
+    @Nullable
+    protected Memory getDeviceRegistryProperty(HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
+        SetupApi apiInst = SetupApi.INSTANCE;
         IntByReference size = new IntByReference();
         int lastError;
         if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, null, 0, size) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
@@ -485,8 +352,21 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         return buffer;
     }
 
-    // TODO: Doc: Win32Exception
-    protected List<String> getDeviceInterfaceDetails(SetupApi apiInst, WinNT.HANDLE deviceInfoSet, SP_DEVINFO_DATA deviceInfoData, SP_DEVICE_INTERFACE_DATA deviceInterfaceData) {
+    /**
+     * Retrieves the details for the specified device interface using {@code SetupDiGetDeviceInterfaceDetail} and
+     * returns the result as a {@link List} of {@link String}s.
+     *
+     * @param deviceInfoSet the handle to the {@code DeviceInfoSet} to read from.
+     * @param deviceInterfaceData the {@code DeviceInterfaceData} from which to retrieve the details.
+     * @param deviceInfoData [out] the optional {@link SP_DEVINFO_DATA} structure that will be populated with
+     *            {@code DeviceInfoData} about the device that supports the requested interface. The structure must
+     *            first have been initialized with {@code DeviceInfoData.cbSize} to {@code sizeof(SP_DEVINFO_DATA)}.
+     * @return The resulting {@link List} of {@link String}s.
+     *
+     * @throws Win32Exception If {@code SetupDiGetDeviceInterfaceDetail} returns an unexpected status.
+     */
+    protected List<String> getDeviceInterfaceDetails(HANDLE deviceInfoSet, SP_DEVICE_INTERFACE_DATA deviceInterfaceData, @Nullable SP_DEVINFO_DATA deviceInfoData) {
+        SetupApi apiInst = SetupApi.INSTANCE;
         IntByReference size = new IntByReference();
         int lastError;
         if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, null, 0, size, deviceInfoData) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
@@ -657,6 +537,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
     @Override
     public void serviceTerminated() {
         logger.debug("Listening for window messages failed, falling back to interval scanning");
+        windowMessageFailed = true;
         synchronized (this) {
             if (windowMessageHandler != null) {
                 startBackgroundScanning();
