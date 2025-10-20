@@ -246,7 +246,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         int SPDRP_MFG = 0x0000000B;
         int SPDRP_PHYSICAL_DEVICE_OBJECT_NAME = 0x0000000E;
 
-        SetupApiEx apiInst = SetupApiEx.INSTANCE;
+        SetupApi apiInst = SetupApi.INSTANCE;
 
         WinNT.HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
         String serialPort;
@@ -281,9 +281,6 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                         logger.error("name: {}, friendlyName: {}, enumName: {}, mfg: {}, pdoName: {}, service: {}, class: {}, compIds: {}, ids: {}", name, friendlyName, enumName, mfg, pdoName, service, clazz, compIds, ids);
                     }
                     //TODO: (Nad) Handle Win32Exception
-//                    String instanceId = getDeviceInstanceId(apiInst, deviceInfoSet, deviceInfoData);
-//                    logger.error("InstanceId: {}", instanceId);
-
 
                     intIdx = 0;
                     while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
@@ -522,32 +519,6 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
             throw new Win32Exception(lastError);
         }
         return readRegMultiSz(result, 4L);
-    }
-
-    // TODO: Doc: Win32Exception
-    @Nullable
-    protected String getDeviceInstanceId(SetupApiEx apiInst, WinNT.HANDLE deviceInfoSet, SP_DEVINFO_DATA deviceInfoData) {
-        IntByReference size = new IntByReference();
-        int lastError;
-        if (!apiInst.SetupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData, null, 0, size) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
-            if (lastError == WinError.ERROR_INVALID_DATA || lastError == ERROR_NO_SUCH_DEVINST) {
-                return null;
-            }
-            throw new Win32Exception(lastError);
-        }
-        int sizeValue = size.getValue();
-        if (sizeValue == 0) {
-            return null;
-        }
-        Memory buffer = new Memory(sizeValue);
-        if (!apiInst.SetupDiGetDeviceInstanceId(deviceInfoSet, deviceInfoData, buffer, sizeValue, null)) {
-            lastError = Native.getLastError();
-            if (lastError == WinError.ERROR_INVALID_DATA) {
-                return null;
-            }
-            throw new Win32Exception(lastError);
-        }
-        return buffer.getWideString(0L);
     }
 
     @Nullable
