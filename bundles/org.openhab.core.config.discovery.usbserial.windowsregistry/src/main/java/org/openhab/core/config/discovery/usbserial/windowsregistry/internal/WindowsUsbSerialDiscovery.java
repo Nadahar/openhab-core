@@ -284,12 +284,15 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                                 if (hKey != WinBase.INVALID_HANDLE_VALUE) {
                                     try {
                                         serialPort = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
-                                    } catch (RuntimeException e) {
-                                        if (!(e instanceof Win32Exception we)
-                                                || we.getErrorCode() != WinError.ERROR_FILE_NOT_FOUND) {
+                                    } catch (Win32Exception e) {
+                                        if (e.getErrorCode() != WinError.ERROR_FILE_NOT_FOUND) {
                                             logger.debug("Failed to read serial port for USB device \"{}\": {} {}",
                                                     name, e.getClass().getSimpleName(), e.getMessage());
                                         }
+                                        serialPort = "";
+                                    } catch (RuntimeException e) {
+                                        logger.debug("Failed to read serial port for USB device \"{}\": {} {}", name,
+                                                e.getClass().getSimpleName(), e.getMessage());
                                         serialPort = "";
                                     } finally {
                                         Advapi32.INSTANCE.RegCloseKey(hKey);
