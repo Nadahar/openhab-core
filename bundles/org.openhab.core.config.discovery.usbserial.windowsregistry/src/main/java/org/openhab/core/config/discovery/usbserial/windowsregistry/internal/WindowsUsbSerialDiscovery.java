@@ -49,6 +49,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Platform;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.SetupApi;
 import com.sun.jna.platform.win32.SetupApi.SP_DEVINFO_DATA;
 import com.sun.jna.platform.win32.SetupApi.SP_DEVICE_INTERFACE_DATA;
@@ -62,8 +63,9 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.platform.win32.Guid.GUID;
 
 /**
- * This is a {@link UsbSerialDiscovery} implementation component for Windows.
- * It uses the Windows API to query for and be notified of USB devices.
+ * This is a {@link UsbSerialDiscovery} implementation component for Windows. It uses the Windows API to query for and
+ * be notified of USB devices. It will attempt to subscribe to device change notifications by creating an invisible
+ * window for that subscribes to changes. If that fails, it will fall back to interval scanning.
  *
  * @author Andrew Fiddian-Green - Initial contribution
  * @author Ravi Nadahar - Refactor to use SetupApi
@@ -179,7 +181,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         Set<UsbSerialDeviceInformation> removed;
         Set<UsbSerialDeviceInformation> unchanged;
         synchronized (this) {
-            scanResult = scanAllUsbDevicesInformation();
+            scanResult = gatherUsbDevicesInformation();
             added = setDifference(scanResult, lastScanResult);
             removed = setDifference(lastScanResult, scanResult);
             unchanged = includeExisting ? setDifference(scanResult, added) :  Set.of();
@@ -216,11 +218,11 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
     }
 
     /**
-     * Traverse the USB tree in Windows registry and return a set of USB device information.
+     * Traverse Windows USB devices and return a set of USB device information.
      *
      * @return a set of USB device information.
      */
-    public Set<UsbSerialDeviceInformation> scanAllUsbDevicesInformation() {
+    public Set<UsbSerialDeviceInformation> gatherUsbDevicesInformation() {
         if (!Platform.isWindows()) {
             return Set.of();
         }
@@ -234,6 +236,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         Set<UsbSerialDeviceInformation> result = new HashSet<>();
         HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
         String serialPort;
+        int lastError;
         if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
             try {
                 SP_DEVINFO_DATA deviceInfoData = new SP_DEVINFO_DATA();
@@ -243,14 +246,27 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 int intIdx;
                 while (apiInst.SetupDiEnumDeviceInfo(deviceInfoSet, devIdx, deviceInfoData)) {
 
-                    String name = getDeviceRegistryPropertyString(deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
-                    String friendlyName = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
-                    String mfg = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_MFG, deviceInfoData);
-                    //TODO: (Nad) Handle Win32Exception
+                    String name;
+                    String friendlyName;
+                    String mfg;
+                    try {
+                        name = getDeviceRegistryPropertyString(deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
+                        friendlyName = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
+                        mfg = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_MFG, deviceInfoData);
+                    } catch (Win32Exception e) {
+                        logger.warn("Failed to get USB device property: {}", e.getMessage());
+                        continue;
+                    }
 
                     intIdx = 0;
                     while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
-                        List<String> devicePaths = getDeviceInterfaceDetails(deviceInfoSet, deviceInterfaceData, null);
+                        List<String> devicePaths;
+                        try {
+                            devicePaths = getDeviceInterfaceDetails(deviceInfoSet, deviceInterfaceData, null);
+                        } catch (Win32Exception e) {
+                            logger.warn("Failed to get USB device interface details for \"{}\": {}", name, e.getMessage());
+                            continue;
+                        }
                         DevicePathData data;
                         for (String devicePath : devicePaths) {
                             data = parseDevicePath(devicePath);
@@ -278,20 +294,24 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                                 result.add(usbSerialDeviceInformation);
                             }
                         }
-
                         intIdx++;
                     }
-                    //TODO: GetLastError / ERROR_NO_MORE_ITEMS
-
+                    lastError = Native.getLastError();
+                    if (lastError != WinError.ERROR_NO_MORE_ITEMS) {
+                        logger.warn("Unexpected error while iterating USB device interfaces: {}", Kernel32Util.formatMessage(lastError));
+                    }
                     devIdx++;
                 }
-                //TODO: GetLastError / ERROR_NO_MORE_ITEMS
-
+                lastError = Native.getLastError();
+                if (lastError != WinError.ERROR_NO_MORE_ITEMS) {
+                    logger.warn("Unexpected error while iterating USB devices: {}", Kernel32Util.formatMessage(lastError));
+                }
             } finally {
                 apiInst.SetupDiDestroyDeviceInfoList(deviceInfoSet);
             }
         } else {
-            //TODO: Log error
+            lastError = Native.getLastError();
+            logger.warn("Unable to enumerate USB devices: {}", Kernel32Util.formatMessage(lastError));
         }
 
         return result;
@@ -401,6 +421,13 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         return readRegMultiSz(result, 4L);
     }
 
+    /**
+     * A {@code DevicePath} is a Windows concept that has a certain syntax. This method attempts to parse a USB
+     * {@code DevicePath} and extract available data.
+     *
+     * @param devicePath the Windows USB {@code DevicePath} to parse.
+     * @return The resulting {@link DevicePathData}.
+     */
     @Nullable
     protected DevicePathData parseDevicePath(String devicePath) {
         Matcher m = devicePathPattern.matcher(devicePath.toLowerCase(Locale.ROOT));
@@ -413,7 +440,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 s = m.group("id");
                 return new DevicePathData(vendorId, productId, s, interfaceNumber);
             } catch (NumberFormatException e) {
-                // TODO: (Nad) LOg?
+                logger.warn("Unable to parse USB device data idVendor: {}, idProduct {} or interface number {}: {}", m.group("vid"), m.group("pid"), m.group("mi"), e.getMessage());
                 return null;
             }
         }
@@ -477,41 +504,6 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         }
     }
 
-    public static List<String> readRegMultiSz(Memory buffer) {
-        int size = (int) buffer.size() / 2;
-        if (size == 0) {
-            return List.of();
-        }
-        return readRegMultiSz(buffer.getCharArray(0L, size));
-    }
-
-    public static List<String> readRegMultiSz(Memory buffer, long offset) {
-        long bufferSize = buffer.size();
-        if (offset >= bufferSize) {
-            throw new IllegalArgumentException("Invalid offset " + offset + "for buffer of size " + bufferSize);
-        }
-        int size = (int) (bufferSize - offset) / 2;
-        if (size == 0) {
-            return List.of();
-        }
-        return readRegMultiSz(buffer.getCharArray(offset, size));
-    }
-
-    public static List<String> readRegMultiSz(char[] chars) {
-        List<String> result = new ArrayList<>();
-        int start = 0;
-        for (int i = 0; i < chars.length; i++) {
-            if (chars[i] != 0) {
-                continue;
-            }
-            if (start < i) {
-                result.add(String.valueOf(chars, start, i - start));
-            }
-            start = i + 1;
-        }
-        return result;
-    }
-
     @Override
     public void deviceAdded(String devicePath) {
         logger.debug("New USB device discovered: {}", devicePath);
@@ -543,5 +535,48 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 startBackgroundScanning();
             }
         }
+    }
+
+    /**
+     * Parses a {@link Memory} buffer containing a {@code RegMultiSz} value into a list of strings. The result of using
+     * this method on a buffer than doesn't contain a {@code RegMultiSz} value is unpredictable.
+     *
+     * @param buffer the buffer to parse.
+     * @param offset the offset for where to start parsing.
+     * @return The resulting {@link List} of {@link String}s.
+     *
+     * @throws IllegalArgumentException If the offset is invalid.
+     */
+    public static List<String> readRegMultiSz(Memory buffer, long offset) {
+        long bufferSize = buffer.size();
+        if (offset < 0L || offset >= bufferSize) {
+            throw new IllegalArgumentException("Invalid offset " + offset + "for buffer of size " + bufferSize);
+        }
+        int size = (int) (bufferSize - offset) / 2;
+        if (size == 0) {
+            return List.of();
+        }
+        return readRegMultiSz(buffer.getCharArray(offset, size));
+    }
+
+    /**
+     * Parses a char array containing a {@code RegMultiSz} value into a list of strings.
+     *
+     * @param chars the char array.
+     * @return The resulting {@link List} of {@link String}s.
+     */
+    public static List<String> readRegMultiSz(char[] chars) {
+        List<String> result = new ArrayList<>();
+        int start = 0;
+        for (int i = 0; i < chars.length; i++) {
+            if (chars[i] != 0) {
+                continue;
+            }
+            if (start < i) {
+                result.add(String.valueOf(chars, start, i - start));
+            }
+            start = i + 1;
+        }
+        return result;
     }
 }
