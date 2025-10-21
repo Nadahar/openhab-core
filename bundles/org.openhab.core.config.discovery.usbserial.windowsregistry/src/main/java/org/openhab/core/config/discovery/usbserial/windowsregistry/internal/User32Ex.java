@@ -107,8 +107,7 @@ public interface User32Ex extends User32 {
     final int QS_ALLEVENTS = (QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT | QS_HOTKEY);
 
     /** Any message is in the queue. */
-    final int QS_ALLINPUT = (QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT
-            | QS_HOTKEY | QS_SENDMESSAGE);
+    final int QS_ALLINPUT = (QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT | QS_HOTKEY | QS_SENDMESSAGE);
 
     /**
      * Waits until one or all of the specified objects are in the signaled state or the time-out interval elapses.
@@ -147,5 +146,4 @@ public interface User32Ex extends User32 {
      *         </ul>
      */
     int MsgWaitForMultipleObjects(int nCount, HANDLE[] pHandles, boolean fWaitAll, int dwMilliseconds, int dwWakeMask);
-
 }

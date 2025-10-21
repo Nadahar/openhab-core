@@ -115,12 +115,8 @@ public class WindowMessageHandler implements Runnable, WindowProc {
         try {
             // Parent can't be the recommended HWND_MESSAGE, because WM_DEVICECHANGE is a broadcast message,
             // which aren't sent to message-only windows.
-            hWnd = user32.CreateWindowEx(
-                        User32.WS_EX_TOPMOST,
-                        windowClass,
-                        "OH helper window, used only to receive window events",
-                        0, 0, 0, 0, 0,
-                        null, null, hInst, null);
+            hWnd = user32.CreateWindowEx(User32.WS_EX_TOPMOST, windowClass,
+                    "OH helper window, used only to receive window events", 0, 0, 0, 0, 0, null, null, hInst, null);
             if (hWnd == null) {
                 logger.debug("Failed to create window, aborting message window creation");
                 return;
@@ -131,17 +127,19 @@ public class WindowMessageHandler implements Runnable, WindowProc {
             notificationFilter.dbcc_devicetype = DBT.DBT_DEVTYP_DEVICEINTERFACE;
             notificationFilter.dbcc_classguid = DBT.GUID_DEVINTERFACE_USB_DEVICE;
 
-            hDevNotify = user32.RegisterDeviceNotification(hWnd, notificationFilter, User32.DEVICE_NOTIFY_WINDOW_HANDLE);
+            hDevNotify = user32.RegisterDeviceNotification(hWnd, notificationFilter,
+                    User32.DEVICE_NOTIFY_WINDOW_HANDLE);
             if (hDevNotify == null) {
                 logger.debug("Failed to register for device notification, terminating message window");
                 return;
             }
 
             MSG msg = new MSG();
-            HANDLE[] handles = new HANDLE[] {terminateEvent};
+            HANDLE[] handles = new HANDLE[] { terminateEvent };
             boolean running = true;
             while (running) {
-                switch (user32.MsgWaitForMultipleObjects(handles.length, handles, false, WinBase.INFINITE, User32Ex.QS_ALLINPUT)) {
+                switch (user32.MsgWaitForMultipleObjects(handles.length, handles, false, WinBase.INFINITE,
+                        User32Ex.QS_ALLINPUT)) {
                     case User32Ex.WAIT_OBJECT_0:
                         // terminateEvent was triggered, terminate
                         logger.debug("Terminate event received, terminating message loop");
@@ -163,7 +161,9 @@ public class WindowMessageHandler implements Runnable, WindowProc {
                     default:
                         // This should not happen, something is very wrong
                         int lastError = Native.getLastError();
-                        logger.warn("An error ({}) occurred while waiting for a window message, terminating message loop: {}", lastError, Kernel32Util.formatMessage(lastError));
+                        logger.warn(
+                                "An error ({}) occurred while waiting for a window message, terminating message loop: {}",
+                                lastError, Kernel32Util.formatMessage(lastError));
                         running = false;
                         user32.PostQuitMessage(0);
                         break;

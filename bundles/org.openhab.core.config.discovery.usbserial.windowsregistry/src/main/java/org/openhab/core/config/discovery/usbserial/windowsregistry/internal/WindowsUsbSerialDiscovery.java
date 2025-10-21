@@ -49,18 +49,18 @@ import com.sun.jna.Native;
 import com.sun.jna.Platform;
 import com.sun.jna.platform.win32.Advapi32;
 import com.sun.jna.platform.win32.Advapi32Util;
+import com.sun.jna.platform.win32.Guid.GUID;
 import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.SetupApi;
-import com.sun.jna.platform.win32.SetupApi.SP_DEVINFO_DATA;
 import com.sun.jna.platform.win32.SetupApi.SP_DEVICE_INTERFACE_DATA;
+import com.sun.jna.platform.win32.SetupApi.SP_DEVINFO_DATA;
 import com.sun.jna.platform.win32.Win32Exception;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinError;
-import com.sun.jna.platform.win32.WinReg;
 import com.sun.jna.platform.win32.WinNT;
 import com.sun.jna.platform.win32.WinNT.HANDLE;
+import com.sun.jna.platform.win32.WinReg;
 import com.sun.jna.ptr.IntByReference;
-import com.sun.jna.platform.win32.Guid.GUID;
 
 /**
  * This is a {@link UsbSerialDiscovery} implementation component for Windows. It uses the Windows API to query for and
@@ -80,7 +80,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
     private static final String DEVICE_PATH_PATTERN = "^\\\\\\\\\\?\\\\usb#vid_(?<vid>[0-9a-f]{4})&pid_(?<pid>[0-9a-f]{4})(?:&mi_(?<mi>[0-9a-f]{2}))?#(?<id>.*?)(?:#(?<guid>\\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\}))$";
 
     private final Pattern devicePathPattern = Pattern.compile(DEVICE_PATH_PATTERN);
-    private record DevicePathData (int vendorId, int productId, String id, int interfaceNumber) {}
+
+    private record DevicePathData(int vendorId, int productId, String id, int interfaceNumber) {
+    }
+
     private static final boolean IS_64_BIT = Platform.is64Bit();
     private static final int ERROR_NO_SUCH_DEVINST = 0xe000020b;
 
@@ -184,7 +187,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
             scanResult = gatherUsbDevicesInformation();
             added = setDifference(scanResult, lastScanResult);
             removed = setDifference(lastScanResult, scanResult);
-            unchanged = includeExisting ? setDifference(scanResult, added) :  Set.of();
+            unchanged = includeExisting ? setDifference(scanResult, added) : Set.of();
 
             lastScanResult = scanResult;
         }
@@ -205,7 +208,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         discoveryListeners.add(listener);
         Set<UsbSerialDeviceInformation> lastScanResult;
         synchronized (this) {
-             lastScanResult = Set.copyOf(this.lastScanResult);
+            lastScanResult = Set.copyOf(this.lastScanResult);
         }
         for (UsbSerialDeviceInformation deviceInfo : lastScanResult) {
             listener.usbSerialDeviceDiscovered(deviceInfo);
@@ -234,7 +237,8 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         SetupApi apiInst = SetupApi.INSTANCE;
 
         Set<UsbSerialDeviceInformation> result = new HashSet<>();
-        HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null, SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
+        HANDLE deviceInfoSet = apiInst.SetupDiGetClassDevs(GUID_DEVINTERFACE_USB_DEVICE, null, null,
+                SetupApi.DIGCF_DEVICEINTERFACE | SetupApi.DIGCF_PRESENT);
         String serialPort;
         int lastError;
         if (!WinBase.INVALID_HANDLE_VALUE.equals(deviceInfoSet)) {
@@ -250,8 +254,10 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     String friendlyName;
                     String mfg;
                     try {
-                        name = getDeviceRegistryPropertyString(deviceInfoSet, SetupApi.SPDRP_DEVICEDESC, deviceInfoData);
-                        friendlyName = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_FRIENDLYNAME, deviceInfoData);
+                        name = getDeviceRegistryPropertyString(deviceInfoSet, SetupApi.SPDRP_DEVICEDESC,
+                                deviceInfoData);
+                        friendlyName = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_FRIENDLYNAME,
+                                deviceInfoData);
                         mfg = getDeviceRegistryPropertyString(deviceInfoSet, SPDRP_MFG, deviceInfoData);
                     } catch (Win32Exception e) {
                         logger.warn("Failed to get USB device property: {}", e.getMessage());
@@ -259,25 +265,30 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     }
 
                     intIdx = 0;
-                    while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(), GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
+                    while (apiInst.SetupDiEnumDeviceInterfaces(deviceInfoSet, deviceInfoData.getPointer(),
+                            GUID_DEVINTERFACE_USB_DEVICE, intIdx, deviceInterfaceData)) {
                         List<String> devicePaths;
                         try {
                             devicePaths = getDeviceInterfaceDetails(deviceInfoSet, deviceInterfaceData, null);
                         } catch (Win32Exception e) {
-                            logger.warn("Failed to get USB device interface details for \"{}\": {}", name, e.getMessage());
+                            logger.warn("Failed to get USB device interface details for \"{}\": {}", name,
+                                    e.getMessage());
                             continue;
                         }
                         DevicePathData data;
                         for (String devicePath : devicePaths) {
                             data = parseDevicePath(devicePath);
                             if (data != null) {
-                                WinReg.HKEY hKey = apiInst.SetupDiOpenDevRegKey(deviceInfoSet, deviceInfoData, SetupApi.DICS_FLAG_GLOBAL, 0, SetupApi.DIREG_DEV, WinNT.KEY_READ);
+                                WinReg.HKEY hKey = apiInst.SetupDiOpenDevRegKey(deviceInfoSet, deviceInfoData,
+                                        SetupApi.DICS_FLAG_GLOBAL, 0, SetupApi.DIREG_DEV, WinNT.KEY_READ);
                                 if (hKey != WinBase.INVALID_HANDLE_VALUE) {
                                     try {
                                         serialPort = Advapi32Util.registryGetStringValue(hKey, KEY_SERIAL_PORT);
                                     } catch (RuntimeException e) {
-                                        if (!(e instanceof Win32Exception we) || we.getErrorCode() != WinError.ERROR_FILE_NOT_FOUND) {
-                                            logger.debug("Failed to read serial port for USB device \"{}\": {} {}", name, e.getClass().getSimpleName(), e.getMessage());
+                                        if (!(e instanceof Win32Exception we)
+                                                || we.getErrorCode() != WinError.ERROR_FILE_NOT_FOUND) {
+                                            logger.debug("Failed to read serial port for USB device \"{}\": {} {}",
+                                                    name, e.getClass().getSimpleName(), e.getMessage());
                                         }
                                         serialPort = "";
                                     } finally {
@@ -288,8 +299,9 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                                 }
 
                                 UsbSerialDeviceInformation usbSerialDeviceInformation = new UsbSerialDeviceInformation(
-                                    data.vendorId, data.productId, data.id, mfg, friendlyName == null || friendlyName.isBlank() ? name : friendlyName,
-                                    data.interfaceNumber, data.id, serialPort);
+                                        data.vendorId, data.productId, data.id, mfg,
+                                        friendlyName == null || friendlyName.isBlank() ? name : friendlyName,
+                                        data.interfaceNumber, data.id, serialPort);
                                 logger.debug("Parsed {}", usbSerialDeviceInformation);
                                 result.add(usbSerialDeviceInformation);
                             }
@@ -298,13 +310,15 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     }
                     lastError = Native.getLastError();
                     if (lastError != WinError.ERROR_NO_MORE_ITEMS) {
-                        logger.warn("Unexpected error while iterating USB device interfaces: {}", Kernel32Util.formatMessage(lastError));
+                        logger.warn("Unexpected error while iterating USB device interfaces: {}",
+                                Kernel32Util.formatMessage(lastError));
                     }
                     devIdx++;
                 }
                 lastError = Native.getLastError();
                 if (lastError != WinError.ERROR_NO_MORE_ITEMS) {
-                    logger.warn("Unexpected error while iterating USB devices: {}", Kernel32Util.formatMessage(lastError));
+                    logger.warn("Unexpected error while iterating USB devices: {}",
+                            Kernel32Util.formatMessage(lastError));
                 }
             } finally {
                 apiInst.SetupDiDestroyDeviceInfoList(deviceInfoSet);
@@ -329,7 +343,8 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
      * @throws Win32Exception If {@code SetupDiGetDeviceRegistryProperty} returns an unexpected status.
      */
     @Nullable
-    protected String getDeviceRegistryPropertyString(HANDLE deviceInfoSet, int property, SP_DEVINFO_DATA deviceInfoData) {
+    protected String getDeviceRegistryPropertyString(HANDLE deviceInfoSet, int property,
+            SP_DEVINFO_DATA deviceInfoData) {
         Memory buffer = getDeviceRegistryProperty(deviceInfoSet, property, deviceInfoData);
         return buffer == null ? null : buffer.getWideString(0L);
     }
@@ -351,7 +366,8 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         SetupApi apiInst = SetupApi.INSTANCE;
         IntByReference size = new IntByReference();
         int lastError;
-        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, null, 0, size) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, null, 0, size)
+                && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
             if (lastError == WinError.ERROR_INVALID_DATA || lastError == ERROR_NO_SUCH_DEVINST) {
                 return null;
             }
@@ -362,7 +378,8 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
             return null;
         }
         Memory buffer = new Memory(sizeValue);
-        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, buffer, sizeValue, null)) {
+        if (!apiInst.SetupDiGetDeviceRegistryProperty(deviceInfoSet, deviceInfoData, property, null, buffer, sizeValue,
+                null)) {
             lastError = Native.getLastError();
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return null;
@@ -385,11 +402,13 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
      *
      * @throws Win32Exception If {@code SetupDiGetDeviceInterfaceDetail} returns an unexpected status.
      */
-    protected List<String> getDeviceInterfaceDetails(HANDLE deviceInfoSet, SP_DEVICE_INTERFACE_DATA deviceInterfaceData, @Nullable SP_DEVINFO_DATA deviceInfoData) {
+    protected List<String> getDeviceInterfaceDetails(HANDLE deviceInfoSet, SP_DEVICE_INTERFACE_DATA deviceInterfaceData,
+            @Nullable SP_DEVINFO_DATA deviceInfoData) {
         SetupApi apiInst = SetupApi.INSTANCE;
         IntByReference size = new IntByReference();
         int lastError;
-        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, null, 0, size, deviceInfoData) && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
+        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, null, 0, size, deviceInfoData)
+                && (lastError = Native.getLastError()) != WinError.ERROR_INSUFFICIENT_BUFFER) {
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return List.of();
             }
@@ -402,16 +421,17 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
         Memory result = new Memory(sizeValue);
 
         /*
-         *  The DWORD (uint) must contain the "size of the structure", which is only logical for those that
-         *  know how C compilers handle padding (64-bit pads where 32-bit doesn't).
+         * The DWORD (uint) must contain the "size of the structure", which is only logical for those that
+         * know how C compilers handle padding (64-bit pads where 32-bit doesn't).
          *
-         *  The 32-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) = 4 + 2
-         *  The 64-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) + padding = 4 + 2 + 2
+         * The 32-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) = 4 + 2
+         * The 64-bit value represents: sizeOf(DWORD) + sizeOf(UTF16 char) + padding = 4 + 2 + 2
          *
-         *  See https://stackoverflow.com/a/10729517 for further details.
+         * See https://stackoverflow.com/a/10729517 for further details.
          */
         result.setInt(0L, IS_64_BIT ? 8 : 6);
-        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, result, sizeValue, null, deviceInfoData)) {
+        if (!apiInst.SetupDiGetDeviceInterfaceDetail(deviceInfoSet, deviceInterfaceData, result, sizeValue, null,
+                deviceInfoData)) {
             lastError = Native.getLastError();
             if (lastError == WinError.ERROR_INVALID_DATA) {
                 return List.of();
@@ -440,13 +460,13 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                 s = m.group("id");
                 return new DevicePathData(vendorId, productId, s, interfaceNumber);
             } catch (NumberFormatException e) {
-                logger.warn("Unable to parse USB device data idVendor: {}, idProduct {} or interface number {}: {}", m.group("vid"), m.group("pid"), m.group("mi"), e.getMessage());
+                logger.warn("Unable to parse USB device data idVendor: {}, idProduct {} or interface number {}: {}",
+                        m.group("vid"), m.group("pid"), m.group("mi"), e.getMessage());
                 return null;
             }
         }
         return null;
     }
-
 
     @Override
     public void startBackgroundScanning() {
@@ -465,9 +485,7 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                     if (scanTask == null || scanTask.isDone()) {
                         this.scanTask = scheduler.scheduleWithFixedDelay(() -> {
                             doSingleScanInternal(false);
-                        },
-                                0, scanInterval.toSeconds(),
-                                TimeUnit.SECONDS);
+                        }, 0, scanInterval.toSeconds(), TimeUnit.SECONDS);
                     }
                 } else {
                     if (scanTask != null) {
@@ -475,11 +493,11 @@ public class WindowsUsbSerialDiscovery implements UsbSerialDiscovery, WindowMess
                         this.scanTask = null;
                     }
                     if (messageHandler == null) {
-                         messageHandler = new WindowMessageHandler();
-                         messageHandler.addListener(this);
-                         this.windowMessageHandler = messageHandler;
-                         scheduler.submit(messageHandler);
-                         initScan = true;
+                        messageHandler = new WindowMessageHandler();
+                        messageHandler.addListener(this);
+                        this.windowMessageHandler = messageHandler;
+                        scheduler.submit(messageHandler);
+                        initScan = true;
                     }
                 }
             }
