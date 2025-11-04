@@ -12,12 +12,15 @@
  */
 package org.openhab.core.io.transport.upnp.internal;
 
+import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledExecutorService;
@@ -89,16 +92,23 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     final Map<UpnpIOParticipant, Boolean> currentStates = new ConcurrentHashMap<>();
     final Map<Service, UpnpSubscriptionCallback> subscriptionCallbacks = new ConcurrentHashMap<>();
 
+    // All access must be guarded by "this"
+    final Map<UpnpIOParticipant, ParticipantData> participants2 = new WeakHashMap<>();
+
     public class UpnpSubscriptionCallback extends SubscriptionCallback {
+
+        private final WeakReference<UpnpIOParticipant> participant;
 
         /**
          * Creates a new subscription callback for the specified service with a requested duration of
          * {@link UserConstants#DEFAULT_SUBSCRIPTION_DURATION_SECONDS}.
          *
+         * @param participant the {@link UpnpIOParticipant} that is the subscriber.
          * @param service the {@link Service} to subscribe to.
          */
-        public UpnpSubscriptionCallback(Service service) {
+        public UpnpSubscriptionCallback(UpnpIOParticipant participant, Service service) {
             super(service);
+            this.participant = new WeakReference<UpnpIOParticipant>(participant);
         }
 
         /**
@@ -106,11 +116,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
          * the specified number of seconds. The UPnP standard states that it "Should be greater than or equal
          * to 1800 seconds (30 minutes)".
          *
+         * @param participant the {@link UpnpIOParticipant} that is the subscriber.
          * @param service the {@link Service} to subscribe to.
          * @param requestedDurationSeconds the subscription duration to request.
          */
-        public UpnpSubscriptionCallback(Service service, int requestedDurationSeconds) {
+        public UpnpSubscriptionCallback(UpnpIOParticipant participant, Service service, int requestedDurationSeconds) {
             super(service, requestedDurationSeconds);
+            this.participant = new WeakReference<UpnpIOParticipant>(participant);
         }
 
         @Override
@@ -140,8 +152,9 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
                 if ((CancelReason.EXPIRED.equals(reason) || CancelReason.RENEWAL_FAILED.equals(reason))) {
                     final ControlPoint cp = upnpService.getControlPoint();
-                    if (cp != null) {
-                        final UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(service,
+                    UpnpIOParticipant participant = this.participant.get();
+                    if (cp != null && participant != null) {
+                        final UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service,
                                 subscription.getActualDurationSeconds());
                         cp.execute(callback);
                     }
@@ -169,6 +182,17 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                         logger.debug("A GENA subscription '{}' for device '{}' was established", serviceId.getId(),
                                 deviceUdn);
                     }
+                }
+
+                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
+                if (participant2 != null) {
+                    try {
+                        participant2.onServiceSubscribed(serviceId.getId(), true);
+                    } catch (Exception e) {
+                        logger.error("Participant threw an exception during onServiceSubscribed()", e);
+                    }
+                } else {
+                    logger.warn("A '{}' GENA subscription was established for a non-existing participant", serviceId.getId());
                 }
 
                 for (UpnpIOParticipant participant : participants) {
@@ -205,6 +229,22 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                         logger.trace("A GENA subscription '{}' event for device '{}' was received", serviceId.getId(),
                                 deviceUdn);
                     }
+                }
+
+                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
+                if (participant2 != null) {
+                    for (Entry<String, StateVariableValue> entry : values.entrySet()) {
+                        Object value = entry.getValue().getValue();
+                        if (value != null) {
+                            try {
+                                participant2.onValueReceived(entry.getKey(), value.toString(), serviceId.getId());
+                            } catch (Exception e) {
+                                logger.error("Participant threw an exception onValueReceived()", e);
+                            }
+                        }
+                    }
+                } else {
+                    logger.warn("A '{}' GENA event was received for a non-existing participant: {}", serviceId.getId(), values);
                 }
 
                 for (UpnpIOParticipant participant : participants) {
@@ -271,6 +311,17 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 }
 
+                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
+                if (participant2 != null) {
+                    try {
+                        participant2.onServiceSubscribed(serviceId.getId(), false);
+                    } catch (Exception pe) {
+                        logger.error("Participant threw an exception during onServiceSubscribed()", pe);
+                    }
+                } else {
+                    logger.warn("A '{}' GENA subscription failed for a non-existing participant", serviceId.getId());
+                }
+
                 for (UpnpIOParticipant participant : participants) {
                     if (Objects.equals(getDevice(participant), deviceRoot)) {
                         try {
@@ -327,7 +378,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                 logger.trace("Setting up an UPNP service subscription '{}' for particpant '{}'", serviceID,
                         participant.getUDN());
 
-                UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(subService, requestedDurationSeconds);
+                UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, subService, requestedDurationSeconds);
                 subscriptionCallbacks.put(subService, callback);
                 upnpService.getControlPoint().execute(callback);
             } else {
@@ -455,11 +506,22 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void registerParticipant(UpnpIOParticipant participant) {
+        synchronized (this) {
+            participants2.computeIfAbsent(participant, d -> new ParticipantData()); //TODO: (Nad) Move sync
+        }
         participants.add(participant);
     }
 
     @Override
     public void unregisterParticipant(UpnpIOParticipant participant) {
+        ParticipantData data;
+        synchronized (this) {
+            data = participants2.remove(participant);
+        }
+        if (data != null) {
+            data.dispose();
+        }
+
         stopPollingForParticipant(participant);
         pollingJobs.remove(participant);
         currentStates.remove(participant);
@@ -496,6 +558,28 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
      * @param status true, if device is reachable, false otherwise
      */
     private void informParticipants(RemoteDevice device, boolean status) {
+        DeviceIdentity identity;
+        if ((identity = device.getIdentity()) == null) {
+            return;
+        }
+        Map<UpnpIOParticipant, ParticipantData> snapshot;
+        synchronized (this) {
+            snapshot = Map.copyOf(participants2);
+        }
+        UpnpIOParticipant participant2; // TODO: (Nad) Rename
+        ParticipantData data;
+        boolean oldStatus;
+        for (Entry<UpnpIOParticipant, ParticipantData> entry : snapshot.entrySet()) {
+            participant2 = entry.getKey();
+            data = entry.getValue();
+            if (participant2.getUDN().equals(identity.getUdn().getIdentifierString())) { // TODO: (Nad) Maybe inform for all devices as well?
+                oldStatus = data.getAndSetAvailable(status);
+                if (oldStatus != status) {
+                    logger.debug("Device '{}' reachability status changed to '{}'", participant2.getUDN(), status);
+                    participant2.onStatusChanged(status);
+                }
+            }
+        }
         for (UpnpIOParticipant participant : participants) {
             if (participant.getUDN().equals(device.getIdentity().getUdn().getIdentifierString())) {
                 setDeviceStatus(participant, status);
@@ -589,6 +673,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         }
     }
 
+    private synchronized List<UpnpIOParticipant> getSubscribingParticipants(ServiceId serviceId) {
+        return participants2.entrySet().stream().filter(e -> e.getValue().hasCallback(serviceId)).map(e -> e.getKey()).toList();
+    }
+
     @Override
     public void removeStatusListener(UpnpIOParticipant participant) {
         unregisterParticipant(participant);
@@ -635,5 +723,112 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void afterShutdown() {
+    }
+
+    // Threadsafe
+    private static class ParticipantData {
+
+        // All access must be guarded by "this"
+        @Nullable
+        private ScheduledFuture<?> job;
+
+        // All access must be guarded by "this"
+        private boolean available;
+
+        // All access must be guarded by "this"
+        private final Map<ServiceId, UpnpSubscriptionCallback> callbacks = new HashMap<>();
+
+        /**
+         * @return The current polling job, if any.
+         */
+        @Nullable
+        public synchronized ScheduledFuture<?> getJob() {
+            return job;
+        }
+
+        /**
+         * Sets the current polling job, and cancels the old one if one already exists.
+         *
+         * @param job the new polling job.
+         */
+        public void setJob(@Nullable ScheduledFuture<?> job) {
+            ScheduledFuture<?> oldJob;
+            synchronized (this) {
+                oldJob = this.job;
+                this.job = job;
+            }
+            if (oldJob != null && !oldJob.isDone()) {
+                oldJob.cancel(true);
+            }
+        }
+
+        /**
+         * Sets the current polling job to {@code null} and cancels the old one if one exists.
+         */
+        public void clearJob() {
+            setJob(null);
+        }
+
+        public synchronized boolean isAvailable() {
+            return available;
+        }
+
+        public synchronized boolean getAndSetAvailable(boolean state) {
+            boolean result = available;
+            available = state;
+            return result;
+        }
+        public synchronized void setAvailable(boolean state) {
+            available = state;
+        }
+
+        @Nullable
+        public synchronized UpnpSubscriptionCallback getCallback(ServiceId serviceId) {
+            return callbacks.get(serviceId);
+        }
+
+        public synchronized boolean hasCallback(ServiceId serviceId) {
+            return callbacks.containsKey(serviceId);
+        }
+
+        @Nullable
+        public UpnpSubscriptionCallback addCallback(ServiceId serviceId, UpnpSubscriptionCallback callback) {
+            UpnpSubscriptionCallback result;
+            synchronized (this) {
+                result = callbacks.put(serviceId, callback);
+            }
+            if (result != null) {
+                result.end();
+            }
+            return result;
+        }
+
+        @Nullable
+        public UpnpSubscriptionCallback removeCallback(ServiceId serviceId) {
+            UpnpSubscriptionCallback result;
+            synchronized (this) {
+                result = callbacks.remove(serviceId);
+            }
+            if (result != null) {
+                result.end();
+            }
+            return result;
+        }
+
+        public void dispose() {
+            ScheduledFuture<?> job;
+            Map<ServiceId, UpnpSubscriptionCallback> callbacks;
+            synchronized (this) {
+                job = this.job;
+                this.job = null;
+                callbacks = this.callbacks;
+                this.callbacks.clear();
+                this.available = false;
+            }
+            if (job != null) {
+                job.cancel(true);
+            }
+            callbacks.forEach((i, c) -> c.end());
+        }
     }
 }
