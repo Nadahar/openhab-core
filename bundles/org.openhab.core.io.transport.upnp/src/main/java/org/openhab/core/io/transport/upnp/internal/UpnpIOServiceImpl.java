@@ -14,15 +14,14 @@ package org.openhab.core.io.transport.upnp.internal;
 
 import java.lang.ref.WeakReference;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +44,7 @@ import org.jupnp.model.meta.Device;
 import org.jupnp.model.meta.DeviceIdentity;
 import org.jupnp.model.meta.LocalDevice;
 import org.jupnp.model.meta.RemoteDevice;
+import org.jupnp.model.meta.RemoteService;
 import org.jupnp.model.meta.Service;
 import org.jupnp.model.state.StateVariableValue;
 import org.jupnp.model.types.ServiceId;
@@ -87,13 +87,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     private final UpnpService upnpService;
 
-    final Set<UpnpIOParticipant> participants = new CopyOnWriteArraySet<>();
-    final Map<UpnpIOParticipant, ScheduledFuture> pollingJobs = new ConcurrentHashMap<>();
-    final Map<UpnpIOParticipant, Boolean> currentStates = new ConcurrentHashMap<>();
     final Map<Service, UpnpSubscriptionCallback> subscriptionCallbacks = new ConcurrentHashMap<>();
 
     // All access must be guarded by "this"
-    final Map<UpnpIOParticipant, ParticipantData> participants2 = new WeakHashMap<>();
+    final Map<UpnpIOParticipant, ParticipantData> participants = new WeakHashMap<>();
 
     public class UpnpSubscriptionCallback extends SubscriptionCallback {
 
@@ -162,6 +159,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             }
         }
 
+        @SuppressWarnings("unused")
         @Override
         protected void established(@Nullable GENASubscription subscription) {
             Service service = subscription == null ? null : subscription.getService();
@@ -184,30 +182,20 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 }
 
-                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
-                if (participant2 != null) {
+                UpnpIOParticipant participant = this.participant.get();
+                if (participant != null) {
                     try {
-                        participant2.onServiceSubscribed(serviceId.getId(), true);
+                        participant.onServiceSubscribed(serviceId.getId(), true);
                     } catch (Exception e) {
                         logger.error("Participant threw an exception during onServiceSubscribed()", e);
                     }
                 } else {
                     logger.warn("A '{}' GENA subscription was established for a non-existing participant", serviceId.getId());
                 }
-
-                for (UpnpIOParticipant participant : participants) {
-                    if (Objects.equals(getDevice(participant), deviceRoot)) {
-                        try {
-                            participant.onServiceSubscribed(serviceId.getId(), true);
-                        } catch (Exception e) {
-                            logger.error("Participant threw an exception onServiceSubscribed", e);
-                        }
-                    }
-                }
             }
         }
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({ "unchecked", "unused" })
         @Override
         protected void eventReceived(@Nullable GENASubscription subscription) {
             Service service = subscription == null ? null : subscription.getService();
@@ -231,13 +219,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 }
 
-                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
-                if (participant2 != null) {
+                UpnpIOParticipant participant = this.participant.get();
+                if (participant != null) {
                     for (Entry<String, StateVariableValue> entry : values.entrySet()) {
                         Object value = entry.getValue().getValue();
                         if (value != null) {
                             try {
-                                participant2.onValueReceived(entry.getKey(), value.toString(), serviceId.getId());
+                                participant.onValueReceived(entry.getKey(), value.toString(), serviceId.getId());
                             } catch (Exception e) {
                                 logger.error("Participant threw an exception onValueReceived()", e);
                             }
@@ -245,22 +233,6 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 } else {
                     logger.warn("A '{}' GENA event was received for a non-existing participant: {}", serviceId.getId(), values);
-                }
-
-                for (UpnpIOParticipant participant : participants) {
-                    if (Objects.equals(getDevice(participant), deviceRoot)) {
-                        for (Entry<String, StateVariableValue> entry : values.entrySet()) {
-                            Object value = entry.getValue().getValue();
-                            if (value != null) {
-                                try {
-                                    participant.onValueReceived(entry.getKey(), value.toString(), serviceId.getId());
-                                } catch (Exception e) {
-                                    logger.error("Participant threw an exception onValueReceived", e);
-                                }
-                            }
-                        }
-                        break;
-                    }
                 }
             }
         }
@@ -288,6 +260,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             }
         }
 
+        @SuppressWarnings("unused")
         @Override
         protected void failed(@Nullable GENASubscription subscription, @Nullable UpnpResponse response,
                 @Nullable Exception e, @Nullable String defaultMsg) {
@@ -311,25 +284,15 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 }
 
-                UpnpIOParticipant participant2 = this.participant.get(); //TODO: (Nad) Rename
-                if (participant2 != null) {
+                UpnpIOParticipant participant = this.participant.get();
+                if (participant != null) {
                     try {
-                        participant2.onServiceSubscribed(serviceId.getId(), false);
+                        participant.onServiceSubscribed(serviceId.getId(), false);
                     } catch (Exception pe) {
                         logger.error("Participant threw an exception during onServiceSubscribed()", pe);
                     }
                 } else {
                     logger.warn("A '{}' GENA subscription failed for a non-existing participant", serviceId.getId());
-                }
-
-                for (UpnpIOParticipant participant : participants) {
-                    if (Objects.equals(getDevice(participant), deviceRoot)) {
-                        try {
-                            participant.onServiceSubscribed(serviceId.getId(), false);
-                        } catch (Exception e2) {
-                            logger.error("Participant threw an exception onServiceSubscribed", e2);
-                        }
-                    }
                 }
             }
         }
@@ -505,27 +468,21 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     @Override
-    public void registerParticipant(UpnpIOParticipant participant) {
+    public void registerParticipant(UpnpIOParticipant participant) { //TODO: (Nad) Inform existing..?
         synchronized (this) {
-            participants2.computeIfAbsent(participant, d -> new ParticipantData()); //TODO: (Nad) Move sync
+            participants.computeIfAbsent(participant, d -> new ParticipantData()); //TODO: (Nad) Move sync
         }
-        participants.add(participant);
     }
 
     @Override
     public void unregisterParticipant(UpnpIOParticipant participant) {
         ParticipantData data;
         synchronized (this) {
-            data = participants2.remove(participant);
+            data = participants.remove(participant);
         }
         if (data != null) {
             data.dispose();
         }
-
-        stopPollingForParticipant(participant);
-        pollingJobs.remove(participant);
-        currentStates.remove(participant);
-        participants.remove(participant);
     }
 
     @Override
@@ -551,6 +508,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         return service;
     }
 
+    private ServiceId resolveServiceId(String serviceId, String namespace) {
+        return UDAServiceId.DEFAULT_NAMESPACE.equals(namespace) || UDAServiceId.BROKEN_DEFAULT_NAMESPACE.equals(namespace) ? new UDAServiceId(serviceId) : new ServiceId(namespace, serviceId);
+    }
+
     /**
      * Propagates a device status change to all participants
      *
@@ -564,32 +525,22 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         }
         Map<UpnpIOParticipant, ParticipantData> snapshot;
         synchronized (this) {
-            snapshot = Map.copyOf(participants2);
+            snapshot = Map.copyOf(participants);
         }
-        UpnpIOParticipant participant2; // TODO: (Nad) Rename
+        UpnpIOParticipant participant;
         ParticipantData data;
-        boolean oldStatus;
         for (Entry<UpnpIOParticipant, ParticipantData> entry : snapshot.entrySet()) {
-            participant2 = entry.getKey();
+            participant = entry.getKey();
             data = entry.getValue();
-            if (participant2.getUDN().equals(identity.getUdn().getIdentifierString())) { // TODO: (Nad) Maybe inform for all devices as well?
-                oldStatus = data.getAndSetAvailable(status);
-                if (oldStatus != status) {
-                    logger.debug("Device '{}' reachability status changed to '{}'", participant2.getUDN(), status);
-                    participant2.onStatusChanged(status);
-                }
-            }
-        }
-        for (UpnpIOParticipant participant : participants) {
-            if (participant.getUDN().equals(device.getIdentity().getUdn().getIdentifierString())) {
-                setDeviceStatus(participant, status);
+            if (participant.getUDN().equals(identity.getUdn().getIdentifierString())) { //TODO: (Nad) Document that participant must use UDN for root device
+                setDeviceStatus(participant, data, status);
             }
         }
     }
 
-    private void setDeviceStatus(UpnpIOParticipant participant, boolean newStatus) {
-        if (!Objects.equals(currentStates.get(participant), newStatus)) {
-            currentStates.put(participant, newStatus);
+    private void setDeviceStatus(UpnpIOParticipant participant, ParticipantData data, boolean newStatus) {
+        boolean oldStatus = data.getAndSetAvailable(newStatus);
+        if (oldStatus != newStatus) {
             logger.debug("Device '{}' reachability status changed to '{}'", participant.getUDN(), newStatus);
             participant.onStatusChanged(newStatus);
         }
@@ -611,11 +562,24 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         public void run() {
             // It is assumed that during addStatusListener() a check is made whether the participant is correctly
             // registered
+            ParticipantData data;
+            synchronized (UpnpIOServiceImpl.this) {
+                data = participants.get(participant);
+            }
+            if (data == null) {
+                //TODO: (Nad) Log
+                return;
+            }
             try {
                 Device device = getDevice(participant);
                 String participantUdn = participant.getUDN();
-                if (device != null) {
-                    Service service = findService(device, null, serviceID);
+                if (device instanceof RemoteDevice remoteDevice) {
+                    ServiceId serviceId = resolveServiceId(serviceID, device.getType().getNamespace());
+
+                    // First look for the service in the root device only, and only if not found,
+                    // look in the embedded devices.
+                    Service service = enumerateServices(remoteDevice, true).stream().filter(s -> serviceId.equals(s.getServiceId())).findAny()
+                        .orElse(enumerateServices(remoteDevice, false).stream().filter(s -> serviceId.equals(s.getServiceId())).findAny().orElse(null));
                     if (service != null) {
                         Action action = service.getAction(actionID);
                         if (action != null) {
@@ -630,10 +594,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                             if (anException != null && (message = anException.getMessage()) != null
                                     && message.contains("Connection error or no response received")) {
                                 // The UDN is not reachable anymore
-                                setDeviceStatus(participant, false);
+                                setDeviceStatus(participant, data, false);
                             } else {
                                 // The UDN functions correctly
-                                setDeviceStatus(participant, true);
+                                setDeviceStatus(participant, data, true);
                             }
                         } else {
                             logger.debug("Could not find action '{}' for participant '{}'", actionID, participantUdn);
@@ -654,27 +618,20 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         int pollingInterval = interval == 0 ? DEFAULT_POLLING_INTERVAL : interval;
 
-        // remove the previous polling job, if any
-        stopPollingForParticipant(participant);
-
-        currentStates.put(participant, true);
-
-        Runnable pollingRunnable = new UPNPPollingRunnable(participant, serviceID, actionID);
-        pollingJobs.put(participant,
-                scheduler.scheduleWithFixedDelay(pollingRunnable, 0, pollingInterval, TimeUnit.SECONDS));
-    }
-
-    private void stopPollingForParticipant(UpnpIOParticipant participant) {
-        if (pollingJobs.containsKey(participant)) {
-            ScheduledFuture<?> pollingJob = pollingJobs.get(participant);
-            if (pollingJob != null) {
-                pollingJob.cancel(true);
-            }
+        ParticipantData data;
+        synchronized (this) {
+            data = participants.get(participant);
         }
+        if (data == null) {
+            // Should not happen
+            logger.warn("Unable to add status listener for participant {}, participant isn't registered", participant.getUDN());
+            return;
+        }
+        data.setJob(scheduler.scheduleWithFixedDelay(new UPNPPollingRunnable(participant, serviceID, actionID), 0, pollingInterval, TimeUnit.SECONDS));
     }
 
     private synchronized List<UpnpIOParticipant> getSubscribingParticipants(ServiceId serviceId) {
-        return participants2.entrySet().stream().filter(e -> e.getValue().hasCallback(serviceId)).map(e -> e.getKey()).toList();
+        return participants.entrySet().stream().filter(e -> e.getValue().hasCallback(serviceId)).map(e -> e.getKey()).toList();
     }
 
     @Override
@@ -725,8 +682,55 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     public void afterShutdown() {
     }
 
+    /**
+     * Generates a {@link List} of {@link RemoteService}es offered by the specified {@link RemoteDevice},
+     * and optionally, all its embedded/child devices, if any.
+     *
+     * @param device the {@link RemoteDevice} whose {@link Service}s to enumerate.
+     * @param rootOnly whether to only enumerate the device itself or also all its children.
+     * @return The resulting {@link List} of {@link RemoteService}es.
+     */
+    public static List<RemoteService> enumerateServices(RemoteDevice device, boolean rootOnly) {
+        List<RemoteService> result = new ArrayList<>();
+        List<RemoteDevice> devices = rootOnly ? List.of(device) : enumerateAllDevices(device);
+        RemoteService[] services;
+        for (RemoteDevice d : devices) {
+            services = d.getServices();
+            if (services != null && services.length > 0) {
+                result.addAll(Arrays.asList(services));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Generates a {@link List} of the specified {@link RemoteDevice} itself and all embedded/child devices.
+     *
+     * @param device the {@link RemoteDevice} whose device tree to enumerate.
+     * @return The resulting {@link List} of {@link RemoteDevice}s.
+     */
+    public static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) { //TODO: (Nad) Check JavaDocs
+        List<RemoteDevice> result = new ArrayList<>();
+        result.add(device);
+        enumerateChildDevices(device, result);
+        return result;
+    }
+
+    /**
+     * Traverses and adds child/embedded devices to the provided {@link List} recursively.
+     *
+     * @param device the {@link RemoteDevice} whose children to add to {@code devices}.
+     * @param devices the {@link List} to add the children to.
+     */
+    private static void enumerateChildDevices(RemoteDevice device, List<RemoteDevice> devices) {
+        for (RemoteDevice child : device.getEmbeddedDevices()) {
+            devices.add(child);
+            enumerateChildDevices(device, devices);
+        }
+    }
+
     // Threadsafe
-    private static class ParticipantData {
+    public static class ParticipantData {
 
         // All access must be guarded by "this"
         @Nullable
@@ -744,6 +748,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         @Nullable
         public synchronized ScheduledFuture<?> getJob() {
             return job;
+        }
+
+        /**
+         * @return {@code true} if a polling job is registered.
+         */
+        public synchronized boolean hasJob() {
+            return job != null;
         }
 
         /**

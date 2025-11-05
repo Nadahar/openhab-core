@@ -38,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openhab.core.io.transport.upnp.UpnpIOParticipant;
+import org.openhab.core.io.transport.upnp.internal.UpnpIOServiceImpl.ParticipantData;
 
 /**
  * Tests {@link UpnpIOServiceImpl}.
@@ -108,9 +109,11 @@ public class UpnpIOServiceTest {
     public void testRegisterParticipant() {
         upnpIoService.registerParticipant(upnpIoParticipantMock);
         assertEquals(1, upnpIoService.participants.size());
-        assertTrue(upnpIoService.participants.contains(upnpIoParticipantMock));
-        assertTrue(upnpIoService.pollingJobs.keySet().isEmpty());
-        assertTrue(upnpIoService.currentStates.keySet().isEmpty());
+        assertTrue(upnpIoService.participants.containsKey(upnpIoParticipantMock));
+        ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
+        assertNotNull(data);
+        assertFalse(data.hasJob());
+        assertFalse(data.isAvailable());
         assertTrue(upnpIoService.subscriptionCallbacks.keySet().isEmpty());
     }
 
@@ -118,11 +121,11 @@ public class UpnpIOServiceTest {
     public void testAddStatusListener() {
         upnpIoService.addStatusListener(upnpIoParticipantMock, SERVICE_ID, ACTION_ID, 60);
         assertEquals(1, upnpIoService.participants.size());
-        assertTrue(upnpIoService.participants.contains(upnpIoParticipantMock));
-        assertEquals(1, upnpIoService.pollingJobs.keySet().size());
-        assertTrue(upnpIoService.pollingJobs.containsKey(upnpIoParticipantMock));
-        assertEquals(1, upnpIoService.currentStates.keySet().size());
-        assertTrue(upnpIoService.currentStates.containsKey(upnpIoParticipantMock));
+        assertTrue(upnpIoService.participants.containsKey(upnpIoParticipantMock));
+        ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
+        assertNotNull(data);
+        assertTrue(data.hasJob());
+        assertFalse(data.isAvailable());
         assertTrue(upnpIoService.subscriptionCallbacks.keySet().isEmpty());
 
         upnpIoService.removeStatusListener(upnpIoParticipantMock);
@@ -133,24 +136,30 @@ public class UpnpIOServiceTest {
     public void testAddSubscription() {
         upnpIoService.addSubscription(upnpIoParticipantMock, SERVICE_ID, 60);
         assertEquals(1, upnpIoService.participants.size());
-        assertTrue(upnpIoService.participants.contains(upnpIoParticipantMock));
-        assertTrue(upnpIoService.pollingJobs.keySet().isEmpty());
-        assertTrue(upnpIoService.currentStates.keySet().isEmpty());
+        assertTrue(upnpIoService.participants.containsKey(upnpIoParticipantMock));
+        ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
+        assertNotNull(data);
+        assertFalse(data.hasJob());
+        assertFalse(data.isAvailable());
         assertEquals(1, upnpIoService.subscriptionCallbacks.size());
 
         upnpIoService.addSubscription(upnpIoParticipant2Mock, SERVICE_ID_2, 60);
         assertEquals(2, upnpIoService.participants.size());
-        assertTrue(upnpIoService.participants.contains(upnpIoParticipantMock));
-        assertTrue(upnpIoService.pollingJobs.keySet().isEmpty());
-        assertTrue(upnpIoService.currentStates.keySet().isEmpty());
+        assertTrue(upnpIoService.participants.containsKey(upnpIoParticipantMock));
+        data = upnpIoService.participants.get(upnpIoParticipantMock);
+        assertNotNull(data);
+        assertFalse(data.hasJob());
+        assertFalse(data.isAvailable());
         assertEquals(2, upnpIoService.subscriptionCallbacks.size());
 
         upnpIoService.removeSubscription(upnpIoParticipantMock, SERVICE_ID);
         upnpIoService.unregisterParticipant(upnpIoParticipantMock);
         assertEquals(1, upnpIoService.participants.size());
-        assertTrue(upnpIoService.participants.contains(upnpIoParticipant2Mock));
-        assertTrue(upnpIoService.pollingJobs.keySet().isEmpty());
-        assertTrue(upnpIoService.currentStates.keySet().isEmpty());
+        assertTrue(upnpIoService.participants.containsKey(upnpIoParticipant2Mock));
+        data = upnpIoService.participants.get(upnpIoParticipant2Mock);
+        assertNotNull(data);
+        assertFalse(data.hasJob());
+        assertFalse(data.isAvailable());
         assertEquals(1, upnpIoService.subscriptionCallbacks.size());
 
         upnpIoService.removeSubscription(upnpIoParticipant2Mock, SERVICE_ID_2);
@@ -160,8 +169,6 @@ public class UpnpIOServiceTest {
 
     private void assertThatEverythingIsEmpty() {
         assertTrue(upnpIoService.participants.isEmpty());
-        assertTrue(upnpIoService.pollingJobs.keySet().isEmpty());
-        assertTrue(upnpIoService.currentStates.keySet().isEmpty());
         assertTrue(upnpIoService.subscriptionCallbacks.keySet().isEmpty());
     }
 }
