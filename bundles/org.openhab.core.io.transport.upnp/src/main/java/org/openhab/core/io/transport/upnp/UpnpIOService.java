@@ -13,10 +13,15 @@
 package org.openhab.core.io.transport.upnp;
 
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.jupnp.model.meta.RemoteDevice;
+import org.jupnp.model.meta.RemoteService;
 import org.jupnp.model.meta.Service;
 
 /**
@@ -136,7 +141,11 @@ public interface UpnpIOService {
     /**
      * Establish a polling mechanism to check the status of a specific UDN device. The polling mechanism
      * works by invoking the actionID on serviceID every interval. It is assumed that the actionID does
-     * not take/have to take any {variable,value} input set
+     * not take/have to take any {variable,value} input set.
+     * <p>
+     * <b>Note:</b> This should be avoided unless the device is unable to stay online according to the UPnP
+     * specification. Polling is not needed for functioning devices, and will lead to increase load on both
+     * sides, and the network, without any benefit.
      *
      * @param participant the participant for whom we want to set up a polling
      * @param serviceID the service to use for polling
@@ -151,4 +160,49 @@ public interface UpnpIOService {
      * @param participant the participant for whom we want to remove the polling
      */
     void removeStatusListener(UpnpIOParticipant participant);
+
+    /**
+     * Generates a {@link List} of the specified {@link RemoteDevice} itself and all embedded/child devices.
+     *
+     * @param device the {@link RemoteDevice} whose device tree to enumerate.
+     * @return The resulting {@link List} of {@link RemoteDevice}s.
+     */
+    static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) { //TODO: (Nad) Check JavaDocs
+        List<RemoteDevice> result = new ArrayList<>();
+        result.add(device);
+        enumerateChildDevices(device, result);
+        return result;
+    }
+
+    /**
+     * Generates a {@link List} of {@link RemoteService}es offered by the specified {@link RemoteDevice} and
+     * all its embedded/child devices, if any.
+     *
+     * @param device the {@link RemoteDevice} whose services to enumerate.
+     * @return The resulting {@link List} of {@link RemoteService}es.
+     */
+    static List<RemoteService> enumerateAllServices(RemoteDevice device) {
+        List<RemoteService> result = new ArrayList<>();
+        RemoteService[] services;
+        for (RemoteDevice d : enumerateAllDevices(device)) {
+            services = d.getServices();
+            if (services != null && services.length > 0) {
+                result.addAll(Arrays.asList(services));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Traverses and adds child/embedded devices to the provided {@link List} recursively.
+     *
+     * @param device the {@link RemoteDevice} whose children to add to {@code devices}.
+     * @param devices the {@link List} to add the children to.
+     */
+    static void enumerateChildDevices(RemoteDevice device, List<RemoteDevice> devices) {
+        for (RemoteDevice child : device.getEmbeddedDevices()) {
+            devices.add(child);
+            enumerateChildDevices(device, devices);
+        }
+    }
 }
