@@ -144,8 +144,8 @@ public interface UpnpIOService {
      * not take/have to take any {variable,value} input set.
      * <p>
      * <b>Note:</b> This should be avoided unless the device is unable to stay online according to the UPnP
-     * specification. Polling is not needed for functioning devices, and will lead to increase load on both
-     * sides, and the network, without any benefit.
+     * specification. Polling is not needed for functioning devices, and will lead to increased load on both
+     * ends and the network, without any benefit.
      *
      * @param participant the participant for whom we want to set up a polling
      * @param serviceID the service to use for polling

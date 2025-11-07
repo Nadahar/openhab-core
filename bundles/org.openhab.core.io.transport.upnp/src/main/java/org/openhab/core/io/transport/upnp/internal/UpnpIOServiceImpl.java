@@ -85,6 +85,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     private static final int DEFAULT_POLLING_INTERVAL = 60;
     private static final String POOL_NAME = "upnp-io";
 
+    // Threadsafe
     private final UpnpService upnpService;
 
     // All access must be guarded by "this"
@@ -120,6 +121,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             this.participant = new WeakReference<UpnpIOParticipant>(participant);
         }
 
+        @SuppressWarnings("null")
         @Override
         protected void ended(@Nullable GENASubscription subscription, @Nullable CancelReason reason,
                 @Nullable UpnpResponse response) {
@@ -157,7 +159,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             }
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings({ "unused", "null" })
         @Override
         protected void established(@Nullable GENASubscription subscription) {
             Service service = subscription == null ? null : subscription.getService();
@@ -193,7 +195,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             }
         }
 
-        @SuppressWarnings({ "unchecked", "unused" })
+        @SuppressWarnings({ "unchecked", "unused", "null" })
         @Override
         protected void eventReceived(@Nullable GENASubscription subscription) {
             Service service = subscription == null ? null : subscription.getService();
@@ -258,7 +260,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             }
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings({ "unused", "null" })
         @Override
         protected void failed(@Nullable GENASubscription subscription, @Nullable UpnpResponse response,
                 @Nullable Exception e, @Nullable String defaultMsg) {
@@ -312,6 +314,12 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     public void deactivate() {
         logger.debug("Stopping UPnP IO service...");
         upnpService.getRegistry().removeListener(this);
+        synchronized (this) {
+            for (ParticipantData data : participants.values()) {
+                data.dispose();
+            }
+            participants.clear();
+        }
     }
 
     @Nullable
@@ -330,21 +338,8 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     // TODO: (Nad) Add to interface
-    public void addSubscription(UpnpIOParticipant participant, Service service, int requestedDurationSeconds) {
-        ServiceId serviceId = service.getServiceId();
-        logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
-            participant.getUDN());
-
-        ParticipantData data;
-        synchronized (this) {
-            data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
-        }
-        UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-        UpnpSubscriptionCallback oldCallback = data.addCallback(serviceId, callback);
-        if (oldCallback != null) {
-            logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), serviceId.getId());
-        }
-        upnpService.getControlPoint().execute(callback);
+    public void addSubscription(UpnpIOParticipant participant, Service service) {
+        addSubscription(participant, service, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
     }
 
     @Override
@@ -374,28 +369,26 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                 logger.trace("Could not find service '{}' for device '{}'", serviceID, device.getIdentity().getUdn());
             }
         } else {
-            logger.trace("Could not find an upnp device for participant '{}'", participant.getUDN());
+            logger.trace("Could not find an UPnP device for participant '{}'", participant.getUDN());
         }
     }
 
     // TODO: (Nad) Add to interface
-    public void removeSubscription(UpnpIOParticipant participant, ServiceId serviceId) {
+    public void addSubscription(UpnpIOParticipant participant, Service service, int requestedDurationSeconds) {
+        ServiceId serviceId = service.getServiceId();
+        logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
+            participant.getUDN());
+
         ParticipantData data;
         synchronized (this) {
-            data = participants.get(participant);
+            data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
         }
-        if (data == null) {
-            logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId.getId());
-            return;
+        UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
+        UpnpSubscriptionCallback oldCallback = data.addCallback(serviceId, callback);
+        if (oldCallback != null) {
+            logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), serviceId.getId());
         }
-
-        UpnpSubscriptionCallback callback = data.removeCallback(serviceId);
-        if (callback != null) {
-            logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
-                participant.getUDN());
-        } else {
-            logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceId.getId(), participant.getUDN());
-        }
+        upnpService.getControlPoint().execute(callback);
     }
 
     @Override
@@ -421,6 +414,26 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         if (callback != null) {
             logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceID,
                 participant.getUDN());
+        }
+    }
+
+    // TODO: (Nad) Add to interface
+    public void removeSubscription(UpnpIOParticipant participant, ServiceId serviceId) {
+        ParticipantData data;
+        synchronized (this) {
+            data = participants.get(participant);
+        }
+        if (data == null) {
+            logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId.getId());
+            return;
+        }
+
+        UpnpSubscriptionCallback callback = data.removeCallback(serviceId);
+        if (callback != null) {
+            logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
+                participant.getUDN());
+        } else {
+            logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceId.getId(), participant.getUDN());
         }
     }
 
@@ -561,12 +574,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             snapshot = Map.copyOf(participants);
         }
         UpnpIOParticipant participant;
-        ParticipantData data;
         for (Entry<UpnpIOParticipant, ParticipantData> entry : snapshot.entrySet()) {
             participant = entry.getKey();
-            data = entry.getValue();
             if (participant.getUDN().equals(identity.getUdn().getIdentifierString())) { //TODO: (Nad) Document that participant must use UDN for root device
-                setDeviceStatus(participant, data, status);
+                setDeviceStatus(participant, entry.getValue(), status);
             }
         }
     }
@@ -600,7 +611,8 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                 data = participants.get(participant);
             }
             if (data == null) {
-                //TODO: (Nad) Log
+                logger.debug("Participant '{}' scheduled for polling with Action '{}' of Service '{}', but isn't registered",
+                        participant.getUDN(), actionID, serviceID);
                 return;
             }
             try {
@@ -681,6 +693,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void remoteDeviceUpdated(@Nullable Registry registry, @Nullable RemoteDevice device) {
+        //TODO: (Nad) Probably set status here too...
     }
 
     @Override
