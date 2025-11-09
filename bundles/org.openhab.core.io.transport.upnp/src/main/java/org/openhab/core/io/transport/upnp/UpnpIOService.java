@@ -108,15 +108,41 @@ public interface UpnpIOService {
     void removeSubscription(UpnpIOParticipant participant, String serviceID);
 
     /**
-     * Verify if the a participant is registered
+     * Verify if the the specified participant is registered with {@link UpnpIOService} and will
+     * receive device status updates.
      *
-     * @param participant the participant whom's participation we want to verify
-     * @return true of the participant is registered with the UpnpIOService
+     * @param participant the participant whose registration to verify-
+     * @return {@code true} if the participant is registered with the {@link UpnpIOService}.
      */
+    boolean isParticipantRegistered(UpnpIOParticipant participant);
+
+    /**
+     * For historic reasons, this method performs the same check as {@link #isDevicePresent(UpnpIOParticipant)}.
+     *
+     * @deprecated Do not use because of its misleading name. Instead, use {@link #isDevicePresent(UpnpIOParticipant)}
+     *             or {@link #isParticipantRegistered(UpnpIOParticipant)} depending on what you want to get an answer
+     *             to.
+     *
+     * @param participant the participant whose "linked device" to check for presence.
+     * @return {@code true} if the device is deemed to be connected, {@code false} if not.
+     */
+    @Deprecated(forRemoval = false)
     boolean isRegistered(UpnpIOParticipant participant);
 
     /**
-     * Register a participant with the UPNP IO Service
+     * Verify if the {@link RemoteDevice} that corresponds to the UDN reported by participant's
+     * {@link UpnpIOParticipant#getUDN()} method, is currently found in jUPnP's registry - which means that
+     * according to the rules of UPnP, it should currently be connected and reachable.
+     *
+     * @param participant the participant whose "linked device" to check for presence.
+     * @return {@code true} if the device is deemed to be connected, {@code false} if not.
+     */
+    boolean isDevicePresent(UpnpIOParticipant participant);
+
+    /**
+     * Register a participant with {@link UpnpIOService}. Participants will automatically receive
+     * presence status updates for their "linked device". The current status will be notified
+     * promptly after registration.
      *
      * @param participant the participant whose participation we want to register
      */
@@ -147,11 +173,15 @@ public interface UpnpIOService {
      * specification. Polling is not needed for functioning devices, and will lead to increased load on both
      * ends and the network, without any benefit.
      *
+     * @deprecated Should be avoided if at all possible. If using a broken device that relies on polling, the
+     *             deprecation warning should be suppressed.
+     *
      * @param participant the participant for whom we want to set up a polling
      * @param serviceID the service to use for polling
      * @param actionID the action to call
      * @param interval the interval in seconds
      */
+    @Deprecated(forRemoval = false)
     void addStatusListener(UpnpIOParticipant participant, String serviceID, String actionID, int interval);
 
     /**

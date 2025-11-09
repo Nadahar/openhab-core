@@ -41,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.openhab.core.io.transport.upnp.UpnpIOParticipant;
 import org.openhab.core.io.transport.upnp.internal.UpnpIOServiceImpl.ParticipantData;
+import org.openhab.core.util.SameThreadExecutorService;
 
 /**
  * Tests {@link UpnpIOServiceImpl}.
@@ -87,13 +88,13 @@ public class UpnpIOServiceTest {
         RemoteService service2 = new RemoteService(serviceType, serviceId2, URI.create("http://example.org/descriptor"), URI.create("http://example.org/control"), URI.create("http://example.org/events"));
         RemoteDevice device2 = new RemoteDevice(deviceIdentity, deviceType, (DeviceDetails) null, service2);
 
-        when(upnpRegistryMock.getDevice(eq(UDN_1), anyBoolean())).thenReturn(device);
-        when(upnpRegistryMock.getDevice(eq(UDN_2), anyBoolean())).thenReturn(device2);
+        when(upnpRegistryMock.getRemoteDevice(eq(UDN_1), anyBoolean())).thenReturn(device);
+        when(upnpRegistryMock.getRemoteDevice(eq(UDN_2), anyBoolean())).thenReturn(device2);
 
         when(upnpServiceMock.getRegistry()).thenReturn(upnpRegistryMock);
         when(upnpServiceMock.getControlPoint()).thenReturn(controlPointMock);
 
-        upnpIoService = new UpnpIOServiceImpl(upnpServiceMock);
+        upnpIoService = new UpnpIOServiceImpl(upnpServiceMock, new SameThreadExecutorService(), 0L);
     }
 
     @Test
@@ -112,10 +113,11 @@ public class UpnpIOServiceTest {
         upnpIoService.registerParticipant(upnpIoParticipantMock);
         assertEquals(1, upnpIoService.participants.size());
         assertTrue(upnpIoService.participants.containsKey(upnpIoParticipantMock));
+        assertTrue(upnpIoService.isParticipantRegistered(upnpIoParticipantMock));
         ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
         assertNotNull(data);
         assertFalse(data.hasJob());
-        assertFalse(data.isAvailable());
+        assertTrue(data.isAvailable());
         assertTrue(data.getCallbacks().isEmpty());
     }
 
@@ -127,7 +129,7 @@ public class UpnpIOServiceTest {
         ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
         assertNotNull(data);
         assertTrue(data.hasJob());
-        assertFalse(data.isAvailable());
+        assertTrue(data.isAvailable());
         assertTrue(data.getCallbacks().isEmpty());
 
         upnpIoService.removeStatusListener(upnpIoParticipantMock);
@@ -142,7 +144,7 @@ public class UpnpIOServiceTest {
         ParticipantData data = upnpIoService.participants.get(upnpIoParticipantMock);
         assertNotNull(data);
         assertFalse(data.hasJob());
-        assertFalse(data.isAvailable());
+        assertTrue(data.isAvailable());
         assertEquals(1, data.getCallbacks().size());
 
         upnpIoService.addSubscription(upnpIoParticipant2Mock, SERVICE_ID_2, 60);
@@ -151,7 +153,7 @@ public class UpnpIOServiceTest {
         data = upnpIoService.participants.get(upnpIoParticipant2Mock);
         assertNotNull(data);
         assertFalse(data.hasJob());
-        assertFalse(data.isAvailable());
+        assertTrue(data.isAvailable());
         assertEquals(1, data.getCallbacks().size());
 
         upnpIoService.removeSubscription(upnpIoParticipantMock, SERVICE_ID);
@@ -161,7 +163,7 @@ public class UpnpIOServiceTest {
         data = upnpIoService.participants.get(upnpIoParticipant2Mock);
         assertNotNull(data);
         assertFalse(data.hasJob());
-        assertFalse(data.isAvailable());
+        assertTrue(data.isAvailable());
         assertEquals(1, data.getCallbacks().size());
 
         upnpIoService.removeSubscription(upnpIoParticipant2Mock, SERVICE_ID_2);
