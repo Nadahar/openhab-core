@@ -542,14 +542,19 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     @Override
-    public void registerParticipant(UpnpIOParticipant participant) {
+    public boolean registerParticipant(UpnpIOParticipant participant) {
         final ParticipantData data;
         synchronized (this) {
-            data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
+            if (participants.containsKey(participant)) {
+                return false;
+            }
+            data = new ParticipantData();
+            participants.put(participant, data);
         }
         scheduler.submit(() -> {
             setDeviceStatus(participant, data, isDevicePresent(participant), true);
         });
+        return true;
     }
 
     @Override
@@ -619,7 +624,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     private void setDeviceStatus(UpnpIOParticipant participant, ParticipantData data, boolean newStatus, boolean force) {
         boolean oldStatus = data.getAndSetAvailable(newStatus);
         if (force || oldStatus != newStatus) {
-            logger.debug("Device '{}' reachability status changed to '{}'", participant.getUDN(), newStatus);
+            logger.debug("Device '{}' reachability status changed to '{}'{}", participant.getUDN(), newStatus, oldStatus == newStatus ? " (forced)" : "");
             participant.onStatusChanged(newStatus);
         }
     }
@@ -715,7 +720,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void removeStatusListener(UpnpIOParticipant participant) {
-        unregisterParticipant(participant);
+        ParticipantData data;
+        synchronized (this) {
+            data = participants.get(participant);
+        }
+        if (data != null) {
+            data.clearJob();
+        }
     }
 
     @Override
@@ -869,13 +880,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             final boolean statusCopy = status;
             final CachedDeviceEvent instanceRef = this;
             this.task = scheduler.schedule(() -> {
-                informParticipants(deviceRef, statusCopy, false);
                 synchronized (events) {
                     CachedDeviceEvent event = events.get(identity);
                     if (event == instanceRef) {
                         events.remove(identity);
                     }
                 }
+                informParticipants(deviceRef, statusCopy, false);
             }, delayMs, TimeUnit.MILLISECONDS);
             return result;
         }

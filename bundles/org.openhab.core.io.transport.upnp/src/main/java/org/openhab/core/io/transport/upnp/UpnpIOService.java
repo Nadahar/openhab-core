@@ -145,8 +145,10 @@ public interface UpnpIOService {
      * promptly after registration.
      *
      * @param participant the participant whose participation we want to register
+     * @return {@code true} if the participant was registered, {@code false} it the participant was
+     *         already registered.
      */
-    void registerParticipant(UpnpIOParticipant participant);
+    boolean registerParticipant(UpnpIOParticipant participant);
 
     /**
      * Unregister a participant with the UPNP IO Service
