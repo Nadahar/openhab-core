@@ -477,32 +477,38 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         return false;
     }
 
-    // TODO: (Nad) Add to interface
-    public boolean removeSubscription(UpnpIOParticipant participant, ServiceId serviceId) {
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.get(participant);
-        }
-        if (data == null) {
-            logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId.getId());
-            return false;
-        }
-
-        UpnpSubscriptionCallback callback = data.removeCallback(serviceId);
-        if (callback != null) {
-            if (logger.isTraceEnabled()) {
-                logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
-                    participant.getUDN());
+    @Override
+    public boolean removeSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace) {
+        RemoteService service = findService(device, namespace, serviceId);
+        if (service != null) {
+            ParticipantData data;
+            synchronized (this) {
+                data = participants.get(participant);
             }
-            return true;
+            if (data == null) {
+                logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId);
+                return false;
+            }
+
+
+            UpnpSubscriptionCallback callback = data.removeCallback(service);
+            if (callback != null) {
+                if (logger.isTraceEnabled()) {
+                    logger.trace("Removed GENA subscription for '{}' for device '{}' for participant '{}'", serviceId,
+                        device.getIdentity().getUdn().getIdentifierString(), participant.getUDN());
+                }
+                return true;
+            } else {
+                logger.debug("Could not find and cancel GENA subscription for '{}' for device '{}' for participant '{}'", serviceId, device.getIdentity().getUdn().getIdentifierString(), participant.getUDN());
+            }
         } else {
-            logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceId.getId(), participant.getUDN());
+            logger.debug("Could not cancel GENA subscription for '{}' for device '{}' for participant '{}' because the service could not be found", serviceId, device.getIdentity().getUdn().getIdentifierString(), participant.getUDN());
         }
         return false;
     }
 
-    // TODO: (Nad) Add to interface
-    public boolean removeSubscription(UpnpIOParticipant participant, Service service) {
+    @Override
+    public boolean removeSubscription(UpnpIOParticipant participant, RemoteService service) {
         ParticipantData data;
         synchronized (this) {
             data = participants.get(participant);
