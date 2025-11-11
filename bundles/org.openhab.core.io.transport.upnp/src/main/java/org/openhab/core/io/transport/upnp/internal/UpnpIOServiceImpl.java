@@ -17,6 +17,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -351,109 +352,177 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     @Override
-    public void addSubscription(UpnpIOParticipant participant, String serviceID) {
-        addSubscription(participant, serviceID, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
-    }
-
-    // TODO: (Nad) Add to interface
-    public void addSubscription(UpnpIOParticipant participant, Service service) {
-        addSubscription(participant, service, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
+    public boolean addSubscription(UpnpIOParticipant participant, String serviceID) {
+        return addSubscription(participant, serviceID, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
     }
 
     @Override
-    public void addSubscription(UpnpIOParticipant participant, String serviceID, int requestedDurationSeconds) {
+    public boolean addSubscription(UpnpIOParticipant participant, String serviceID, int requestedDurationSeconds) {
         registerParticipant(participant);
         RemoteDevice device = getDevice(participant);
         if (device instanceof RemoteDevice remoteDevice) {
             ServiceId sid = resolveServiceId(serviceID, device.getType().getNamespace());
             // First look for the service in the root device only, and only if not found,
             // look in the embedded devices.
-            Service service = enumerateServices(remoteDevice, true).stream().filter(s -> sid.equals(s.getServiceId())).findAny()
+            RemoteService service = enumerateServices(remoteDevice, true).stream().filter(s -> sid.equals(s.getServiceId())).findAny()
                 .orElse(enumerateServices(remoteDevice, false).stream().filter(s -> sid.equals(s.getServiceId())).findAny().orElse(null));
             if (service != null) {
-                logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", serviceID,
-                    participant.getUDN());
+                if (logger.isTraceEnabled()) {
+                    logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", serviceID,
+                        participant.getUDN());
+                }
 
                 ParticipantData data;
                 synchronized (this) {
                     data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
                 }
                 UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-                UpnpSubscriptionCallback oldCallback = data.addCallback(sid, callback);
+                UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
                 if (oldCallback != null) {
                     logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), serviceID);
                 }
                 upnpService.getControlPoint().execute(callback);
+                return true;
             } else {
-                logger.trace("Could not find service '{}' for device '{}'", serviceID, device.getIdentity().getUdn());
+                logger.debug("Could not find service '{}' for device '{}'", serviceID, device.getIdentity().getUdn());
             }
         } else {
-            logger.trace("Could not find an UPnP device for participant '{}'", participant.getUDN());
+            logger.debug("Could not find an UPnP device for participant '{}'", participant.getUDN());
         }
+        return false;
     }
 
-    // TODO: (Nad) Add to interface
-    public void addSubscription(UpnpIOParticipant participant, Service service, int requestedDurationSeconds) {
-        ServiceId serviceId = service.getServiceId();
-        logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
-            participant.getUDN());
+    @Override
+    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace) {
+        return addSubscription(participant, device, serviceId, namespace, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
+    }
+
+    @Override
+    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace, int requestedDurationSeconds) {
+        RemoteService service = findService(device, namespace, serviceId);
+        if (service != null) {
+            if (logger.isTraceEnabled()) {
+                logger.trace("Setting up a GENA subscription for '{}' for device '{}'", service.getServiceId().getId(),
+                    device.getIdentity().getUdn().getIdentifierString());
+            }
+
+            ParticipantData data;
+            synchronized (this) {
+                data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
+            }
+            UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
+            UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
+            if (oldCallback != null) {
+                logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), service.getServiceId().getId());
+            }
+            upnpService.getControlPoint().execute(callback);
+            return true;
+        } else {
+            logger.debug("Could not find service '{}' for device '{}'", serviceId, device.getIdentity().getUdn().getIdentifierString());
+        }
+        return false;
+    }
+
+    @Override
+    public void addSubscription(UpnpIOParticipant participant, RemoteService service) {
+        addSubscription(participant, service, UserConstants.DEFAULT_SUBSCRIPTION_DURATION_SECONDS);
+    }
+
+    @Override
+    public void addSubscription(UpnpIOParticipant participant, RemoteService service, int requestedDurationSeconds) {
+        if (logger.isTraceEnabled()) {
+            logger.trace("Setting up a GENA subscription for '{}' for particpant '{}'", service.getServiceId().getId(),
+                participant.getUDN());
+        }
 
         ParticipantData data;
         synchronized (this) {
             data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
         }
         UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-        UpnpSubscriptionCallback oldCallback = data.addCallback(serviceId, callback);
+        UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
         if (oldCallback != null) {
-            logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), serviceId.getId());
+            logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), service.getServiceId().getId());
         }
         upnpService.getControlPoint().execute(callback);
     }
 
     @Override
-    public void removeSubscription(UpnpIOParticipant participant, String serviceID) {
+    public boolean removeSubscription(UpnpIOParticipant participant, String serviceID) {
         ParticipantData data;
         synchronized (this) {
             data = participants.get(participant);
         }
         if (data == null) {
             logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceID);
-            return;
+            return false;
         }
 
         UpnpSubscriptionCallback callback;
         synchronized (data) {
-            ServiceId sid = data.getCallbacks().keySet().stream().filter(s -> serviceID.equals(s.getId())).findAny().orElse(null);
-            if (sid == null) {
+            Service service = data.getCallbacks().keySet().stream().filter(s -> serviceID.equals(s.getServiceId().getId())).findAny().orElse(null);
+            if (service == null) {
                 logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceID, participant.getUDN());
-                return;
+                return false;
             }
-            callback = data.removeCallback(sid);
+            callback = data.removeCallback(service);
         }
         if (callback != null) {
-            logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceID,
-                participant.getUDN());
+            if (logger.isTraceEnabled()) {
+                logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceID,
+                    participant.getUDN());
+            }
+            return true;
         }
+        return false;
     }
 
     // TODO: (Nad) Add to interface
-    public void removeSubscription(UpnpIOParticipant participant, ServiceId serviceId) {
+    public boolean removeSubscription(UpnpIOParticipant participant, ServiceId serviceId) {
         ParticipantData data;
         synchronized (this) {
             data = participants.get(participant);
         }
         if (data == null) {
             logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId.getId());
-            return;
+            return false;
         }
 
         UpnpSubscriptionCallback callback = data.removeCallback(serviceId);
         if (callback != null) {
-            logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
-                participant.getUDN());
+            if (logger.isTraceEnabled()) {
+                logger.trace("Removed GENA subscription for '{}' for particpant '{}'", serviceId.getId(),
+                    participant.getUDN());
+            }
+            return true;
         } else {
             logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceId.getId(), participant.getUDN());
         }
+        return false;
+    }
+
+    // TODO: (Nad) Add to interface
+    public boolean removeSubscription(UpnpIOParticipant participant, Service service) {
+        ParticipantData data;
+        synchronized (this) {
+            data = participants.get(participant);
+        }
+        if (data == null) {
+            logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), service.getServiceId().getId());
+            return false;
+        }
+
+        UpnpSubscriptionCallback callback = data.removeCallback(service);
+        if (callback != null) {
+            if (logger.isTraceEnabled()) {
+                logger.trace("Removed GENA subscription for '{}' for particpant '{}'", service.getServiceId().getId(),
+                    participant.getUDN());
+            }
+            return true;
+        } else {
+            logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", service.getServiceId().getId(), participant.getUDN());
+        }
+        return false;
     }
 
     @Override
@@ -965,7 +1034,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         private boolean available;
 
         // All access must be guarded by "this"
-        private final Map<ServiceId, UpnpSubscriptionCallback> callbacks = new HashMap<>();
+        private final Map<RemoteService, UpnpSubscriptionCallback> callbacks = new HashMap<>();
 
         /**
          * @return The current polling job, if any.
@@ -1019,23 +1088,32 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         }
 
         public synchronized boolean hasCallback(ServiceId serviceId) {
-            return callbacks.containsKey(serviceId);
+            return callbacks.keySet().stream().anyMatch(s -> serviceId.equals(s.getServiceId()));
+        }
+
+        public synchronized boolean hasCallback(Service service) {
+            return callbacks.containsKey(service);
         }
 
         @Nullable
         public synchronized UpnpSubscriptionCallback getCallback(ServiceId serviceId) {
-            return callbacks.get(serviceId);
+            return callbacks.entrySet().stream().filter(e -> serviceId.equals(e.getKey().getServiceId())).findAny().map(e -> e.getValue()).orElse(null);
         }
 
-        public synchronized Map<ServiceId, UpnpSubscriptionCallback> getCallbacks() {
+        @Nullable
+        public synchronized UpnpSubscriptionCallback getCallback(Service service) {
+            return callbacks.get(service);
+        }
+
+        public synchronized Map<Service, UpnpSubscriptionCallback> getCallbacks() {
             return Map.copyOf(callbacks);
         }
 
         @Nullable
-        public UpnpSubscriptionCallback addCallback(ServiceId serviceId, UpnpSubscriptionCallback callback) {
+        public UpnpSubscriptionCallback addCallback(RemoteService service, UpnpSubscriptionCallback callback) {
             UpnpSubscriptionCallback result;
             synchronized (this) {
-                result = callbacks.put(serviceId, callback);
+                result = callbacks.put(service, callback);
             }
             if (result != null) {
                 result.end();
@@ -1045,9 +1123,29 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         @Nullable
         public UpnpSubscriptionCallback removeCallback(ServiceId serviceId) {
+            UpnpSubscriptionCallback result = null;
+            Entry<RemoteService, UpnpSubscriptionCallback> entry;
+            synchronized (this) {
+                for (Iterator<Entry<RemoteService, UpnpSubscriptionCallback>> iterator = callbacks.entrySet().iterator(); iterator.hasNext();) {
+                    entry = iterator.next();
+                    if (serviceId.equals(entry.getKey().getServiceId())) {
+                        result = entry.getValue();
+                        iterator.remove();
+                        break;
+                    }
+                }
+            }
+            if (result != null) {
+                result.end();
+            }
+            return result;
+        }
+
+        @Nullable
+        public UpnpSubscriptionCallback removeCallback(Service service) {
             UpnpSubscriptionCallback result;
             synchronized (this) {
-                result = callbacks.remove(serviceId);
+                result = callbacks.remove(service);
             }
             if (result != null) {
                 result.end();
@@ -1057,7 +1155,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         public void dispose() {
             ScheduledFuture<?> job;
-            Map<ServiceId, UpnpSubscriptionCallback> callbacks;
+            Map<RemoteService, UpnpSubscriptionCallback> callbacks;
             synchronized (this) {
                 job = this.job;
                 this.job = null;
