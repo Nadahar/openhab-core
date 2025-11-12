@@ -76,16 +76,19 @@ public class UpnpIOServiceTest {
         when(upnpIoParticipantMock.getUDN()).thenReturn(UDN_1_STRING);
         when(upnpIoParticipant2Mock.getUDN()).thenReturn(UDN_2_STRING);
 
-        RemoteDeviceIdentity deviceIdentity = new RemoteDeviceIdentity(UDN_1, 300, URI.create("http://example.com/ident-descriptor").toURL(), new byte[4], null);
+        RemoteDeviceIdentity deviceIdentity = new RemoteDeviceIdentity(UDN_1, 300,
+                URI.create("http://example.com/ident-descriptor").toURL(), new byte[4], null);
         DeviceType deviceType = new DeviceType(UDAServiceId.DEFAULT_NAMESPACE, DEVICE_TYPE, 1);
         ServiceType serviceType = new ServiceType(UDAServiceId.DEFAULT_NAMESPACE, SERVICE_TYPE);
 
         ServiceId serviceId = new ServiceId(UDAServiceId.DEFAULT_NAMESPACE, SERVICE_ID);
-        RemoteService service = new RemoteService(serviceType, serviceId, URI.create("http://example.com/descriptor"), URI.create("http://example.com/control"), URI.create("http://example.com/events"));
+        RemoteService service = new RemoteService(serviceType, serviceId, URI.create("http://example.com/descriptor"),
+                URI.create("http://example.com/control"), URI.create("http://example.com/events"));
         RemoteDevice device = new RemoteDevice(deviceIdentity, deviceType, (DeviceDetails) null, service);
 
         ServiceId serviceId2 = new ServiceId(UDAServiceId.DEFAULT_NAMESPACE, SERVICE_ID_2);
-        RemoteService service2 = new RemoteService(serviceType, serviceId2, URI.create("http://example.org/descriptor"), URI.create("http://example.org/control"), URI.create("http://example.org/events"));
+        RemoteService service2 = new RemoteService(serviceType, serviceId2, URI.create("http://example.org/descriptor"),
+                URI.create("http://example.org/control"), URI.create("http://example.org/events"));
         RemoteDevice device2 = new RemoteDevice(deviceIdentity, deviceType, (DeviceDetails) null, service2);
 
         when(upnpRegistryMock.getRemoteDevice(eq(UDN_1), anyBoolean())).thenReturn(device);

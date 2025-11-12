@@ -45,6 +45,7 @@ public interface UpnpIOService {
      * </ul>
      * To avoid these limitations, use one of the other overloaded versions.
      * <p>
+     * 
      * @param participant the participant to invoke the action for
      * @param serviceID the UPNP service to invoke the action upon
      * @param actionID the Action to invoke
@@ -65,14 +66,15 @@ public interface UpnpIOService {
      * </ul>
      * To avoid these limitations, use one of the other overloaded versions.
      * <p>
+     * 
      * @param participant the participant to invoke the action for
      * @param namespace the namespace of the service to invoke the action upon
      * @param serviceID the UPNP service to invoke the action upon
      * @param actionID the Action to invoke
      * @param inputs a map of {variable,values} to parameterize the Action that will be invoked
      */
-    Map<String, String> invokeAction(UpnpIOParticipant participant, @Nullable String namespace, String serviceID, String actionID,
-            @Nullable Map<String, String> inputs);
+    Map<String, String> invokeAction(UpnpIOParticipant participant, @Nullable String namespace, String serviceID,
+            String actionID, @Nullable Map<String, String> inputs);
 
     /**
      * Invoke the action with the specified action name from the device with the specified UDN and
@@ -89,8 +91,8 @@ public interface UpnpIOService {
      * @return The resulting {@link Map} of results.
      * @throws ActionException If the invocation fails.
      */
-    public Map<String, @Nullable String> invokeAction(String deviceUdn, @Nullable String namespace,
-        String serviceId, String actionName, @Nullable Map<String, String> inputs) throws ActionException;
+    public Map<String, @Nullable String> invokeAction(String deviceUdn, @Nullable String namespace, String serviceId,
+            String actionName, @Nullable Map<String, String> inputs) throws ActionException;
 
     /**
      * Invoke the action with the specified action name from the specified {@link RemoteDevice} and
@@ -107,8 +109,8 @@ public interface UpnpIOService {
      * @return The resulting {@link Map} of results.
      * @throws ActionException If the invocation fails.
      */
-    public Map<String, @Nullable String> invokeAction(RemoteDevice device, @Nullable String namespace,
-        String serviceId, String actionName, @Nullable Map<String, String> inputs) throws ActionException;
+    public Map<String, @Nullable String> invokeAction(RemoteDevice device, @Nullable String namespace, String serviceId,
+            String actionName, @Nullable Map<String, String> inputs) throws ActionException;
 
     /**
      * Invoke the action with the specified action name from the specified {@link RemoteService} using
@@ -120,8 +122,8 @@ public interface UpnpIOService {
      * @return The resulting {@link Map} of results.
      * @throws ActionException If the invocation fails.
      */
-    public Map<String, @Nullable String> invokeAction(RemoteService service,
-        String actionName, @Nullable Map<String, String> inputs) throws ActionException;
+    public Map<String, @Nullable String> invokeAction(RemoteService service, String actionName,
+            @Nullable Map<String, String> inputs) throws ActionException;
 
     /**
      * Invoke the specified {@link Action} and inputs.
@@ -131,8 +133,8 @@ public interface UpnpIOService {
      * @return The resulting {@link Map} of results.
      * @throws ActionException If the invocation fails.
      */
-    public Map<String, @Nullable String> invokeAction(
-        Action<RemoteService> action, @Nullable Map<String, String> inputs) throws ActionException;
+    public Map<String, @Nullable String> invokeAction(Action<RemoteService> action,
+            @Nullable Map<String, String> inputs) throws ActionException;
 
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID and with a request for the
@@ -211,7 +213,8 @@ public interface UpnpIOService {
      * @param namespace the namespace to use, or {@code null} to use the device default namespace.
      * @return {@code true} if the subscription attempt succeeded.
      */
-    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace);
+    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId,
+            @Nullable String namespace);
 
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID offered by the specified
@@ -248,7 +251,8 @@ public interface UpnpIOService {
      * @param requestedDurationSeconds the requested duration of the subscription in seconds.
      * @return {@code true} if the subscription attempt succeeded.
      */
-    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace, int requestedDurationSeconds);
+    public boolean addSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId,
+            @Nullable String namespace, int requestedDurationSeconds);
 
     /**
      * Create a GENA subscription for the specified {@link RemoteService} with a request for the default
@@ -320,7 +324,8 @@ public interface UpnpIOService {
      * @param namespace the namespace to use, or {@code null} to use the device default namespace.
      * @return {@code true} if a subscription was unsubscribed from.
      */
-    public boolean removeSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace);
+    public boolean removeSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId,
+            @Nullable String namespace);
 
     /**
      * Unsubscribe from a GENA subscription with the specified {@link RemoteService}.
