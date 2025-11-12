@@ -733,10 +733,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     /**
-     * Propagates a device status change to all participants
+     * Propagates a device status change to all participants.
      *
-     * @param device the device that has changed its status
-     * @param status {@code true}, if device is reachable, {@code false} otherwise
+     * @param device the device that has changed its status.
+     * @param status {@code true}, if device is reachable, {@code false} otherwise.
      * @param force if {@code true}, participants will be notified regardless of the previous status.
      */
     private void informParticipants(RemoteDevice device, boolean status, boolean force) {
@@ -1025,7 +1025,9 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         }
     }
 
-    // Threadsafe
+    /**
+     * A container for data held for each registered participant. Threadsafe.
+     */
     public static class ParticipantData {
 
         // All access must be guarded by "this"
@@ -1076,41 +1078,95 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             setJob(null);
         }
 
+        /**
+         * @return {@code true} is the associated {@link RemoteDevice} is available, {@code false} otherwise.
+         */
         public synchronized boolean isAvailable() {
             return available;
         }
 
-        public synchronized boolean getAndSetAvailable(boolean state) {
+        /**
+         * Sets the availability status and returns the old one, within the same lock.
+         *
+         * @param status the new availability status.
+         * @return the old availability status.
+         */
+        public synchronized boolean getAndSetAvailable(boolean status) {
             boolean result = available;
-            available = state;
+            available = status;
             return result;
         }
-        public synchronized void setAvailable(boolean state) {
-            available = state;
+
+        /**
+         * Sets the availability status.
+         *
+         * @param status the new availability status.
+         */
+        public synchronized void setAvailable(boolean status) {
+            available = status;
         }
 
+        /**
+         * Checks if this {@link ParticipantData} instance holds as subscription callback that is registered
+         * using the specified service ID.
+         *
+         * @param serviceId the service ID to check for.
+         * @return {@code true} if a matching callback was found, {@code false} otherwise.
+         */
         public synchronized boolean hasCallback(ServiceId serviceId) {
             return callbacks.keySet().stream().anyMatch(s -> serviceId.equals(s.getServiceId()));
         }
 
+        /**
+         * Checks if this {@link ParticipantData} instance holds as subscription callback that is registered
+         * using the specified {@link Service}.
+         *
+         * @param service the {@link Service} to check for.
+         * @return {@code true} if a matching callback was found, {@code false} otherwise.
+         */
         public synchronized boolean hasCallback(Service service) {
             return callbacks.containsKey(service);
         }
 
+        /**
+         * Retrieve a {@link UpnpSubscriptionCallback} instance registered with the specified {@link ServiceId}.
+         *
+         * @param serviceId the {@link ServiceId} used for evaluation.
+         * @return A matching {@link UpnpSubscriptionCallback} or {@code null}.
+         */
         @Nullable
         public synchronized UpnpSubscriptionCallback getCallback(ServiceId serviceId) {
             return callbacks.entrySet().stream().filter(e -> serviceId.equals(e.getKey().getServiceId())).findAny().map(e -> e.getValue()).orElse(null);
         }
 
+        /**
+         * Retrieve the {@link UpnpSubscriptionCallback} instance registered with the specified {@link Service}.
+         *
+         * @param service the {@link Service} key.
+         * @return The resulting {@link UpnpSubscriptionCallback} or {@code null}.
+         */
         @Nullable
         public synchronized UpnpSubscriptionCallback getCallback(Service service) {
             return callbacks.get(service);
         }
 
-        public synchronized Map<Service, UpnpSubscriptionCallback> getCallbacks() {
+        /**
+         * @return A snapshot/copy of the {@link Map} of {@link RemoteService} and
+         *         {@link UpnpSubscriptionCallback} pairs.
+         */
+        public synchronized Map<RemoteService, UpnpSubscriptionCallback> getCallbacks() {
             return Map.copyOf(callbacks);
         }
 
+        /**
+         * Add a {@link UpnpSubscriptionCallback} callback associated with the specified {@link RemoteService}
+         * to the {@link Map} of callbacks. If one already exists for the specified {@link RemoteService}, its
+         * subscription will be cancelled and the callback returned.
+         *
+         * @param service the {@link RemoteService} to use as the key.
+         * @param callback The {@link UpnpSubscriptionCallback} to use as the value.
+         * @return The previous {@link UpnpSubscriptionCallback} stored for the specified key, or {@code null}.
+         */
         @Nullable
         public UpnpSubscriptionCallback addCallback(RemoteService service, UpnpSubscriptionCallback callback) {
             UpnpSubscriptionCallback result;
@@ -1123,6 +1179,14 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             return result;
         }
 
+        /**
+         * Remove a {@link UpnpSubscriptionCallback} associated with a service of the specified service ID from
+         * the {@link Map} of callbacks, and return it. If a callback is found, its subscription is canceled
+         * before it is returned.
+         *
+         * @param serviceId the {@link ServiceId} to match.
+         * @return The removed {@link UpnpSubscriptionCallback} or {@code null}.
+         */
         @Nullable
         public UpnpSubscriptionCallback removeCallback(ServiceId serviceId) {
             UpnpSubscriptionCallback result = null;
@@ -1143,6 +1207,14 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             return result;
         }
 
+        /**
+         * Remove a {@link UpnpSubscriptionCallback} associated with the specified {@link Service} from the
+         * {@link Map} of callbacks, and return it. If a callback is found, its subscription is canceled before
+         * it is returned.
+         *
+         * @param service the {@link Service} key for the entry to remove.
+         * @return The removed {@link UpnpSubscriptionCallback} or {@code null}.
+         */
         @Nullable
         public UpnpSubscriptionCallback removeCallback(Service service) {
             UpnpSubscriptionCallback result;
@@ -1155,9 +1227,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             return result;
         }
 
+        /**
+         * Cancels all ongoing operations referenced by this {@link ParticipantData} instance. If a job is
+         * registered, it is canceled, and so are any active subscriptions.
+         */
         public void dispose() {
             ScheduledFuture<?> job;
-            Map<RemoteService, UpnpSubscriptionCallback> callbacks;
+            Map<RemoteService, UpnpSubscriptionCallback> callbacks; // TODO: (Nad) Handle subscription failures
             synchronized (this) {
                 job = this.job;
                 this.job = null;
