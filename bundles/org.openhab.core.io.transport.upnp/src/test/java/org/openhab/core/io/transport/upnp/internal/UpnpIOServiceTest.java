@@ -133,7 +133,7 @@ public class UpnpIOServiceTest {
         assertTrue(data.getCallbacks().isEmpty());
 
         upnpIoService.removeStatusListener(upnpIoParticipantMock);
-        assertThatEverythingIsEmpty();
+        assertThatDataIsIsEmpty(data);
     }
 
     @Test
@@ -173,5 +173,10 @@ public class UpnpIOServiceTest {
 
     private void assertThatEverythingIsEmpty() {
         assertTrue(upnpIoService.participants.isEmpty());
+    }
+
+    private void assertThatDataIsIsEmpty(ParticipantData data) {
+        assertFalse(data.hasJob());
+        assertTrue(data.getCallbacks().isEmpty());
     }
 }

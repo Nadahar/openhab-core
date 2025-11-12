@@ -137,7 +137,8 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID and with a request for the
      * default subscription duration (30 minutes). Please note that this is just a request, the published might
-     * grant a subscription with a different duration.
+     * grant a subscription with a different duration. If the service is found, this method will also register the
+     * participant with the {@link UpnpIOService} if it's not already registered.
      * <p>
      * For more information about subscription duration, see {@link #addSubscription(UpnpIOParticipant, String, int)}.
      * <p>
@@ -156,7 +157,8 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID with the specified subscription
      * duration. Please note that this is just a request, the published might grant a subscription with a
-     * different duration.
+     * different duration. If the service is found, this method will also register the participant with the
+     * {@link UpnpIOService} if it's not already registered.
      * <p>
      * The service will first be attempted resolved by looking through the services provided by the root device
      * the participant is tied to with its UDN. If a service with the specified ID is found, it will be subscribed
@@ -193,7 +195,9 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID offered by the specified
      * {@link RemoteDevice}, with a request for the default subscription duration (30 minutes). Please note that
-     * this is just a request, the publisher might grant a subscription with a different duration.
+     * this is just a request, the publisher might grant a subscription with a different duration. If the service
+     * is found, this method will also register the participant with the {@link UpnpIOService} if it's not already
+     * registered.
      * <p>
      * The service will be resolved by looking only at the services provided by the specified device. If the device
      * offers multiple versions of the same service, it is unpredictable which service will be subscribed to.
@@ -212,7 +216,8 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for a {@link Service} with the specified ID offered by the specified
      * {@link RemoteDevice}, with the specified subscription duration. Please note that this is just a request,
-     * the publisher might grant a subscription with a different duration.
+     * the publisher might grant a subscription with a different duration. If the service is found, this method
+     * will also register the participant with the {@link UpnpIOService} if it's not already registered.
      * <p>
      * The service will be resolved by looking only at the services provided by the specified device. If the device
      * offers multiple versions of the same service, it is unpredictable which service will be subscribed to.
@@ -248,7 +253,8 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for the specified {@link RemoteService} with a request for the default
      * subscription duration (30 minutes). Please note that this is just a request, the publisher might
-     * grant a subscription with a different duration.
+     * grant a subscription with a different duration. This method will register the participant with
+     * the {@link UpnpIOService} if it's not already registered.
      * <p>
      * For more information about subscription duration, see
      * {@link #addSubscription(UpnpIOParticipant, RemoteService, int)}.
@@ -261,6 +267,7 @@ public interface UpnpIOService {
     /**
      * Create a GENA subscription for the specified {@link RemoteService} with the specified subscription duration.
      * Please note that this is just a request, the publisher might grant a subscription with a different duration.
+     * This method will register the participant with the {@link UpnpIOService} if it's not already registered.
      * <p>
      * The subscription duration is <i>not</i> the duration the subscription will stay active. It will stay
      * active until it is cancelled. Instead, it's a Time To Live value for the subscription, within which the

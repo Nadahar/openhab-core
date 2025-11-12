@@ -371,7 +371,6 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public boolean addSubscription(UpnpIOParticipant participant, String serviceID, int requestedDurationSeconds) {
-        registerParticipant(participant);
         RemoteDevice device = getDevice(participant);
         if (device instanceof RemoteDevice remoteDevice) {
             ServiceId sid = resolveServiceId(serviceID, device.getType().getNamespace());
@@ -387,6 +386,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
                 ParticipantData data;
                 synchronized (this) {
+                    registerParticipant(participant);
                     data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
                 }
                 UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
@@ -421,6 +421,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
             ParticipantData data;
             synchronized (this) {
+                registerParticipant(participant);
                 data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
             }
             UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
@@ -450,6 +451,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         ParticipantData data;
         synchronized (this) {
+            registerParticipant(participant);
             data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
         }
         UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
@@ -700,7 +702,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void unregisterParticipant(UpnpIOParticipant participant) {
-        ParticipantData data = getData(participant);
+        ParticipantData data;
+        synchronized (this) {
+            data = participants.remove(participant);
+        }
         if (data != null) {
             data.dispose();
         }
