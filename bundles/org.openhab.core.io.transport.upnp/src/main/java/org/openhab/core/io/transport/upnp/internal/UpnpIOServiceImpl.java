@@ -155,13 +155,22 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     }
                 }
 
+                UpnpSubscriptionCallback callback = null;
+                UpnpIOParticipant participant = this.participant.get();
                 if ((CancelReason.EXPIRED.equals(reason) || CancelReason.RENEWAL_FAILED.equals(reason))) {
                     final ControlPoint cp = upnpService.getControlPoint();
-                    UpnpIOParticipant participant = this.participant.get();
                     if (cp != null && participant != null) {
-                        final UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service,
+                        callback = new UpnpSubscriptionCallback(participant, service,
                                 subscription.getActualDurationSeconds());
                         cp.execute(callback);
+                    }
+                }
+                ParticipantData data = participant == null ? null : getData(participant);
+                if (data != null) {
+                    if (callback == null) {
+                        data.removeCallback(getService(), false);
+                    } else {
+                        data.addCallback((RemoteService) getService(), callback, false);
                     }
                 }
             }
@@ -294,6 +303,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
                 UpnpIOParticipant participant = this.participant.get();
                 if (participant != null) {
+                    ParticipantData data = getData(participant);
+                    if (data != null) {
+                        data.removeCallback(getService(), false);
+                    }
                     try {
                         participant.onServiceSubscribed(serviceId.getId(), false);
                     } catch (Exception pe) {
@@ -377,7 +390,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                     data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
                 }
                 UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-                UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
+                UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback, true);
                 if (oldCallback != null) {
                     logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), serviceID);
                 }
@@ -411,7 +424,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                 data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
             }
             UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-            UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
+            UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback, true);
             if (oldCallback != null) {
                 logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), service.getServiceId().getId());
             }
@@ -440,7 +453,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             data = Objects.requireNonNull(participants.computeIfAbsent(participant, d -> new ParticipantData()));
         }
         UpnpSubscriptionCallback callback = new UpnpSubscriptionCallback(participant, service, requestedDurationSeconds);
-        UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback);
+        UpnpSubscriptionCallback oldCallback = data.addCallback(service, callback, true);
         if (oldCallback != null) {
             logger.warn("Participant '{}' added a GENA subscription for '{}' when one already existed. Cancelling the old subscription.", participant.getUDN(), service.getServiceId().getId());
         }
@@ -449,10 +462,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public boolean removeSubscription(UpnpIOParticipant participant, String serviceID) {
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.get(participant);
-        }
+        ParticipantData data = getData(participant);
         if (data == null) {
             logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceID);
             return false;
@@ -465,7 +475,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                 logger.debug("Could not find and cancel GENA subscription for '{}' for participant '{}'", serviceID, participant.getUDN());
                 return false;
             }
-            callback = data.removeCallback(service);
+            callback = data.removeCallback(service, true);
         }
         if (callback != null) {
             if (logger.isTraceEnabled()) {
@@ -481,17 +491,14 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     public boolean removeSubscription(UpnpIOParticipant participant, RemoteDevice device, String serviceId, @Nullable String namespace) {
         RemoteService service = findService(device, namespace, serviceId);
         if (service != null) {
-            ParticipantData data;
-            synchronized (this) {
-                data = participants.get(participant);
-            }
+            ParticipantData data = getData(participant);
             if (data == null) {
                 logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), serviceId);
                 return false;
             }
 
 
-            UpnpSubscriptionCallback callback = data.removeCallback(service);
+            UpnpSubscriptionCallback callback = data.removeCallback(service, true);
             if (callback != null) {
                 if (logger.isTraceEnabled()) {
                     logger.trace("Removed GENA subscription for '{}' for device '{}' for participant '{}'", serviceId,
@@ -509,16 +516,13 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public boolean removeSubscription(UpnpIOParticipant participant, RemoteService service) {
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.get(participant);
-        }
+        ParticipantData data = getData(participant);
         if (data == null) {
             logger.debug("Participant '{}' is trying to remove GENA subscription for '{}', but isn't registered", participant.getUDN(), service.getServiceId().getId());
             return false;
         }
 
-        UpnpSubscriptionCallback callback = data.removeCallback(service);
+        UpnpSubscriptionCallback callback = data.removeCallback(service, true);
         if (callback != null) {
             if (logger.isTraceEnabled()) {
                 logger.trace("Removed GENA subscription for '{}' for particpant '{}'", service.getServiceId().getId(),
@@ -696,10 +700,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void unregisterParticipant(UpnpIOParticipant participant) {
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.remove(participant);
-        }
+        ParticipantData data = getData(participant);
         if (data != null) {
             data.dispose();
         }
@@ -714,6 +715,11 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         } else {
             return null;
         }
+    }
+
+    @Nullable
+    private synchronized ParticipantData getData(UpnpIOParticipant participant) {
+        return participants.get(participant);
     }
 
     @Nullable
@@ -782,10 +788,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         public void run() {
             // It is assumed that during addStatusListener() a check is made whether the participant is correctly
             // registered
-            ParticipantData data;
-            synchronized (UpnpIOServiceImpl.this) {
-                data = participants.get(participant);
-            }
+            ParticipantData data = getData(participant);
             if (data == null) {
                 logger.debug("Participant '{}' scheduled for polling with Action '{}' of Service '{}', but isn't registered",
                         participant.getUDN(), actionID, serviceID);
@@ -838,10 +841,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         registerParticipant(participant);
 
         int pollingInterval = interval == 0 ? DEFAULT_POLLING_INTERVAL : interval;
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.get(participant);
-        }
+        ParticipantData data = getData(participant);
         if (data == null) {
             // Should not happen
             logger.warn("Unable to add status listener for participant {}, participant isn't registered", participant.getUDN());
@@ -852,10 +852,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
     @Override
     public void removeStatusListener(UpnpIOParticipant participant) {
-        ParticipantData data;
-        synchronized (this) {
-            data = participants.get(participant);
-        }
+        ParticipantData data = getData(participant);
         if (data != null) {
             data.clearJob();
         }
@@ -1160,20 +1157,23 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         /**
          * Add a {@link UpnpSubscriptionCallback} callback associated with the specified {@link RemoteService}
-         * to the {@link Map} of callbacks. If one already exists for the specified {@link RemoteService}, its
-         * subscription will be cancelled and the callback returned.
+         * to the {@link Map} of callbacks. If a callback already exists for the specified {@link RemoteService},
+         * the previously registered callback will be returned. If {@code doEnd} is {@code true}, its subscription
+         * will also be cancelled before it is returned.
          *
          * @param service the {@link RemoteService} to use as the key.
          * @param callback The {@link UpnpSubscriptionCallback} to use as the value.
+         * @param doEnd {@code true} to cancel the subscription of the old callback, if one is already registered for
+         *            the key.
          * @return The previous {@link UpnpSubscriptionCallback} stored for the specified key, or {@code null}.
          */
         @Nullable
-        public UpnpSubscriptionCallback addCallback(RemoteService service, UpnpSubscriptionCallback callback) {
+        public UpnpSubscriptionCallback addCallback(RemoteService service, UpnpSubscriptionCallback callback, boolean doEnd) {
             UpnpSubscriptionCallback result;
             synchronized (this) {
                 result = callbacks.put(service, callback);
             }
-            if (result != null) {
+            if (doEnd && result != null) {
                 result.end();
             }
             return result;
@@ -1209,19 +1209,20 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
 
         /**
          * Remove a {@link UpnpSubscriptionCallback} associated with the specified {@link Service} from the
-         * {@link Map} of callbacks, and return it. If a callback is found, its subscription is canceled before
-         * it is returned.
+         * {@link Map} of callbacks, and return it. If a callback is found and {@code doEnd} is {@code true},
+         * its subscription is canceled before it is returned.
          *
          * @param service the {@link Service} key for the entry to remove.
+         * @param doEnd {@code true} to cancel the subscription on successful removal.
          * @return The removed {@link UpnpSubscriptionCallback} or {@code null}.
          */
         @Nullable
-        public UpnpSubscriptionCallback removeCallback(Service service) {
+        public UpnpSubscriptionCallback removeCallback(Service service, boolean doEnd) {
             UpnpSubscriptionCallback result;
             synchronized (this) {
                 result = callbacks.remove(service);
             }
-            if (result != null) {
+            if (doEnd && result != null) {
                 result.end();
             }
             return result;
@@ -1233,7 +1234,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
          */
         public void dispose() {
             ScheduledFuture<?> job;
-            Map<RemoteService, UpnpSubscriptionCallback> callbacks; // TODO: (Nad) Handle subscription failures
+            Map<RemoteService, UpnpSubscriptionCallback> callbacks;
             synchronized (this) {
                 job = this.job;
                 this.job = null;
