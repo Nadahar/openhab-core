@@ -752,7 +752,7 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         UpnpIOParticipant participant;
         for (Entry<UpnpIOParticipant, ParticipantData> entry : snapshot.entrySet()) {
             participant = entry.getKey();
-            if (participant.getUDN().equals(identifier)) { //TODO: (Nad) Document that participant must use UDN for root device
+            if (participant.getUDN().equals(identifier)) {
                 setDeviceStatus(participant, entry.getValue(), status, force);
             }
         }
@@ -815,10 +815,10 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
                             if (anException != null && (message = anException.getMessage()) != null
                                     && message.contains("Connection error or no response received")) {
                                 // The UDN is not reachable anymore
-                                setDeviceStatus(participant, data, false, false); //TODO: (Nad) Look into
+                                setDeviceStatus(participant, data, false, false);
                             } else {
                                 // The UDN functions correctly
-                                setDeviceStatus(participant, data, true, false); //TODO: (Nad) Look into
+                                setDeviceStatus(participant, data, true, false);
                             }
                         } else {
                             logger.debug("Could not find action '{}' for participant '{}'", actionID, participantUdn);
@@ -838,7 +838,6 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
         registerParticipant(participant);
 
         int pollingInterval = interval == 0 ? DEFAULT_POLLING_INTERVAL : interval;
-
         ParticipantData data;
         synchronized (this) {
             data = participants.get(participant);
@@ -849,10 +848,6 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
             return;
         }
         data.setJob(scheduler.scheduleWithFixedDelay(new UPNPPollingRunnable(participant, serviceID, actionID), 0, pollingInterval, TimeUnit.SECONDS));
-    }
-
-    private synchronized List<UpnpIOParticipant> getSubscribingParticipants(ServiceId serviceId) {
-        return participants.entrySet().stream().filter(e -> e.getValue().hasCallback(serviceId)).map(e -> e.getKey()).toList();
     }
 
     @Override
@@ -934,11 +929,12 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     /**
-     * Generates a {@link List} of {@link RemoteService}es offered by the specified {@link RemoteDevice},
-     * and optionally, all its embedded/child devices, if any.
+     * Generates a {@link List} of {@link RemoteService}es provided by the specified {@link RemoteDevice},
+     * and optionally, any embedded/child devices.
      *
      * @param device the {@link RemoteDevice} whose {@link Service}s to enumerate.
-     * @param rootOnly whether to only enumerate the device itself or also all its children.
+     * @param rootOnly {@code true} to only enumerate services from the device itself, {@code false} to also
+     *            include services from its children.
      * @return The resulting {@link List} of {@link RemoteService}es.
      */
     public static List<RemoteService> enumerateServices(RemoteDevice device, boolean rootOnly) {
@@ -955,12 +951,12 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     }
 
     /**
-     * Generates a {@link List} of the specified {@link RemoteDevice} itself and all embedded/child devices.
+     * Generates a {@link List} of the specified {@link RemoteDevice} itself and its embedded/child devices.
      *
      * @param device the {@link RemoteDevice} whose device tree to enumerate.
      * @return The resulting {@link List} of {@link RemoteDevice}s.
      */
-    public static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) { //TODO: (Nad) Check JavaDocs
+    public static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) {
         List<RemoteDevice> result = new ArrayList<>();
         result.add(device);
         enumerateChildDevices(device, result);
@@ -970,8 +966,8 @@ public class UpnpIOServiceImpl implements UpnpIOService, RegistryListener {
     /**
      * Traverses and adds child/embedded devices to the provided {@link List} recursively.
      *
-     * @param device the {@link RemoteDevice} whose children to add to {@code devices}.
-     * @param devices the {@link List} to add the children to.
+     * @param device the {@link RemoteDevice} whose descendants to add to {@code devices}.
+     * @param devices the {@link List} to add the descendants to.
      */
     private static void enumerateChildDevices(RemoteDevice device, List<RemoteDevice> devices) {
         for (RemoteDevice child : device.getEmbeddedDevices()) {

@@ -105,21 +105,8 @@ public interface UpnpDiscoveryParticipant {
     }
 
     /**
-     * Generates a {@link List} of the specified {@link RemoteDevice} itself and all embedded/child devices.
-     *
-     * @param device the {@link RemoteDevice} whose device tree to enumerate.
-     * @return The resulting {@link List} of {@link RemoteDevice}s.
-     */
-    static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) {
-        List<RemoteDevice> result = new ArrayList<>();
-        result.add(device);
-        enumerateChildDevices(device, result);
-        return result;
-    }
-
-    /**
      * Generates a {@link List} of {@link RemoteService}es offered by the specified {@link RemoteDevice} and
-     * all its embedded/child devices, if any.
+     * its embedded/child devices, if any.
      *
      * @param device the {@link RemoteDevice} whose services to enumerate.
      * @return The resulting {@link List} of {@link RemoteService}es.
@@ -137,10 +124,23 @@ public interface UpnpDiscoveryParticipant {
     }
 
     /**
+     * Generates a {@link List} of the specified {@link RemoteDevice} itself and its embedded/child devices.
+     *
+     * @param device the {@link RemoteDevice} whose device tree to enumerate.
+     * @return The resulting {@link List} of {@link RemoteDevice}s.
+     */
+    static List<RemoteDevice> enumerateAllDevices(RemoteDevice device) {
+        List<RemoteDevice> result = new ArrayList<>();
+        result.add(device);
+        enumerateChildDevices(device, result);
+        return result;
+    }
+
+    /**
      * Traverses and adds child/embedded devices to the provided {@link List} recursively.
      *
-     * @param device the {@link RemoteDevice} whose children to add to {@code devices}.
-     * @param devices the {@link List} to add the children to.
+     * @param device the {@link RemoteDevice} whose descendants to add to {@code devices}.
+     * @param devices the {@link List} to add the descendants to.
      */
     static void enumerateChildDevices(RemoteDevice device, List<RemoteDevice> devices) {
         for (RemoteDevice child : device.getEmbeddedDevices()) {
