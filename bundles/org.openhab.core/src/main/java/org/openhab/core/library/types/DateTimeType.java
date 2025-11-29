@@ -176,20 +176,25 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
 
     @Override
     public String format(@Nullable String pattern) {
-        return format(pattern, ZoneId.systemDefault());
+        return format(null, pattern, ZoneId.systemDefault());
     }
 
     public String format(@Nullable String pattern, ZoneId zoneId) {
+        return format(null, pattern, zoneId);
+    }
+
+    public String format(@Nullable Locale locale, @Nullable String pattern, ZoneId zoneId) {
         ZonedDateTime zonedDateTime = instant.atZone(zoneId);
+        Locale l = locale == null ? Locale.getDefault() : locale;
         if (pattern == null) {
-            return DateTimeFormatter.ofPattern(DATE_PATTERN).format(zonedDateTime);
+            return DateTimeFormatter.ofPattern(DATE_PATTERN, l).format(zonedDateTime);
         }
 
-        return String.format(pattern, zonedDateTime);
+        return String.format(l, pattern, zonedDateTime);
     }
 
     public String format(Locale locale, String pattern) {
-        return String.format(locale, pattern, getZonedDateTime());
+        return format(locale, pattern, ZoneId.systemDefault());
     }
 
     @Override
