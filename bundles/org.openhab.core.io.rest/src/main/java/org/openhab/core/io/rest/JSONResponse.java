@@ -25,9 +25,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
 import javax.ws.rs.core.StreamingOutput;
 
-import org.openhab.core.addon.AnnotationExclusionStrategy;
-import org.openhab.core.addon.Version;
-import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.library.types.DateTimeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,9 +45,7 @@ import com.google.gson.stream.JsonWriter;
 public class JSONResponse {
 
     private static final JSONResponse INSTANCE = new JSONResponse();
-    private final Gson gson = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS)
-            .setExclusionStrategies(new AnnotationExclusionStrategy())
-            .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
+    private final Gson gson = new GsonBuilder().setDateFormat(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS).create();
 
     static final String JSON_KEY_ERROR_MESSAGE = "message";
     static final String JSON_KEY_ERROR = "error";

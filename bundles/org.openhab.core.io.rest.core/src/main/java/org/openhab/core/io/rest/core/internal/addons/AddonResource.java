@@ -152,7 +152,7 @@ public class AddonResource implements RESTResource {
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getAddons", summary = "Get all add-ons.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Addon.class)))),
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonDTO.class)))),
             @ApiResponse(responseCode = "404", description = "Service not found") })
     public Response getAddon(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language,
@@ -168,7 +168,7 @@ public class AddonResource implements RESTResource {
             if (addonService == null) {
                 return Response.status(HttpStatus.NOT_FOUND_404).build();
             }
-            return Response.ok(new Stream2JSONInputStream(addonService.getAddons(locale).stream())).build();
+            return Response.ok(new Stream2JSONInputStream(addonService.getAddons(locale).stream().map(AddonDTO::fromAddon))).build();
         }
         } finally {
             logger.error("Replied to HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
@@ -179,7 +179,7 @@ public class AddonResource implements RESTResource {
     @Path("/services")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getAddonTypes", summary = "Get all add-on types.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonType.class)))) })
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonServiceDTO.class)))) })
     public Response getServices(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language) {
         logger.error("Received HTTP GET request at '{}' {} {}", uriInfo.getPath(), uriInfo.getPathParameters(true), uriInfo.getQueryParameters(true)); // TODO: (Nad) Temp error
@@ -196,7 +196,7 @@ public class AddonResource implements RESTResource {
     @Path("/suggestions")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getSuggestedAddons", summary = "Get suggested add-ons to be installed.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = Addon.class)))), })
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = AddonInfo.class)))), })
     public Response getSuggestions(
             @HeaderParam("Accept-Language") @Parameter(description = "language") @Nullable String language) {
         logger.debug("Received HTTP GET request at '{}'", uriInfo.getPath());
@@ -235,7 +235,7 @@ public class AddonResource implements RESTResource {
     @Path("/{addonId: [a-zA-Z_0-9-:]+}")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getAddonById", summary = "Get add-on with given ID.", responses = {
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = Addon.class))),
+            @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = AddonDTO.class))),
             @ApiResponse(responseCode = "404", description = "Not found") })
             @ApiResponse(responseCode = "422", description = "Version not found")
     public Response getById(
@@ -245,11 +245,11 @@ public class AddonResource implements RESTResource {
             @QueryParam("version") @Parameter(description = "version") @Nullable String version) {
         logger.debug("Received HTTP GET request at '{}'.", uriInfo.getPath());
         Locale locale = localeService.getLocale(language);
-        Addon responseObject = null; //TODO: (Nad) Installed version...?
+        Addon addon = null; //TODO: (Nad) Installed version...?
         if ("all".equals(serviceId)) {
             for (AddonService addonService : getAllServices()) {
-                responseObject = addonService.getAddon(addonId, locale);
-                if (responseObject != null) {
+                addon = addonService.getAddon(addonId, locale);
+                if (addon != null) {
                     break;
                 }
             }
@@ -258,9 +258,9 @@ public class AddonResource implements RESTResource {
             if (addonService == null) {
                 return Response.status(HttpStatus.NOT_FOUND_404).build();
             }
-            responseObject = addonService.getAddon(addonId, locale);
+            addon = addonService.getAddon(addonId, locale);
         }
-        if (responseObject != null) {
+        if (addon != null) {
             Version v = null;
             if (version != null && !version.isBlank()) {
                 try {
@@ -269,24 +269,24 @@ public class AddonResource implements RESTResource {
                     return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
                 }
             }
-            if (responseObject.isVersioned()) {
+            if (addon.isVersioned()) {
                 if (v == null) {
-                    v = responseObject.getInstalledVersion();
+                    v = addon.getInstalledVersion();
                     if (v == null) {
-                        v = responseObject.getDefaultVersion();
+                        v = addon.getDefaultVersion();
                     }
                 }
                 if (v != null) { //TODO: (Nad) Make "merge" fail if current is set?
                     try {
-                        responseObject = responseObject.mergeVersion(v); //TODO: (Nad) Installed can't be merged..!
+                        addon = addon.mergeVersion(v); //TODO: (Nad) Installed can't be merged..!
                     } catch (IllegalArgumentException e) {
                         return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
                     }
                 }
-            } else if (v != null && !v.equals(responseObject.getVersion())){
+            } else if (v != null && !v.equals(addon.getVersion())){
                 return Response.status(HttpStatus.UNPROCESSABLE_ENTITY_422).build();
             }
-            return Response.ok(responseObject).build();
+            return Response.ok(AddonDTO.fromAddon(addon)).build();
         }
 
         return Response.status(HttpStatus.NOT_FOUND_404).build();
@@ -515,8 +515,8 @@ public class AddonResource implements RESTResource {
                 .findFirst().orElse(addonServices.stream().findFirst().orElse(null));
     }
 
-    private Stream<Addon> getAllAddons(@Nullable Locale locale) {
-        return addonServices.stream().map(s -> s.getAddons(locale)).flatMap(Collection::stream);
+    private Stream<AddonDTO> getAllAddons(@Nullable Locale locale) {
+        return addonServices.stream().map(s -> s.getAddons(locale)).flatMap(Collection::stream).map(AddonDTO::fromAddon);
     }
 
     private Set<AddonType> getAllAddonTypes(Locale locale) {
