@@ -30,15 +30,15 @@ public class AddonVersionDTO {
     public String version;
     public String coreRange;
     public String maturity;
-    public Set<String> dependsOn;
+    public Set<@NonNull String> dependsOn;
     public boolean compatible;
     public String documentationLink;
     public String issuesLink;
     public String description;
     public String keywords;
-    public List<String> countries;
-    public Map<String, Object> properties;
-    public List<String> loggerPackages;
+    public List<@NonNull String> countries;
+    public Map<@NonNull String, @NonNull Object> properties;
+    public List<@NonNull String> loggerPackages;
 
     /**
      * Creates a new {@link AddonVersion} from this {@link AddonVersionDTO}.
@@ -100,7 +100,7 @@ public class AddonVersionDTO {
             result.coreRange = vr.toString();
         }
         result.maturity = addonVersion.getMaturity();
-        Set<String> stringSet = addonVersion.getDependsOn();
+        Set<@NonNull String> stringSet = addonVersion.getDependsOn();
         if (!stringSet.isEmpty()) {
             result.dependsOn = stringSet;
         }
@@ -109,11 +109,11 @@ public class AddonVersionDTO {
         result.issuesLink = addonVersion.getIssuesLink();
         result.description = addonVersion.getDescription();
         result.keywords = addonVersion.getKeywords();
-        List<String> stringList = addonVersion.getCountries();
+        List<@NonNull String> stringList = addonVersion.getCountries();
         if (!stringList.isEmpty()) {
             result.countries = stringList;
         }
-        Map<String, Object> map = addonVersion.getProperties();
+        Map<@NonNull String, @NonNull Object> map = addonVersion.getProperties();
         if (!map.isEmpty()) {
             result.properties = map;
         }

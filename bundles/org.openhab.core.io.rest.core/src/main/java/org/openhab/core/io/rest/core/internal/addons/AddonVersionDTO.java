@@ -11,8 +11,6 @@
  * SPDX-License-Identifier: EPL-2.0
  */
 package org.openhab.core.io.rest.core.internal.addons;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNull;
@@ -22,7 +20,7 @@ import org.openhab.core.addon.Version;
 import org.openhab.core.addon.VersionRange;
 
 /**
- * A DTO representing an {@link AddonVersion}.
+ * A DTO representing an {@link AddonVersion} in the REST API.
  *
  * @author Ravi Nadahar - Initial contribution
  */
@@ -34,13 +32,6 @@ public class AddonVersionDTO {
     public boolean stable;
     public @Nullable Set<@NonNull String> dependsOn;
     public boolean compatible;
-    public String documentationLink;
-    public String issuesLink;
-    public String description;
-    public String keywords;
-    public @Nullable List<@NonNull String> countries;
-    public Map<@NonNull String, @NonNull Object> properties;
-    public List<@NonNull String> loggerPackages;
 
     /**
      * Creates a new {@link AddonVersion} from this {@link AddonVersionDTO}.
@@ -62,27 +53,6 @@ public class AddonVersionDTO {
             b.withDependsOn(this.dependsOn);
         }
         b.withCompatible(this.compatible);
-        if (this.documentationLink != null) {
-            b.withDocumentationLink(this.documentationLink);
-        }
-        if (this.issuesLink != null) {
-            b.withIssuesLink(this.issuesLink);
-        }
-        if (this.description != null) {
-            b.withDescription(this.description);
-        }
-        if (this.keywords != null) {
-            b.withKeywords(this.keywords);
-        }
-        if (this.countries != null) {
-            b.withCountries(this.countries);
-        }
-        if (this.properties != null) {
-            b.withProperties(this.properties);
-        }
-        if (this.loggerPackages != null) {
-            b.withLoggerPackages(this.loggerPackages);
-        }
 
         return b.build();
     }
@@ -108,22 +78,6 @@ public class AddonVersionDTO {
             result.dependsOn = stringSet;
         }
         result.compatible = addonVersion.isCompatible();
-        result.documentationLink = addonVersion.getDocumentationLink();
-        result.issuesLink = addonVersion.getIssuesLink();
-        result.description = addonVersion.getDescription();
-        result.keywords = addonVersion.getKeywords();
-        List<@NonNull String> stringList = addonVersion.getCountries();
-        if (!stringList.isEmpty()) {
-            result.countries = stringList;
-        }
-        Map<@NonNull String, @NonNull Object> map = addonVersion.getProperties();
-        if (!map.isEmpty()) {
-            result.properties = map;
-        }
-        stringList = addonVersion.getLoggerPackages();
-        if (!stringList.isEmpty()) {
-            result.loggerPackages = stringList;
-        }
 
         return result;
     }

@@ -29,9 +29,6 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.ext.MessageBodyReader;
 import javax.ws.rs.ext.MessageBodyWriter;
 
-import org.openhab.core.addon.AnnotationExclusionStrategy;
-import org.openhab.core.addon.Version;
-import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.io.rest.RESTConstants;
 import org.openhab.core.library.types.DateTimeType;
 import org.osgi.service.component.annotations.Component;

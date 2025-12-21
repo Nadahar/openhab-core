@@ -26,7 +26,7 @@ import org.openhab.core.addon.AddonVersion;
 import org.openhab.core.addon.Version;
 
 /**
- * A DTO representing an {@link Addon}.
+ * A DTO representing an {@link Addon} in the REST API.
  *
  * @author Ravi Nadahar - Initial contribution
  */
@@ -36,7 +36,6 @@ public class AddonDTO {
     public String id;
     public String label;
     public String version;
-    public String baseVersion;
     public String maturity;
     public String defaultVersion;
     public @Nullable Set<@NonNull String> dependsOn;
@@ -78,9 +77,6 @@ public class AddonDTO {
         }
         if (this.version != null) {
             b.withVersion(Version.valueOf(this.version));
-        }
-        if (this.baseVersion != null) {
-            b.withBaseVersion(Version.valueOf(this.baseVersion));
         }
         if (this.maturity != null) {
             b.withMaturity(this.maturity);
@@ -165,10 +161,6 @@ public class AddonDTO {
         Version v = addon.getVersion();
         if (v != null) {
             result.version = v.toString();
-        }
-        v = addon.getBaseVersion();
-        if (v != null) {
-            result.baseVersion = v.toString();
         }
         result.maturity = addon.getMaturity();
         v = addon.getDefaultVersion();

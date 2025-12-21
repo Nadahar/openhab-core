@@ -25,7 +25,7 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
 /**
@@ -34,53 +34,55 @@ import org.eclipse.jdt.annotation.Nullable;
  * @author Kai Kreuzer - Initial contribution
  * @author Yannick Schaus - Add fields
  */
+@NonNullByDefault
 public class Addon {
     public static final Set<String> CODE_MATURITY_LEVELS = Set.of("alpha", "beta", "mature", "stable");
     public static final String ADDON_SEPARATOR = "-";
     public static final Set<String> MARKETPLACE_RESOURCE_PROPERTIES = Set.of("json_content", "yaml_content",
             "jar_download_url", "kar_download_url", "json_download_url", "yaml_download_url");
 
-    private final @NonNull String uid;
-    private final @NonNull String id;
+    private final String uid;
+
+    private final String id;
     private final @Nullable String label;
     private final @Nullable Version version;
     private final @Nullable Version baseVersion;
     private final @Nullable String maturity;
-    private final @Nullable @Exclude String baseMaturity;
+    private final @Nullable String baseMaturity;
     private final @Nullable Version defaultVersion;
-    private final @NonNull Set<@NonNull String> dependsOn;
-    private final @NonNull @Exclude Set<@NonNull String> baseDependsOn;
+    private final Set<String> dependsOn;
+    private final Set<String> baseDependsOn;
     private final boolean compatible;
-    private final @Exclude boolean baseCompatible;
+    private final boolean baseCompatible;
     private final @Nullable String contentType;
     private final @Nullable String link;
     private final @Nullable String documentationLink;
-    private final @Nullable @Exclude String baseDocumentationLink;
+    private final @Nullable String baseDocumentationLink;
     private final @Nullable String issuesLink;
-    private final @Nullable @Exclude String baseIssuesLink;
-    private final @NonNull String author;
+    private final @Nullable String baseIssuesLink;
+    private final String author;
     private final boolean verifiedAuthor;
     private boolean installed;
     private @Nullable Version installedVersion;
-    private final @NonNull String type;
+    private final String type;
     private final @Nullable String description;
-    private final @Nullable @Exclude String baseDescription;
+    private final @Nullable String baseDescription;
     private final @Nullable String detailedDescription;
-    private final @Nullable @Exclude String baseDetailedDescription;
-    private final @NonNull String configDescriptionURI;
-    private final @NonNull String keywords;
-    private final @NonNull @Exclude String baseKeywords;
-    private final @NonNull List<@NonNull String> countries;
-    private final @NonNull @Exclude List<@NonNull String> baseCountries;
+    private final @Nullable String baseDetailedDescription;
+    private final String configDescriptionURI;
+    private final String keywords;
+    private final String baseKeywords;
+    private final List<String> countries;
+    private final List<String> baseCountries;
     private final @Nullable String license;
-    private final @NonNull String connection;
+    private final String connection;
     private final @Nullable String backgroundColor;
     private final @Nullable String imageLink;
-    private final @NonNull Map<@NonNull String, @NonNull Object> properties;
-    private final @NonNull @Exclude Map<@NonNull String, @NonNull Object> baseProperties;
-    private final @NonNull List<@NonNull String> loggerPackages;
-    private final @NonNull @Exclude List<@NonNull String> baseLoggerPackages;
-    private final @NonNull SortedMap<@NonNull Version, @NonNull AddonVersion> versions;
+    private final Map<String, Object> properties;
+    private final Map<String, Object> baseProperties;
+    private final List<String> loggerPackages;
+    private final List<String> baseLoggerPackages;
+    private final SortedMap<Version, AddonVersion> versions;
 
     /**
      * Creates a new Addon instance
@@ -116,9 +118,9 @@ public class Addon {
      * @param installedVersion the currently installed {@link Version}, if any (may be null)
      * @throws IllegalArgumentException when a mandatory parameter is invalid
      */
-    protected Addon(String uid, String type, String id, @Nullable String label, @Nullable Version version, @Nullable Version baseVersion,
+    protected Addon(@Nullable String uid, @Nullable String type, @Nullable String id, @Nullable String label, @Nullable Version version, @Nullable Version baseVersion,
             @Nullable String maturity, @Nullable String baseMaturity,
-            @Nullable Set<@NonNull String> dependsOn, @Nullable Set<@NonNull String> baseDependsOn,
+            @Nullable Set<String> dependsOn, @Nullable Set<String> baseDependsOn,
             boolean compatible, boolean baseCompatible,
             @Nullable String contentType, @Nullable String link,
             @Nullable String documentationLink, @Nullable String baseDocumentationLink,
@@ -126,12 +128,12 @@ public class Addon {
             boolean installed, @Nullable Version installedVersion, @Nullable String description, @Nullable String baseDescription,
             @Nullable String detailedDescription, @Nullable String baseDetailedDescription, @Nullable String configDescriptionURI,
             @Nullable String keywords, @Nullable String baseKeywords,
-            @Nullable List<@NonNull String> countries, @Nullable List<@NonNull String> baseCountries,
+            @Nullable List<String> countries, @Nullable List<String> baseCountries,
             @Nullable String license, @Nullable String connection,
             @Nullable String backgroundColor, @Nullable String imageLink,
-            @Nullable Map<@NonNull String, @NonNull Object> properties, @Nullable Map<@NonNull String, @NonNull Object> baseProperties,
-            @Nullable List<@NonNull String> loggerPackages, @Nullable List<@NonNull String> baseLoggerPackages,
-            @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions) {
+            @Nullable Map<String, Object> properties, @Nullable Map<String, Object> baseProperties,
+            @Nullable List<String> loggerPackages, @Nullable List<String> baseLoggerPackages,
+            @Nullable Map<Version, AddonVersion> versions) {
         if (uid == null || uid.isBlank()) {
             throw new IllegalArgumentException("uid must not be empty");
         }
@@ -185,7 +187,7 @@ public class Addon {
         if (versions == null || versions.isEmpty()) {
             this.versions = Collections.emptySortedMap();
         } else {
-            SortedMap<@NonNull Version, @NonNull AddonVersion> locVersions = createVersionsMap();
+            SortedMap<Version, AddonVersion> locVersions = createVersionsMap();
             locVersions.putAll(versions);
             this.versions = Collections.unmodifiableSortedMap(locVersions);
         }
@@ -195,21 +197,21 @@ public class Addon {
     /**
      * The type of the addon (same as id of {@link AddonType})
      */
-    public @NonNull String getType() {
+    public String getType() {
         return type;
     }
 
     /**
      * The uid of the add-on (e.g. "binding-dmx", "json:transform-format" or "marketplace:123456")
      */
-    public @NonNull String getUid() {
+    public String getUid() {
         return uid;
     }
 
     /**
      * The id of the add-on (e.g. "influxdb")
      */
-    public @NonNull String getId() {
+    public String getId() {
         return id;
     }
 
@@ -258,7 +260,7 @@ public class Addon {
     /**
      * The author of the add-on
      */
-    public @NonNull String getAuthor() {
+    public String getAuthor() {
         return author;
     }
 
@@ -307,14 +309,14 @@ public class Addon {
     /**
      * The other add-ons this add-on depends on.
      */
-    public @NonNull Set<@NonNull String> getDependsOn() {
+    public Set<String> getDependsOn() {
         return dependsOn;
     }
 
     /**
      * The "base" other add-ons this add-on depends on, if the add-on is versioned.
      */
-    public @NonNull Set<@NonNull String> getBaseDependsOn() {
+    public Set<String> getBaseDependsOn() {
         return baseDependsOn;
     }
 
@@ -370,35 +372,35 @@ public class Addon {
     /**
      * The URI to the configuration description for this add-on
      */
-    public @NonNull String getConfigDescriptionURI() {
+    public String getConfigDescriptionURI() {
         return configDescriptionURI;
     }
 
     /**
      * The keywords for this add-on
      */
-    public @NonNull String getKeywords() {
+    public String getKeywords() {
         return keywords;
     }
 
     /**
      * The "base" keywords for this add-on, if the add-on is versioned.
      */
-    public @NonNull String getBaseKeywords() {
+    public String getBaseKeywords() {
         return baseKeywords;
     }
 
     /**
      * A list of ISO 3166 codes relevant to this add-on
      */
-    public @NonNull List<@NonNull String> getCountries() {
+    public List<String> getCountries() {
         return countries;
     }
 
     /**
      * The "base" list of ISO 3166 codes relevant to this add-on, if the add-on is versioned.
      */
-    public @NonNull List<@NonNull String> getBaseCountries() {
+    public List<String> getBaseCountries() {
         return baseCountries;
     }
 
@@ -412,21 +414,21 @@ public class Addon {
     /**
      * A string describing the type of connection (local, cloud, cloudDiscovery) this add-on uses, if applicable.
      */
-    public @NonNull String getConnection() {
+    public String getConnection() {
         return connection;
     }
 
     /**
      * A set of additional properties relative to this add-on
      */
-    public @NonNull Map<@NonNull String, @NonNull Object> getProperties() {
+    public Map<String, Object> getProperties() {
         return properties;
     }
 
     /**
      * The "base" set of additional properties relative to this add-on, if the add-on is versioned.
      */
-    public @NonNull Map<@NonNull String, @NonNull Object> getBaseProperties() {
+    public Map<String, Object> getBaseProperties() {
         return baseProperties;
     }
 
@@ -477,14 +479,14 @@ public class Addon {
     /**
      * The package names that are associated with this add-on
      */
-    public @NonNull List<@NonNull String> getLoggerPackages() {
+    public List<String> getLoggerPackages() {
         return loggerPackages;
     }
 
     /**
      * The "base" package names that are associated with this add-on, if the add-on is versioned.
      */
-    public @NonNull List<@NonNull String> getBaseLoggerPackages() {
+    public List<String> getBaseLoggerPackages() {
         return baseLoggerPackages;
     }
 
@@ -495,7 +497,7 @@ public class Addon {
     /**
      * The {@link SortedMap} containing the {@link AddonVersion}s, if any
      */
-    public @NonNull SortedMap<@NonNull Version, @NonNull AddonVersion> getVersions() {
+    public SortedMap<Version, AddonVersion> getVersions() {
         return versions;
     }
 
@@ -507,7 +509,7 @@ public class Addon {
      * @return The merged {@link Addon}
      * @throws IllegalArgumentException If the version doesn't exist
      */
-    public @NonNull Addon mergeVersion(@NonNull Version version) {
+    public Addon mergeVersion(Version version) {
         if (version.equals(this.version)) {
             return this;
         }
@@ -520,7 +522,7 @@ public class Addon {
         Builder builder = new Builder(this, false);
         builder.withVersion(version).withCompatible(addonVersion.isCompatible());
         if (!addonVersion.getCountries().isEmpty()) {
-            List<@NonNull String> c = new ArrayList<>(baseCountries);
+            List<String> c = new ArrayList<>(baseCountries);
             for (String country : addonVersion.getCountries()) {
                 if (!c.contains(country)) {
                     c.add(country);
@@ -564,7 +566,7 @@ public class Addon {
         builder.withMaturity((s = addonVersion.getMaturity()) != null && !s.isBlank() ? s : baseMaturity);
 
         if (!addonVersion.getLoggerPackages().isEmpty()) {
-            List<@NonNull String> l = new ArrayList<>(baseLoggerPackages);
+            List<String> l = new ArrayList<>(baseLoggerPackages);
             for (String lPackage : addonVersion.getLoggerPackages()) {
                 if (!l.contains(lPackage)) {
                     l.add(lPackage);
@@ -576,7 +578,7 @@ public class Addon {
         }
 
         if (!addonVersion.getDependsOn().isEmpty()) {
-            Set<@NonNull String> deps;
+            Set<String> deps;
             if (!(deps = baseDependsOn).isEmpty()) {
                 builder.withDependsOn(Stream.concat(deps.stream(), addonVersion.getDependsOn().stream())
                         .distinct().collect(Collectors.toSet()));
@@ -588,7 +590,7 @@ public class Addon {
         }
 
         // Remove "resource" properties, they shouldn't be part of the merge
-        Map<@NonNull String, @NonNull Object> newProperties = baseProperties.entrySet().stream()
+        Map<String, Object> newProperties = baseProperties.entrySet().stream()
                 .filter(e -> !MARKETPLACE_RESOURCE_PROPERTIES.contains(e.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         newProperties.putAll(addonVersion.getProperties());
@@ -607,7 +609,7 @@ public class Addon {
             return this.versions.firstKey();
         }
 
-        List<@NonNull AddonVersion> versions = new ArrayList<>(this.versions.values());
+        List<AddonVersion> versions = new ArrayList<>(this.versions.values());
         versions.sort(new Comparator<AddonVersion>() {
 
             @Override
@@ -632,7 +634,7 @@ public class Addon {
         return versions.get(0).getVersion();
     }
 
-    protected SortedMap<@NonNull Version, @NonNull AddonVersion> createVersionsMap() {
+    protected SortedMap<Version, AddonVersion> createVersionsMap() {
         return new TreeMap<>(new Comparator<Version>() {
 
             @Override
@@ -687,15 +689,15 @@ public class Addon {
 
     public static class Builder {
         protected boolean setBase = true;
-        protected final @NonNull String uid;
+        protected final String uid;
         protected @Nullable String id;
         protected @Nullable String label;
         protected @Nullable Version version;
         protected @Nullable Version baseVersion;
         protected @Nullable String maturity;
         protected @Nullable String baseMaturity;
-        protected @Nullable Set<@NonNull String> dependsOn;
-        protected @Nullable Set<@NonNull String> baseDependsOn;
+        protected @Nullable Set<String> dependsOn;
+        protected @Nullable Set<String> baseDependsOn;
         protected boolean compatible = true;
         protected boolean baseCompatible = true;
         protected @Nullable String contentType;
@@ -716,24 +718,24 @@ public class Addon {
         protected @Nullable String configDescriptionURI;
         protected @Nullable String keywords;
         protected @Nullable String baseKeywords;
-        protected @Nullable List<@NonNull String> countries;
-        protected @Nullable List<@NonNull String> baseCountries;
+        protected @Nullable List<String> countries;
+        protected @Nullable List<String> baseCountries;
         protected @Nullable String license;
         protected @Nullable String connection;
         protected @Nullable String backgroundColor;
         protected @Nullable String imageLink;
-        protected @Nullable Map<@NonNull String, @NonNull Object> properties;
-        protected @Nullable Map<@NonNull String, @NonNull Object> baseProperties;
-        protected @Nullable List<@NonNull String> loggerPackages;
-        protected @Nullable List<@NonNull String> baseLoggerPackages;
-        protected @Nullable Map<@NonNull Version, @NonNull AddonVersion> versions;
+        protected @Nullable Map<String, Object> properties;
+        protected @Nullable Map<String, Object> baseProperties;
+        protected @Nullable List<String> loggerPackages;
+        protected @Nullable List<String> baseLoggerPackages;
+        protected @Nullable Map<Version, AddonVersion> versions;
 
-        protected Builder(@NonNull String uid, boolean setBase) {
+        protected Builder(String uid, boolean setBase) {
             this.setBase = setBase;
             this.uid = uid;
         }
 
-        protected Builder(@NonNull Addon addon, boolean setBase) {
+        protected Builder(Addon addon, boolean setBase) {
             this.setBase = setBase;
             this.uid = addon.uid;
             this.id = addon.id;
@@ -779,17 +781,17 @@ public class Addon {
             this.versions = new HashMap<>(addon.versions);
         }
 
-        public Builder withType(String type) {
+        public Builder withType(@Nullable String type) {
             this.type = type;
             return this;
         }
 
-        public Builder withId(String id) {
+        public Builder withId(@Nullable String id) {
             this.id = id;
             return this;
         }
 
-        public Builder withLabel(String label) {
+        public Builder withLabel(@Nullable String label) {
             this.label = label;
             return this;
         }
@@ -826,11 +828,11 @@ public class Addon {
             return this;
         }
 
-        public @Nullable Set<@NonNull String> getDependsOn() {
+        public @Nullable Set<String> getDependsOn() {
             return dependsOn;
         }
 
-        public Builder withDependsOn(@Nullable Set<@NonNull String> dependsOn) {
+        public Builder withDependsOn(@Nullable Set<String> dependsOn) {
             this.dependsOn = dependsOn;
             if (this.setBase) {
                 this.baseDependsOn = dependsOn;
@@ -838,7 +840,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withBaseDependsOn(@Nullable Set<@NonNull String> baseDependsOn) {
+        public Builder withBaseDependsOn(@Nullable Set<String> baseDependsOn) {
             if (this.setBase) {
                 throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
             }
@@ -862,12 +864,12 @@ public class Addon {
             return this;
         }
 
-        public Builder withContentType(String contentType) {
+        public Builder withContentType(@Nullable String contentType) {
             this.contentType = contentType;
             return this;
         }
 
-        public Builder withLink(String link) {
+        public Builder withLink(@Nullable String link) {
             this.link = link;
             return this;
         }
@@ -905,11 +907,11 @@ public class Addon {
         }
 
         public Builder withAuthor(@Nullable String author) {
-            this.author = Objects.requireNonNullElse(author, "");
+            this.author = author;
             return this;
         }
 
-        public Builder withAuthor(String author, boolean verifiedAuthor) {
+        public Builder withAuthor(@Nullable String author, boolean verifiedAuthor) {
             this.author = author;
             this.verifiedAuthor = verifiedAuthor;
             return this;
@@ -979,11 +981,11 @@ public class Addon {
             return this;
         }
 
-        public @Nullable List<@NonNull String> getCountries() {
+        public @Nullable List<String> getCountries() {
             return countries;
         }
 
-        public Builder withCountries(@Nullable List<@NonNull String> countries) {
+        public Builder withCountries(@Nullable List<String> countries) {
             this.countries = countries;
             if (this.setBase) {
                 this.baseCountries = countries;
@@ -991,7 +993,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withBaseCountries(@Nullable List<@NonNull String> baseCountries) {
+        public Builder withBaseCountries(@Nullable List<String> baseCountries) {
             if (this.setBase) {
                 throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
             }
@@ -1004,12 +1006,12 @@ public class Addon {
             return this;
         }
 
-        public Builder withConnection(String connection) {
+        public Builder withConnection(@Nullable String connection) {
             this.connection = connection;
             return this;
         }
 
-        public Builder withBackgroundColor(String backgroundColor) {
+        public Builder withBackgroundColor(@Nullable String backgroundColor) {
             this.backgroundColor = backgroundColor;
             return this;
         }
@@ -1019,8 +1021,8 @@ public class Addon {
             return this;
         }
 
-        public Builder withProperty(@NonNull String key, @NonNull Object value) {
-            Map<@NonNull String, @NonNull Object> props = this.properties;
+        public Builder withProperty(String key, Object value) {
+            Map<String, Object> props = this.properties;
             if (props == null) {
                 props = new HashMap<>();
             }
@@ -1032,11 +1034,11 @@ public class Addon {
             return this;
         }
 
-        public Builder withBaseProperty(@NonNull String key, @NonNull Object value) {
+        public Builder withBaseProperty(String key, Object value) {
             if (this.setBase) {
                 throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
             }
-            Map<@NonNull String, @NonNull Object> baseProps = this.baseProperties;
+            Map<String, Object> baseProps = this.baseProperties;
             if (baseProps == null) {
                 baseProps = new HashMap<>();
             }
@@ -1045,7 +1047,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withProperties(@Nullable Map<@NonNull String, @NonNull Object> properties) {
+        public Builder withProperties(@Nullable Map<String, Object> properties) {
             this.properties = properties;
             if (this.setBase) {
                 this.baseProperties = properties;
@@ -1053,7 +1055,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withBaseProperties(@Nullable Map<@NonNull String, @NonNull Object> baseProperties) {
+        public Builder withBaseProperties(@Nullable Map<String, Object> baseProperties) {
             if (this.setBase) {
                 throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
             }
@@ -1061,11 +1063,11 @@ public class Addon {
             return this;
         }
 
-        public @Nullable List<@NonNull String> getLoggerPackages() {
+        public @Nullable List<String> getLoggerPackages() {
             return loggerPackages;
         }
 
-        public Builder withLoggerPackages(@Nullable List<@NonNull String> loggerPackages) {
+        public Builder withLoggerPackages(@Nullable List<String> loggerPackages) {
             this.loggerPackages = loggerPackages;
             if (this.setBase) {
                 this.baseLoggerPackages = loggerPackages;
@@ -1073,7 +1075,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withBaseLoggerPackages(@Nullable List<@NonNull String> baseLoggerPackages) {
+        public Builder withBaseLoggerPackages(@Nullable List<String> baseLoggerPackages) {
             if (this.setBase) {
                 throw new UnsupportedOperationException("Setting of 'base' fields not allowed");
             }
@@ -1082,12 +1084,12 @@ public class Addon {
         }
 
         @Nullable
-        public Map<@NonNull Version, @NonNull AddonVersion> getVersions() {
+        public Map<Version, AddonVersion> getVersions() {
             return versions;
         }
 
-        public Builder withAddonVersion(@NonNull AddonVersion addonVersion) {
-            Map<@NonNull Version, @NonNull AddonVersion> locVersions = versions;
+        public Builder withAddonVersion(AddonVersion addonVersion) {
+            Map<Version, AddonVersion> locVersions = versions;
             if (locVersions == null) {
                 locVersions = new HashMap<>();
             }
@@ -1096,7 +1098,7 @@ public class Addon {
             return this;
         }
 
-        public Builder withAddonVersions(@Nullable Map<@NonNull Version, @NonNull AddonVersion> versions) {
+        public Builder withAddonVersions(@Nullable Map<Version, AddonVersion> versions) {
             this.versions = versions;
             return this;
         }

@@ -39,7 +39,6 @@ import org.openhab.core.addon.AddonInfoRegistry;
 import org.openhab.core.addon.AddonService;
 import org.openhab.core.addon.AddonType;
 import org.openhab.core.addon.Version;
-import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.addon.dto.AddonDTO;
 import org.openhab.core.cache.ExpiringCache;
 import org.openhab.core.common.ThreadPoolManager;
@@ -83,8 +82,7 @@ public abstract class AbstractRemoteAddonService implements AddonService, Bundle
 
     protected final Version coreVersion;
 
-    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-        .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create();
+    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
     protected final CopyOnWriteArraySet<MarketplaceAddonHandler> addonHandlers = new CopyOnWriteArraySet<>();
     // Guarded by "this"
     protected final Storage<AddonDTO> installedAddonStorage;
@@ -135,7 +133,7 @@ public abstract class AbstractRemoteAddonService implements AddonService, Bundle
         } else if (addonObject instanceof String s) {
             // In previous versions stored items were "double wrapped" in JSON, this is here to make sure add-ons
             // stored by a previous version can still be read.
-            storedAddon = Objects.requireNonNull(gson.fromJson(s, Addon.class));
+            storedAddon = Objects.requireNonNull(gson.fromJson(s, AddonDTO.class)).toAddon();
         } else if (addonObject == null) {
             throw new IllegalArgumentException("Stored addon is null");
         } else {

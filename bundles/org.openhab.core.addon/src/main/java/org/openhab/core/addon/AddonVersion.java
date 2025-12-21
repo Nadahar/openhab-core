@@ -8,16 +8,12 @@ import java.util.Set;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 
-import com.google.gson.annotations.SerializedName;
-
 
 @NonNullByDefault
 public class AddonVersion {
 
     protected final Version version;
-    protected final @Nullable VersionRange coreRangeObj;
-    @SerializedName("coreRange")
-    protected final @Nullable String coreRangeString;
+    protected final @Nullable VersionRange coreRange;
     protected final @Nullable String maturity;
     protected final boolean stable;
     protected final Set<String> dependsOn;
@@ -36,8 +32,7 @@ public class AddonVersion {
         @Nullable List<String> countries, @Nullable Map<String, Object> properties,
         @Nullable List<String> loggerPackages) {
         this.version = version;
-        this.coreRangeObj = coreRange;
-        this.coreRangeString = coreRange == null ? null : coreRange.toString();
+        this.coreRange = coreRange;
         this.maturity = maturity;
         this.stable = resoleStable(version, maturity);
         this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
@@ -56,7 +51,7 @@ public class AddonVersion {
     }
 
     public @Nullable VersionRange getCoreRange() {
-        return coreRangeObj;
+        return coreRange;
     }
 
     public @Nullable String getMaturity() {
@@ -107,8 +102,9 @@ public class AddonVersion {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(getClass().getSimpleName()).append(" [").append("version=").append(version).append(", ");
-        if (coreRangeString != null) {
-            sb.append("coreRange=").append(coreRangeString).append(", ");
+        VersionRange range = coreRange;
+        if (range != null) {
+            sb.append("coreRange=").append(range.toString()).append(", ");
         }
         if (maturity != null) {
             sb.append("maturity=").append(maturity).append(", ");

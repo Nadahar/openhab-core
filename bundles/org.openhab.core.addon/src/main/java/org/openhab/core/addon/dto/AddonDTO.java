@@ -36,8 +36,8 @@ public class AddonDTO {
     public String baseVersion;
     public String maturity;
     public String baseMaturity;
-    public Set<String> dependsOn;
-    public Set<String> baseDependsOn;
+    public Set<@NonNull String> dependsOn;
+    public Set<@NonNull String> baseDependsOn;
     public boolean compatible;
     public Boolean baseCompatible;
     public String contentType;
@@ -58,17 +58,17 @@ public class AddonDTO {
     public String configDescriptionURI;
     public String keywords;
     public String baseKeywords;
-    public List<String> countries;
-    public List<String> baseCountries;
+    public List<@NonNull String> countries;
+    public List<@NonNull String> baseCountries;
     public String license;
     public String connection;
     public String backgroundColor;
     public String imageLink;
-    public Map<String, Object> properties;
-    public Map<String, Object> baseProperties;
-    public List<String> loggerPackages;
-    public List<String> baseLoggerPackages;
-    public LinkedHashMap<String, AddonVersionDTO> versions;
+    public Map<@NonNull String, @NonNull Object> properties;
+    public Map<@NonNull String, @NonNull Object> baseProperties;
+    public List<@NonNull String> loggerPackages;
+    public List<@NonNull String> baseLoggerPackages;
+    public LinkedHashMap<@NonNull String, @NonNull AddonVersionDTO> versions;
 
     /**
      * Creates a new {@link Addon} from this {@link AddonDTO}.
@@ -209,7 +209,7 @@ public class AddonDTO {
         }
         result.maturity = addon.getMaturity();
         result.baseMaturity = addon.getBaseMaturity();
-        Set<String> stringSet = addon.getDependsOn();
+        Set<@NonNull String> stringSet = addon.getDependsOn();
         if (!stringSet.isEmpty()) {
             result.dependsOn = stringSet;
         }
@@ -240,7 +240,7 @@ public class AddonDTO {
         result.configDescriptionURI = addon.getConfigDescriptionURI();
         result.keywords = addon.getKeywords();
         result.baseKeywords = addon.getBaseKeywords();
-        List<String> stringList = addon.getCountries();
+        List<@NonNull String> stringList = addon.getCountries();
         if (!stringList.isEmpty()) {
             result.countries = stringList;
         }
@@ -252,7 +252,7 @@ public class AddonDTO {
         result.connection = addon.getConnection();
         result.backgroundColor = addon.getBackgroundColor();
         result.imageLink = addon.getImageLink();
-        Map<String, Object> map = addon.getProperties();
+        Map<@NonNull String, @NonNull Object> map = addon.getProperties();
         if (!map.isEmpty()) {
             result.properties = map;
         }

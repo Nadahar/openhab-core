@@ -33,7 +33,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.OpenHAB;
 import org.openhab.core.addon.Version;
-import org.openhab.core.addon.VersionTypeAdapter;
 import org.openhab.core.util.UIDUtils;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -67,8 +66,7 @@ public abstract class MarketplaceBundleInstaller {
 
     private static final Path BUNDLE_CACHE_PATH = Path.of(OpenHAB.getUserDataFolder(), "marketplace", "bundles");
 
-    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-        .registerTypeAdapter(Version.class, new VersionTypeAdapter()).create(); // TODO: (Nad) Consider needed adapters
+    protected final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").create();
 
     /**
      * Downloads a bundle file from a remote source and puts it in the local cache with the add-on ID.
