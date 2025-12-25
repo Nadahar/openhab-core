@@ -34,7 +34,7 @@ public class AddonVersion {
         this.version = version;
         this.coreRange = coreRange;
         this.maturity = maturity;
-        this.stable = resoleStable(version, maturity);
+        this.stable = resolveStable(version, maturity);
         this.dependsOn = dependsOn == null ? Set.of() : Set.copyOf(dependsOn);
         this.compatible = compatible;
         this.documentationLink = documentationLink;
@@ -128,7 +128,7 @@ public class AddonVersion {
         return sb.toString();
     }
 
-    protected boolean resoleStable(@Nullable Version version, @Nullable String maturity) {
+    protected boolean resolveStable(@Nullable Version version, @Nullable String maturity) {
         if (version == null || Version.EMPTY_VERSION.equals(version)) {
             return false;
         }
