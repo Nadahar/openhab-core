@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -41,6 +42,7 @@ import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionParameterBuilder;
 import org.openhab.core.i18n.TimeZoneProvider;
 import org.openhab.core.i18n.UnitProvider;
+import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.types.util.UnitUtils;
@@ -309,9 +311,25 @@ public class ActionInputsHelper {
                             }
                             yield ((LocalDateTime) dt).atZone(timeZoneProvider.getTimeZone());
                         }
-                        case "java.time.Instant" ->
-                            // Accepted format is: 2007-12-03T10:15:30
-                            LocalDateTime.parse(valueString).atZone(timeZoneProvider.getTimeZone()).toInstant();
+                        case "java.time.Instant" -> {
+                            /*
+                             * Accepted format is one of:
+                             * - 2007-12-03T10:15:30
+                             * - 2007-12-03T10:15:30+01:00
+                             * - 2007-12-03T10:15:30+01:00[Europe/Paris]
+                             *
+                             * UTC is assumed if no time zone is specified
+                             */
+                            TemporalAccessor dt = DateTimeFormatter.ISO_DATE_TIME.parseBest(valueString,
+                                    ZonedDateTime::from, LocalDateTime::from);
+                            if (dt instanceof ZonedDateTime zdt) {
+                                yield zdt.toInstant();
+                            }
+                            yield ((LocalDateTime) dt).atOffset(ZoneOffset.UTC).toInstant();
+                        }
+                        case "org.openhab.core.library.types.DateTimeType" ->
+                            // Accepted formats are those supported by the DateTimeType constructor
+                            new DateTimeType(valueString);
                         case "java.time.Duration" ->
                             // Accepted format is: P2DT17H25M30.5S
                             Duration.parse(valueString);
