@@ -12,13 +12,18 @@
  */
 package org.openhab.core.library.types;
 
+import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.Temporal;
+import java.time.zone.ZoneRulesException;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -71,7 +76,10 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     private static final DateTimeFormatter FORMATTER_TZ_RFC = DateTimeFormatter
             .ofPattern(DATE_FORMAT_PATTERN_WITH_TZ_RFC);
 
-    private Instant instant;
+    private final Instant instant;
+    private final ZoneOffset zoneOffset;
+    private final ZoneId zoneId;
+    private final boolean authoritativeZone;
 
     /**
      * Creates a new {@link DateTimeType} representing the current
@@ -82,73 +90,151 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-     * Creates a new {@link DateTimeType} with the given value.
+     * Creates a new {@link DateTimeType} with the given value without an authoritative timezone.
+     * <p>
+     * <b>Note:</b> For the timezone to be preserved, used one of the other constructors.
      *
-     * @param instant
+     * @param instant the moment in time.
      */
     public DateTimeType(Instant instant) {
         this.instant = instant;
+        ZoneId zoneId = ZoneId.systemDefault();
+        this.zoneId = zoneId;
+        if (zoneId instanceof ZoneOffset zoneOffset) {
+            this.zoneOffset = zoneOffset;
+        } else {
+            this.zoneOffset = zoneId.getRules().getOffset(instant);
+        }
+        this.authoritativeZone = false;
+    }
+
+    // TODO: (Nad) JavaDocs everywhere
+    public DateTimeType(Instant instant, ZoneId zoneId) {
+        this.instant = instant;
+        this.zoneId = zoneId;
+        if (zoneId instanceof ZoneOffset offset) {
+            this.zoneOffset = offset;
+        } else {
+            this.zoneOffset = zoneId.getRules().getOffset(instant);
+        }
+        this.authoritativeZone = true;
+    }
+
+    public DateTimeType(Instant instant, ZoneOffset zoneOffset) {
+        this.instant = instant;
+        this.zoneId = zoneOffset;
+        this.zoneOffset = zoneOffset;
+        this.authoritativeZone = true;
+    }
+
+    // Doc: Authoritative unless both null
+    public DateTimeType(Instant instant, @Nullable ZoneId zoneId, @Nullable ZoneOffset zoneOffset) {
+        this.instant = instant;
+        ZoneId resolvedZoneId;
+        ZoneOffset resolvedOffset;
+        boolean resolvedAuthoritative;
+        if (zoneId instanceof ZoneOffset offset) {
+            resolvedZoneId = zoneId;
+            resolvedOffset = offset;
+            resolvedAuthoritative = true;
+        } else if (zoneId == null) {
+            if (zoneOffset == null) {
+                resolvedZoneId = ZoneId.systemDefault();
+                if (resolvedZoneId instanceof ZoneOffset offset) {
+                    resolvedOffset = offset;
+                } else {
+                    resolvedOffset = resolvedZoneId.getRules().getOffset(instant);
+                }
+                resolvedAuthoritative = false;
+            } else {
+                resolvedZoneId = zoneOffset;
+                resolvedOffset = zoneOffset;
+                resolvedAuthoritative = true;
+            }
+        } else {
+            resolvedZoneId = zoneId;
+            resolvedOffset = zoneId.getRules().getOffset(instant);
+            resolvedAuthoritative = true;
+        }
+
+        this.zoneId = resolvedZoneId;
+        this.zoneOffset = resolvedOffset;
+        this.authoritativeZone = resolvedAuthoritative;
     }
 
     /**
-     * Creates a new {@link DateTimeType} with the given value.
-     * The time-zone information will be discarded, only the
-     * resulting {@link Instant} is preserved.
+     * Creates a new {@link DateTimeType} with the given value with an authoritative timezone.
      *
-     * @param zoned
+     * @param zoned the moment in time.
      */
     public DateTimeType(ZonedDateTime zoned) {
         instant = zoned.toInstant();
+        zoneId = zoned.getZone();
+        zoneOffset = zoned.getOffset();
+        authoritativeZone = true;
     }
 
+    // doc: throws
     public DateTimeType(String zonedValue) {
         try {
             // direct parsing (date and time)
+            Temporal temporal;
             try {
                 if (DATE_PARSE_PATTERN_WITH_SPACE.matcher(zonedValue).matches()) {
-                    instant = parse(zonedValue.substring(0, 10) + "T" + zonedValue.substring(11));
+                    temporal = parse(zonedValue.substring(0, 10) + "T" + zonedValue.substring(11));
                 } else {
-                    instant = parse(zonedValue);
+                    temporal = parse(zonedValue);
                 }
             } catch (DateTimeParseException fullDtException) {
                 // time only
                 try {
-                    instant = parse("1970-01-01T" + zonedValue);
+                    temporal = parse("1970-01-01T" + zonedValue);
                 } catch (DateTimeParseException timeOnlyException) {
                     try {
                         long epoch = Double.valueOf(zonedValue).longValue();
                         int length = (int) (Math.log10(epoch >= 0 ? epoch : epoch * -1) + 1);
                         // Assume that below 12 digits we're in seconds
                         if (length < 12) {
-                            instant = Instant.ofEpochSecond(epoch);
+                            temporal = Instant.ofEpochSecond(epoch);
                         } else {
-                            instant = Instant.ofEpochMilli(epoch);
+                            temporal = Instant.ofEpochMilli(epoch);
                         }
                     } catch (NumberFormatException notANumberException) {
                         // date only
                         if (zonedValue.length() == 10) {
-                            instant = parse(zonedValue + "T00:00:00");
+                            temporal = parse(zonedValue + "T00:00:00");
                         } else {
-                            instant = parse(zonedValue.substring(0, 10) + "T00:00:00" + zonedValue.substring(10));
+                            temporal = parse(zonedValue.substring(0, 10) + "T00:00:00" + zonedValue.substring(10));
                         }
                     }
                 }
             }
+            if (temporal instanceof LocalDateTime localDateTime) {
+                temporal = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
+                this.authoritativeZone = false;
+            } else if (temporal instanceof Instant instant) {
+                temporal = instant.atZone(ZoneId.systemDefault());
+                this.authoritativeZone = false;
+            } else {
+                this.authoritativeZone = true;
+            }
+            ZonedDateTime zdt = (ZonedDateTime) temporal;
+            instant = zdt.toInstant();
+            zoneId = zdt.getZone();
+            zoneOffset = zdt.getOffset();
         } catch (DateTimeParseException invalidFormatException) {
             throw new IllegalArgumentException(zonedValue + " is not in a valid format.", invalidFormatException);
         }
     }
 
     /**
-     * @deprecated
      *             Get object represented as a {@link ZonedDateTime} with system
      *             default time-zone applied
      *
      * @return a {@link ZonedDateTime} representation of the object
      */
-    @Deprecated
     public ZonedDateTime getZonedDateTime() {
-        return getZonedDateTime(ZoneId.systemDefault());
+        return getZonedDateTime(zoneId);
     }
 
     /**
@@ -162,23 +248,37 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-     * Get the {@link Instant} value of the object
+     * Get the current object represented in UTC as an {@link Instant}.
      *
-     * @return the {@link Instant} value of the object
+     * @return The resulting UTC {@link Instant}.
      */
     public Instant getInstant() {
         return instant;
+    }
+
+    public ZoneId getZoneId() {
+        return zoneId;
+    }
+
+    public ZoneOffset getZoneOffset() {
+        return zoneOffset;
+    }
+
+    public boolean isZoneAuthoritative() {
+        return authoritativeZone;
     }
 
     public static DateTimeType valueOf(String value) {
         return new DateTimeType(value);
     }
 
+    @Deprecated(forRemoval = false)
     @Override
     public String format(@Nullable String pattern) {
         return format(pattern, ZoneId.systemDefault());
     }
 
+    @Deprecated(forRemoval = false)
     public String format(@Nullable String pattern, ZoneId zoneId) {
         ZonedDateTime zonedDateTime = instant.atZone(zoneId);
         if (pattern == null) {
@@ -188,18 +288,52 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return String.format(pattern, zonedDateTime);
     }
 
+    @Deprecated(forRemoval = false)
     public String format(Locale locale, String pattern) {
         return String.format(locale, pattern, getZonedDateTime());
     }
 
+    public String format(Locale locale, @Nullable String pattern, ZoneId zoneId) {
+        ZonedDateTime zonedDateTime = instant.atZone(zoneId);
+        if (pattern == null) {
+            return DateTimeFormatter.ofPattern(DATE_PATTERN, locale).format(zonedDateTime);
+        }
+
+        return String.format(locale, pattern, zonedDateTime);
+    }
+
+    /**
+    *
+    * TODO: (Nad) Authoritative
+    * @param zone the target zone as a string
+    * @return a {@link DateTimeType} translated to the given zone
+    * @throws DateTimeException if the zone has an invalid format or the result exceeds the supported date range
+    * @throws ZoneRulesException if the zone is a region ID that cannot be found
+    */
+   public DateTimeType toZone(String zone) throws DateTimeException, ZoneRulesException {
+       return toZone(ZoneId.of(zone));
+   }
+
+   /**
+    * Create a {@link DateTimeType} being the translation of the current object to a given zone
+    *             Create a {@link DateTimeType} being the translation of the current object to a given zone
+    * TODO: (Nad) Authoritative
+    * @param zoneId the target {@link ZoneId}
+    * @return a {@link DateTimeType} translated to the given zone
+    * @throws DateTimeException if the result exceeds the supported date range
+    */
+   public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
+       return new DateTimeType(instant, zoneId, null);
+   }
+
     @Override
     public String toString() {
-        return toFullString();
+        return toFullString(zoneId);
     }
 
     @Override
     public String toFullString() {
-        return toFullString(ZoneId.systemDefault());
+        return toFullString(zoneId);
     }
 
     public String toFullString(ZoneId zoneId) {
@@ -222,10 +356,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + instant.hashCode();
-        return result;
+        return Objects.hash(authoritativeZone, instant, zoneId, zoneOffset);
     }
 
     @Override
@@ -233,42 +364,39 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         if (this == obj) {
             return true;
         }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
+        if (!(obj instanceof DateTimeType)) {
             return false;
         }
         DateTimeType other = (DateTimeType) obj;
-        return instant.compareTo(other.instant) == 0;
+        return authoritativeZone == other.authoritativeZone && Objects.equals(instant, other.instant)
+                && Objects.equals(zoneId, other.zoneId) && Objects.equals(zoneOffset, other.zoneOffset);
     }
 
     @Override
-    public int compareTo(DateTimeType o) {
+    public int compareTo(DateTimeType o) { //TODO: (Nad) What here? Look at ZDT
         return instant.compareTo(o.getInstant());
     }
 
-    private Instant parse(String value) throws DateTimeParseException {
-        ZonedDateTime date;
+    private Temporal parse(String value) throws DateTimeParseException {
+        ZonedDateTime result;
         try {
-            date = ZonedDateTime.parse(value, PARSER_TZ_RFC);
+            result = ZonedDateTime.parse(value, PARSER_TZ_RFC);
         } catch (DateTimeParseException tzMsRfcException) {
             try {
-                date = ZonedDateTime.parse(value, PARSER_TZ_ISO);
+                result = ZonedDateTime.parse(value, PARSER_TZ_ISO);
             } catch (DateTimeParseException tzMsIsoException) {
                 try {
-                    date = ZonedDateTime.parse(value, PARSER_TZ);
+                    result = ZonedDateTime.parse(value, PARSER_TZ);
                 } catch (DateTimeParseException tzException) {
                     try {
-                        date = ZonedDateTime.parse(value);
+                        result = ZonedDateTime.parse(value);
                     } catch (DateTimeParseException e) {
-                        LocalDateTime localDateTime = LocalDateTime.parse(value, PARSER);
-                        date = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
+                        return LocalDateTime.parse(value, PARSER);
                     }
                 }
             }
         }
 
-        return date.toInstant();
+        return result;
     }
 }
