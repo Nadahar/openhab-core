@@ -90,9 +90,9 @@ public class EnrichedItemDTOMapper {
             parents.add(item);
         }
         String state;
-        if (item instanceof DateTimeItem dateTimeItem && zoneId != null) {
+        if (item instanceof DateTimeItem dateTimeItem) {
             DateTimeType dateTime = dateTimeItem.getStateAs(DateTimeType.class);
-            if (dateTime == null) {
+            if (dateTime == null || zoneId == null || dateTime.isZoneAuthoritative()) {
                 state = item.getState().toFullString();
             } else {
                 state = dateTime.toFullString(zoneId);
