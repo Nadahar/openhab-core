@@ -92,7 +92,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     /**
      * Creates a new {@link DateTimeType} with the given value without an authoritative timezone.
      * <p>
-     * <b>Note:</b> For the timezone to be preserved, used one of the other constructors.
+     * <b>Note:</b> For the timezone to be preserved, use one of the other constructors.
      *
      * @param instant the moment in time.
      */
@@ -117,13 +117,6 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         } else {
             this.zoneOffset = zoneId.getRules().getOffset(instant);
         }
-        this.authoritativeZone = true;
-    }
-
-    public DateTimeType(Instant instant, ZoneOffset zoneOffset) {
-        this.instant = instant;
-        this.zoneId = zoneOffset;
-        this.zoneOffset = zoneOffset;
         this.authoritativeZone = true;
     }
 
@@ -168,68 +161,38 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      * @param zoned the moment in time.
      */
     public DateTimeType(ZonedDateTime zoned) {
-        instant = zoned.toInstant();
-        zoneId = zoned.getZone();
-        zoneOffset = zoned.getOffset();
-        authoritativeZone = true;
+        this(zoned, true);
+    }
+
+    public DateTimeType(ZonedDateTime zoned, boolean authoritativeZone) {
+        this.instant = zoned.toInstant();
+        this.zoneId = zoned.getZone();
+        this.zoneOffset = zoned.getOffset();
+        this.authoritativeZone = authoritativeZone;
     }
 
     // doc: throws
-    public DateTimeType(String zonedValue) {
-        try {
-            // direct parsing (date and time)
-            Temporal temporal;
-            try {
-                if (DATE_PARSE_PATTERN_WITH_SPACE.matcher(zonedValue).matches()) {
-                    temporal = parse(zonedValue.substring(0, 10) + "T" + zonedValue.substring(11));
-                } else {
-                    temporal = parse(zonedValue);
-                }
-            } catch (DateTimeParseException fullDtException) {
-                // time only
-                try {
-                    temporal = parse("1970-01-01T" + zonedValue);
-                } catch (DateTimeParseException timeOnlyException) {
-                    try {
-                        long epoch = Double.valueOf(zonedValue).longValue();
-                        int length = (int) (Math.log10(epoch >= 0 ? epoch : epoch * -1) + 1);
-                        // Assume that below 12 digits we're in seconds
-                        if (length < 12) {
-                            temporal = Instant.ofEpochSecond(epoch);
-                        } else {
-                            temporal = Instant.ofEpochMilli(epoch);
-                        }
-                    } catch (NumberFormatException notANumberException) {
-                        // date only
-                        if (zonedValue.length() == 10) {
-                            temporal = parse(zonedValue + "T00:00:00");
-                        } else {
-                            temporal = parse(zonedValue.substring(0, 10) + "T00:00:00" + zonedValue.substring(10));
-                        }
-                    }
-                }
-            }
-            if (temporal instanceof LocalDateTime localDateTime) {
-                temporal = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
-                this.authoritativeZone = false;
-            } else if (temporal instanceof Instant instant) {
-                temporal = instant.atZone(ZoneId.systemDefault());
-                this.authoritativeZone = false;
-            } else {
-                this.authoritativeZone = true;
-            }
-            ZonedDateTime zdt = (ZonedDateTime) temporal;
-            instant = zdt.toInstant();
-            zoneId = zdt.getZone();
-            zoneOffset = zdt.getOffset();
-        } catch (DateTimeParseException invalidFormatException) {
-            throw new IllegalArgumentException(zonedValue + " is not in a valid format.", invalidFormatException);
-        }
+    public DateTimeType(String zonedValue) throws IllegalArgumentException {
+        ParsedDateTimeResult result = parseDateTime(zonedValue);
+        authoritativeZone = result.authoritativeZone;
+        instant = result.zdt.toInstant();
+        zoneId = result.zdt.getZone();
+        zoneOffset = result.zdt.getOffset();
+    }
+
+    // doc: throws, always auth
+    public DateTimeType(String zonedValue, ZoneId zoneId) throws IllegalArgumentException {
+        ParsedDateTimeResult result = parseDateTime(zonedValue);
+        ZonedDateTime zdt = result.zdt.withZoneSameInstant(zoneId);
+        this.authoritativeZone = true;
+        this.instant = zdt.toInstant();
+        this.zoneId = zdt.getZone();
+        this.zoneOffset = zdt.getOffset();
     }
 
     /**
-     *             Get object represented as a {@link ZonedDateTime} with system
-     *             default time-zone applied
+     * Get object represented as a {@link ZonedDateTime} with system
+     * default time-zone applied
      *
      * @return a {@link ZonedDateTime} representation of the object
      */
@@ -275,7 +238,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     @Deprecated(forRemoval = false)
     @Override
     public String format(@Nullable String pattern) {
-        return format(pattern, ZoneId.systemDefault());
+        return format(pattern, zoneId);
     }
 
     @Deprecated(forRemoval = false)
@@ -288,9 +251,8 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return String.format(pattern, zonedDateTime);
     }
 
-    @Deprecated(forRemoval = false)
-    public String format(Locale locale, String pattern) {
-        return String.format(locale, pattern, getZonedDateTime());
+    public String format(Locale locale, @Nullable String pattern) {
+        return format(locale, pattern, zoneId);
     }
 
     public String format(Locale locale, @Nullable String pattern, ZoneId zoneId) {
@@ -303,32 +265,34 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-    *
-    * TODO: (Nad) Authoritative
-    * @param zone the target zone as a string
-    * @return a {@link DateTimeType} translated to the given zone
-    * @throws DateTimeException if the zone has an invalid format or the result exceeds the supported date range
-    * @throws ZoneRulesException if the zone is a region ID that cannot be found
-    */
-   public DateTimeType toZone(String zone) throws DateTimeException, ZoneRulesException {
-       return toZone(ZoneId.of(zone));
-   }
+     *
+     * TODO: (Nad) Authoritative
+     * 
+     * @param zone the target zone as a string
+     * @return a {@link DateTimeType} translated to the given zone
+     * @throws DateTimeException if the zone has an invalid format or the result exceeds the supported date range
+     * @throws ZoneRulesException if the zone is a region ID that cannot be found
+     */
+    public DateTimeType toZone(String zone) throws DateTimeException, ZoneRulesException {
+        return toZone(ZoneId.of(zone));
+    }
 
-   /**
-    * Create a {@link DateTimeType} being the translation of the current object to a given zone
-    *             Create a {@link DateTimeType} being the translation of the current object to a given zone
-    * TODO: (Nad) Authoritative
-    * @param zoneId the target {@link ZoneId}
-    * @return a {@link DateTimeType} translated to the given zone
-    * @throws DateTimeException if the result exceeds the supported date range
-    */
-   public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
-       return new DateTimeType(instant, zoneId, null);
-   }
+    /**
+     * Create a {@link DateTimeType} being the translation of the current object to a given zone
+     * Create a {@link DateTimeType} being the translation of the current object to a given zone
+     * TODO: (Nad) Authoritative
+     * 
+     * @param zoneId the target {@link ZoneId}
+     * @return a {@link DateTimeType} translated to the given zone
+     * @throws DateTimeException if the result exceeds the supported date range
+     */
+    public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
+        return new DateTimeType(instant, zoneId, null);
+    }
 
     @Override
     public String toString() {
-        return toFullString(zoneId);
+        return toString(zoneId);
     }
 
     @Override
@@ -336,8 +300,26 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return toFullString(zoneId);
     }
 
-    public String toFullString(ZoneId zoneId) {
+    public String toString(ZoneId zoneId) {
         String formatted = instant.atZone(zoneId).format(FORMATTER_TZ_RFC);
+        if (formatted.contains(".")) {
+            String sign = "";
+            if (formatted.contains("+")) {
+                sign = "+";
+            } else if (formatted.contains("-")) {
+                sign = "-";
+            }
+            if (!sign.isEmpty()) {
+                // the formatted string contains 9 fraction-of-second digits
+                // truncate at most 2 trailing groups of 000s
+                return formatted.replace("000" + sign, sign).replace("000" + sign, sign);
+            }
+        }
+        return formatted;
+    }
+
+    public String toFullString(ZoneId zoneId) {
+        String formatted = instant.atZone(zoneId).format(DateTimeFormatter.ISO_DATE_TIME);
         if (formatted.contains(".")) {
             String sign = "";
             if (formatted.contains("+")) {
@@ -373,11 +355,66 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     @Override
-    public int compareTo(DateTimeType o) { //TODO: (Nad) What here? Look at ZDT
-        return instant.compareTo(o.getInstant());
+    public int compareTo(DateTimeType o) {
+        return instant.compareTo(o.instant);
     }
 
-    private Temporal parse(String value) throws DateTimeParseException {
+    public static record ParsedDateTimeResult(ZonedDateTime zdt, boolean authoritativeZone) {
+    }
+
+    // doc: throws
+    public static ParsedDateTimeResult parseDateTime(String value) throws IllegalArgumentException {
+        try {
+            // direct parsing (date and time)
+            Temporal temporal;
+            try {
+                if (DATE_PARSE_PATTERN_WITH_SPACE.matcher(value).matches()) {
+                    temporal = parse(value.substring(0, 10) + "T" + value.substring(11));
+                } else {
+                    temporal = parse(value);
+                }
+            } catch (DateTimeParseException fullDtException) {
+                // time only
+                try {
+                    temporal = parse("1970-01-01T" + value);
+                } catch (DateTimeParseException timeOnlyException) {
+                    try {
+                        long epoch = Double.valueOf(value).longValue();
+                        int length = (int) (Math.log10(epoch >= 0 ? epoch : epoch * -1) + 1);
+                        // Assume that below 12 digits we're in seconds
+                        if (length < 12) {
+                            temporal = Instant.ofEpochSecond(epoch);
+                        } else {
+                            temporal = Instant.ofEpochMilli(epoch);
+                        }
+                    } catch (NumberFormatException notANumberException) {
+                        // date only
+                        if (value.length() == 10) {
+                            temporal = parse(value + "T00:00:00");
+                        } else {
+                            temporal = parse(value.substring(0, 10) + "T00:00:00" + value.substring(10));
+                        }
+                    }
+                }
+            }
+
+            boolean authoritativeZone;
+            if (temporal instanceof LocalDateTime localDateTime) {
+                temporal = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
+                authoritativeZone = false;
+            } else if (temporal instanceof Instant instant) {
+                temporal = instant.atZone(ZoneId.systemDefault());
+                authoritativeZone = false;
+            } else {
+                authoritativeZone = true;
+            }
+            return new ParsedDateTimeResult((ZonedDateTime) temporal, authoritativeZone);
+        } catch (DateTimeParseException invalidFormatException) {
+            throw new IllegalArgumentException(value + " is not in a valid format.", invalidFormatException);
+        }
+    }
+
+    private static Temporal parse(String value) throws DateTimeParseException {
         ZonedDateTime result;
         try {
             result = ZonedDateTime.parse(value, PARSER_TZ_RFC);
