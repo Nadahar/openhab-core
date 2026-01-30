@@ -193,7 +193,7 @@ public class SseItemStatesEventBuilder {
                     }
 
                     // The following exception handling has been added to work around a Java bug with formatting
-                    // numbers. See http://bugs.sun.com/view_bug.do?bug_id=6476425
+                    // numbers. See https://bugs.java.com/bugdatabase/JDK-6476425
                     // This also handles IllegalFormatConversionException, which is a subclass of
                     // IllegalArgument.
                     try {
