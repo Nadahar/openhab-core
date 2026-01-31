@@ -287,7 +287,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      * @throws DateTimeException if the result exceeds the supported date range
      */
     public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
-        return new DateTimeType(instant, zoneId, null);
+        return this.authoritativeZone && this.zoneId.equals(zoneId) ? this : new DateTimeType(instant, zoneId, null);
     }
 
     @Override
