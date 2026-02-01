@@ -235,6 +235,10 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return new DateTimeType(value);
     }
 
+    public static DateTimeType now() {
+        return new DateTimeType();
+    }
+
     @Deprecated(forRemoval = false)
     @Override
     public String format(@Nullable String pattern) {
@@ -333,7 +337,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
                 return formatted.replace("000" + sign, sign).replace("000" + sign, sign);
             }
         }
-        return formatted;
+        return authoritativeZone ? formatted : '?' + formatted;
     }
 
     @Override
@@ -364,22 +368,31 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
 
     // doc: throws
     public static ParsedDateTimeResult parseDateTime(String value) throws IllegalArgumentException {
+        String dateTime;
+        boolean explicitNotAuthoritative;
+        if (value.charAt(0) == '?') {
+            dateTime = value.substring(1);
+            explicitNotAuthoritative = true;
+        } else {
+            dateTime = value;
+            explicitNotAuthoritative = false;
+        }
         try {
             // direct parsing (date and time)
             Temporal temporal;
             try {
-                if (DATE_PARSE_PATTERN_WITH_SPACE.matcher(value).matches()) {
-                    temporal = parse(value.substring(0, 10) + "T" + value.substring(11));
+                if (DATE_PARSE_PATTERN_WITH_SPACE.matcher(dateTime).matches()) {
+                    temporal = parse(dateTime.substring(0, 10) + "T" + dateTime.substring(11));
                 } else {
-                    temporal = parse(value);
+                    temporal = parse(dateTime);
                 }
             } catch (DateTimeParseException fullDtException) {
                 // time only
                 try {
-                    temporal = parse("1970-01-01T" + value);
+                    temporal = parse("1970-01-01T" + dateTime);
                 } catch (DateTimeParseException timeOnlyException) {
                     try {
-                        long epoch = Double.valueOf(value).longValue();
+                        long epoch = Double.valueOf(dateTime).longValue();
                         int length = (int) (Math.log10(epoch >= 0 ? epoch : epoch * -1) + 1);
                         // Assume that below 12 digits we're in seconds
                         if (length < 12) {
@@ -389,10 +402,10 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
                         }
                     } catch (NumberFormatException notANumberException) {
                         // date only
-                        if (value.length() == 10) {
-                            temporal = parse(value + "T00:00:00");
+                        if (dateTime.length() == 10) {
+                            temporal = parse(dateTime + "T00:00:00");
                         } else {
-                            temporal = parse(value.substring(0, 10) + "T00:00:00" + value.substring(10));
+                            temporal = parse(dateTime.substring(0, 10) + "T00:00:00" + dateTime.substring(10));
                         }
                     }
                 }
@@ -408,9 +421,9 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
             } else {
                 authoritativeZone = true;
             }
-            return new ParsedDateTimeResult((ZonedDateTime) temporal, authoritativeZone);
+            return new ParsedDateTimeResult((ZonedDateTime) temporal, !explicitNotAuthoritative && authoritativeZone);
         } catch (DateTimeParseException invalidFormatException) {
-            throw new IllegalArgumentException(value + " is not in a valid format.", invalidFormatException);
+            throw new IllegalArgumentException(dateTime + " is not in a valid format.", invalidFormatException);
         }
     }
 
