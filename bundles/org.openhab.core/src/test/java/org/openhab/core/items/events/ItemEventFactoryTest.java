@@ -15,18 +15,49 @@ package org.openhab.core.items.events;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.Locale;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.FieldSource;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.openhab.core.events.Event;
+import org.openhab.core.i18n.TimeZoneProvider;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.dto.ItemDTOMapper;
 import org.openhab.core.library.CoreItemFactory;
 import org.openhab.core.library.items.SwitchItem;
+import org.openhab.core.library.types.DateTimeType;
+import org.openhab.core.library.types.DecimalType;
+import org.openhab.core.library.types.HSBType;
+import org.openhab.core.library.types.IncreaseDecreaseType;
+import org.openhab.core.library.types.NextPreviousType;
 import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.OpenClosedType;
+import org.openhab.core.library.types.PercentType;
+import org.openhab.core.library.types.PlayPauseType;
+import org.openhab.core.library.types.PointType;
+import org.openhab.core.library.types.QuantityType;
 import org.openhab.core.library.types.RawType;
+import org.openhab.core.library.types.RewindFastforwardType;
+import org.openhab.core.library.types.StopMoveType;
+import org.openhab.core.library.types.StringListType;
+import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.types.UpDownType;
+import org.openhab.core.library.unit.SIUnits;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.State;
@@ -35,14 +66,18 @@ import org.openhab.core.types.UnDefType;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 
+
 /**
  * {@link ItemEventFactoryTest} tests the {@link ItemEventFactory}.
  *
  * @author Stefan Bußweiler - Initial contribution
  */
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @NonNullByDefault
 public class ItemEventFactoryTest {
-    private final ItemEventFactory factory = new ItemEventFactory();
+    @Mock @NonNullByDefault({}) private TimeZoneProvider timeZoneProvider;
+    private @NonNullByDefault({}) ItemEventFactory factory;
 
     private static final String ITEM_NAME = "ItemA";
     private static final Item ITEM = new SwitchItem(ITEM_NAME);
@@ -76,6 +111,87 @@ public class ItemEventFactoryTest {
     private static final State RAW_ITEM_STATE = new RawType(new byte[] { 1, 2, 3, 4, 5 }, RawType.DEFAULT_MIME_TYPE);
     private static final State NEW_RAW_ITEM_STATE = new RawType(new byte[] { 5, 4, 3, 2, 1 },
             RawType.DEFAULT_MIME_TYPE);
+
+    private record CommandTestCase(String itemName, Command command, @Nullable String source, String expectedPayload,
+            Command expectedCommand, @Nullable ZoneId zone) {
+    }
+
+    @BeforeEach
+    public void init() {
+        when(timeZoneProvider.getTimeZone()).thenReturn(ZoneOffset.UTC);
+        factory = new ItemEventFactory(timeZoneProvider);
+    }
+
+
+    public static final List<CommandTestCase> COMMAND_TEST_SOURCE = List.of(
+            new CommandTestCase("ItemA", OnOffType.ON, SOURCE, "{\"type\":\"OnOff\",\"value\":\"ON\"}",
+                    OnOffType.ON, null),
+            new CommandTestCase("ItemB", OnOffType.OFF, SOURCE, "{\"type\":\"OnOff\",\"value\":\"OFF\"}",
+                    OnOffType.OFF, null),
+            new CommandTestCase("ItemC", DateTimeType.valueOf("2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
+                    DateTimeType.valueOf("2012-04-08T18:23:12FJT"), null),
+            new CommandTestCase("ItemD", DateTimeType.valueOf("?2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
+                    DateTimeType.valueOf("2012-04-08T08:23:12+02:00[CET]"), ZoneId.of("CET")),
+            new CommandTestCase("ItemD", DateTimeType.valueOf("?2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
+                    DateTimeType.valueOf("2012-04-08T08:23:12+02:00[Asia/Kathmandu]"), ZoneId.of("Asia/Kathmandu")),
+            new CommandTestCase("ItemE", DateTimeType.valueOf("2012-04-08T18:23:12+00:00[Australia/Eucla]"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2012-04-09T03:08:12+08:45[Australia/Eucla]\"}",
+                    DateTimeType.valueOf("2012-04-09T03:08:12+08:45[Australia/Eucla]"), ZoneId.of("America/Manaus")),
+            new CommandTestCase("ItemE", new DecimalType("92.942", Locale.ROOT), SOURCE, "{\"type\":\"Decimal\",\"value\":\"92.942\"}",
+                    new DecimalType(92.942), null),
+            new CommandTestCase("ItemG", new PercentType("13", Locale.ROOT), SOURCE, "{\"type\":\"Percent\",\"value\":\"13\"}",
+                    new PercentType(13), null),
+            new CommandTestCase("ItemH", HSBType.GREEN, SOURCE, "{\"type\":\"HSB\",\"value\":\"120,100,100\"}",
+                    HSBType.GREEN, null),
+            new CommandTestCase("ItemI", IncreaseDecreaseType.INCREASE, SOURCE, "{\"type\":\"IncreaseDecrease\",\"value\":\"INCREASE\"}",
+                    IncreaseDecreaseType.INCREASE, null),
+            new CommandTestCase("ItemJ", NextPreviousType.PREVIOUS, SOURCE, "{\"type\":\"NextPrevious\",\"value\":\"PREVIOUS\"}",
+                    NextPreviousType.PREVIOUS, null),
+            new CommandTestCase("ItemK", OpenClosedType.CLOSED, SOURCE, "{\"type\":\"OpenClosed\",\"value\":\"CLOSED\"}",
+                    OpenClosedType.CLOSED, null),
+            new CommandTestCase("ItemL", PlayPauseType.PLAY, SOURCE, "{\"type\":\"PlayPause\",\"value\":\"PLAY\"}",
+                    PlayPauseType.PLAY, null),
+            new CommandTestCase("ItemM", new PointType("52.4791061,62.1830008,385"), SOURCE, "{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\"}",
+                    new PointType("52.4791061,62.1830008,385"), null),
+            new CommandTestCase("ItemN", new QuantityType<>("366m", Locale.ROOT), SOURCE, "{\"type\":\"Quantity\",\"value\":\"366 m\"}",
+                    new QuantityType<>(366, SIUnits.METRE), null),
+            new CommandTestCase("ItemO", RefreshType.REFRESH, SOURCE, "{\"type\":\"Refresh\",\"value\":\"REFRESH\"}",
+                    RefreshType.REFRESH, null),
+            new CommandTestCase("ItemP", RewindFastforwardType.FASTFORWARD, SOURCE, "{\"type\":\"RewindFastforward\",\"value\":\"FASTFORWARD\"}",
+                    RewindFastforwardType.FASTFORWARD, null),
+            new CommandTestCase("ItemQ", StopMoveType.MOVE, SOURCE, "{\"type\":\"StopMove\",\"value\":\"MOVE\"}",
+                    StopMoveType.MOVE, null),
+            new CommandTestCase("ItemR", UpDownType.DOWN, SOURCE, "{\"type\":\"UpDown\",\"value\":\"DOWN\"}",
+                    UpDownType.DOWN, null),
+            new CommandTestCase("ItemS", StringListType.valueOf("Foo,Bar,Foreva"), SOURCE, "{\"type\":\"StringList\",\"value\":\"Foo,Bar,Foreva\"}",
+                    new StringListType(List.of("Foo", "Bar", "Foreva")), null),
+            new CommandTestCase("ItemT", StringType.valueOf("Foobar"), SOURCE, "{\"type\":\"String\",\"value\":\"Foobar\"}",
+                    new StringType("Foobar"), null)
+    );
+
+    @ParameterizedTest
+    @FieldSource("COMMAND_TEST_SOURCE")
+    public void testCreateEventItemCommandEvent(CommandTestCase testCase) throws Exception {
+        String topic = "openhab/items/" + testCase.itemName + "/command";
+        ZoneId zone = testCase.zone;
+        if (zone != null) {
+            when(timeZoneProvider.getTimeZone()).thenReturn(zone);
+        }
+        ItemCommandEvent commandEvent = ItemEventFactory.createCommandEvent(testCase.itemName, testCase.command,
+                testCase.source);
+        Event event = factory.createEvent(commandEvent.getType(), commandEvent.getTopic(), commandEvent.getPayload(),
+                commandEvent.getSource());
+
+        assertEquals(ItemCommandEvent.class, event.getClass());
+        ItemCommandEvent itemCommandEvent = (ItemCommandEvent) event;
+        assertEquals(ITEM_COMMAND_EVENT_TYPE, itemCommandEvent.getType());
+        assertEquals(topic, itemCommandEvent.getTopic());
+        assertEquals(testCase.expectedPayload, itemCommandEvent.getPayload());
+        assertEquals(testCase.itemName, itemCommandEvent.getItemName());
+        assertEquals(testCase.source, itemCommandEvent.getSource());
+        assertEquals(testCase.command.getClass(), itemCommandEvent.getItemCommand().getClass());
+        assertEquals(testCase.expectedCommand.toFullString(), itemCommandEvent.getItemCommand().toFullString());
+        assertEquals(testCase.expectedCommand, itemCommandEvent.getItemCommand());
+    }
 
     @Test
     public void testCreateEventItemCommandEventOnOffType() throws Exception {
