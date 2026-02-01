@@ -23,6 +23,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
 
+import javax.measure.MetricPrefix;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +66,8 @@ import org.openhab.core.types.UnDefType;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
+
+import tech.units.indriya.unit.Units;
 
 
 /**
@@ -116,12 +119,15 @@ public class ItemEventFactoryTest {
             Command expectedCommand, @Nullable ZoneId zone) {
     }
 
+    private record StateTestCase(String itemName, State state, @Nullable String source, String expectedPayload,
+            State expectedState, @Nullable ZoneId zone) {
+    }
+
     @BeforeEach
     public void init() {
         when(timeZoneProvider.getTimeZone()).thenReturn(ZoneOffset.UTC);
         factory = new ItemEventFactory(timeZoneProvider);
     }
-
 
     public static final List<CommandTestCase> COMMAND_TEST_SOURCE = List.of(
             new CommandTestCase("ItemA", OnOffType.ON, SOURCE, "{\"type\":\"OnOff\",\"value\":\"ON\"}",
@@ -132,40 +138,83 @@ public class ItemEventFactoryTest {
                     DateTimeType.valueOf("2012-04-08T18:23:12FJT"), null),
             new CommandTestCase("ItemD", DateTimeType.valueOf("?2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
                     DateTimeType.valueOf("2012-04-08T08:23:12+02:00[CET]"), ZoneId.of("CET")),
-            new CommandTestCase("ItemD", DateTimeType.valueOf("?2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
+            new CommandTestCase("ItemE", DateTimeType.valueOf("?2012-04-08T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2012-04-08T18:23:12+12:00[Pacific/Fiji]\"}",
                     DateTimeType.valueOf("2012-04-08T08:23:12+02:00[Asia/Kathmandu]"), ZoneId.of("Asia/Kathmandu")),
-            new CommandTestCase("ItemE", DateTimeType.valueOf("2012-04-08T18:23:12+00:00[Australia/Eucla]"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2012-04-09T03:08:12+08:45[Australia/Eucla]\"}",
+            new CommandTestCase("ItemF", DateTimeType.valueOf("2012-04-08T18:23:12+00:00[Australia/Eucla]"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2012-04-09T03:08:12+08:45[Australia/Eucla]\"}",
                     DateTimeType.valueOf("2012-04-09T03:08:12+08:45[Australia/Eucla]"), ZoneId.of("America/Manaus")),
-            new CommandTestCase("ItemE", new DecimalType("92.942", Locale.ROOT), SOURCE, "{\"type\":\"Decimal\",\"value\":\"92.942\"}",
+            new CommandTestCase("ItemG", new DecimalType("92.942", Locale.ROOT), SOURCE, "{\"type\":\"Decimal\",\"value\":\"92.942\"}",
                     new DecimalType(92.942), null),
-            new CommandTestCase("ItemG", new PercentType("13", Locale.ROOT), SOURCE, "{\"type\":\"Percent\",\"value\":\"13\"}",
+            new CommandTestCase("ItemH", new PercentType("13", Locale.ROOT), SOURCE, "{\"type\":\"Percent\",\"value\":\"13\"}",
                     new PercentType(13), null),
-            new CommandTestCase("ItemH", HSBType.GREEN, SOURCE, "{\"type\":\"HSB\",\"value\":\"120,100,100\"}",
+            new CommandTestCase("ItemI", HSBType.GREEN, SOURCE, "{\"type\":\"HSB\",\"value\":\"120,100,100\"}",
                     HSBType.GREEN, null),
-            new CommandTestCase("ItemI", IncreaseDecreaseType.INCREASE, SOURCE, "{\"type\":\"IncreaseDecrease\",\"value\":\"INCREASE\"}",
+            new CommandTestCase("ItemJ", IncreaseDecreaseType.INCREASE, SOURCE, "{\"type\":\"IncreaseDecrease\",\"value\":\"INCREASE\"}",
                     IncreaseDecreaseType.INCREASE, null),
-            new CommandTestCase("ItemJ", NextPreviousType.PREVIOUS, SOURCE, "{\"type\":\"NextPrevious\",\"value\":\"PREVIOUS\"}",
+            new CommandTestCase("ItemK", NextPreviousType.PREVIOUS, SOURCE, "{\"type\":\"NextPrevious\",\"value\":\"PREVIOUS\"}",
                     NextPreviousType.PREVIOUS, null),
-            new CommandTestCase("ItemK", OpenClosedType.CLOSED, SOURCE, "{\"type\":\"OpenClosed\",\"value\":\"CLOSED\"}",
+            new CommandTestCase("ItemL", OpenClosedType.CLOSED, SOURCE, "{\"type\":\"OpenClosed\",\"value\":\"CLOSED\"}",
                     OpenClosedType.CLOSED, null),
-            new CommandTestCase("ItemL", PlayPauseType.PLAY, SOURCE, "{\"type\":\"PlayPause\",\"value\":\"PLAY\"}",
+            new CommandTestCase("ItemM", PlayPauseType.PLAY, SOURCE, "{\"type\":\"PlayPause\",\"value\":\"PLAY\"}",
                     PlayPauseType.PLAY, null),
-            new CommandTestCase("ItemM", new PointType("52.4791061,62.1830008,385"), SOURCE, "{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\"}",
+            new CommandTestCase("ItemN", new PointType("52.4791061,62.1830008,385"), SOURCE, "{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\"}",
                     new PointType("52.4791061,62.1830008,385"), null),
-            new CommandTestCase("ItemN", new QuantityType<>("366m", Locale.ROOT), SOURCE, "{\"type\":\"Quantity\",\"value\":\"366 m\"}",
+            new CommandTestCase("ItemO", new QuantityType<>("366m", Locale.ROOT), SOURCE, "{\"type\":\"Quantity\",\"value\":\"366 m\"}",
                     new QuantityType<>(366, SIUnits.METRE), null),
-            new CommandTestCase("ItemO", RefreshType.REFRESH, SOURCE, "{\"type\":\"Refresh\",\"value\":\"REFRESH\"}",
+            new CommandTestCase("ItemP", RefreshType.REFRESH, SOURCE, "{\"type\":\"Refresh\",\"value\":\"REFRESH\"}",
                     RefreshType.REFRESH, null),
-            new CommandTestCase("ItemP", RewindFastforwardType.FASTFORWARD, SOURCE, "{\"type\":\"RewindFastforward\",\"value\":\"FASTFORWARD\"}",
+            new CommandTestCase("ItemQ", RewindFastforwardType.FASTFORWARD, SOURCE, "{\"type\":\"RewindFastforward\",\"value\":\"FASTFORWARD\"}",
                     RewindFastforwardType.FASTFORWARD, null),
-            new CommandTestCase("ItemQ", StopMoveType.MOVE, SOURCE, "{\"type\":\"StopMove\",\"value\":\"MOVE\"}",
+            new CommandTestCase("ItemR", StopMoveType.MOVE, SOURCE, "{\"type\":\"StopMove\",\"value\":\"MOVE\"}",
                     StopMoveType.MOVE, null),
-            new CommandTestCase("ItemR", UpDownType.DOWN, SOURCE, "{\"type\":\"UpDown\",\"value\":\"DOWN\"}",
+            new CommandTestCase("ItemS", UpDownType.DOWN, SOURCE, "{\"type\":\"UpDown\",\"value\":\"DOWN\"}",
                     UpDownType.DOWN, null),
-            new CommandTestCase("ItemS", StringListType.valueOf("Foo,Bar,Foreva"), SOURCE, "{\"type\":\"StringList\",\"value\":\"Foo,Bar,Foreva\"}",
+            new CommandTestCase("ItemT", StringListType.valueOf("Foo,Bar,Foreva"), SOURCE, "{\"type\":\"StringList\",\"value\":\"Foo,Bar,Foreva\"}",
                     new StringListType(List.of("Foo", "Bar", "Foreva")), null),
-            new CommandTestCase("ItemT", StringType.valueOf("Foobar"), SOURCE, "{\"type\":\"String\",\"value\":\"Foobar\"}",
+            new CommandTestCase("ItemU", StringType.valueOf("Foobar"), SOURCE, "{\"type\":\"String\",\"value\":\"Foobar\"}",
                     new StringType("Foobar"), null)
+    );
+
+    public static final List<StateTestCase> STATE_TEST_SOURCE = List.of(
+            new StateTestCase("ItemA", OnOffType.OFF, SOURCE, "{\"type\":\"OnOff\",\"value\":\"OFF\"}",
+                    OnOffType.OFF, null),
+            new StateTestCase("ItemB", OnOffType.ON, SOURCE, "{\"type\":\"OnOff\",\"value\":\"ON\"}",
+                    OnOffType.ON, null),
+            new StateTestCase("ItemC", new DateTimeType("2019-11-11T13:50", ZoneId.of("Africa/Addis_Ababa")), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]\"}",
+                    DateTimeType.valueOf("2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]"), null),
+            new StateTestCase("ItemD", DateTimeType.valueOf("?2019-11-11T13:50:23FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2019-11-11T13:50:23+13:00[Pacific/Fiji]\"}",
+                    DateTimeType.valueOf("2019-11-11T01:50:23+01:00[CET]"), ZoneId.of("CET")),
+            new StateTestCase("ItemE", DateTimeType.valueOf("?2019-11-11T18:23:12FJT"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"?2019-11-11T18:23:12+13:00[Pacific/Fiji]\"}",
+                    DateTimeType.valueOf("2019-11-11T11:08:12+05:45[Asia/Kathmandu]"), ZoneId.of("Asia/Kathmandu")),
+            new StateTestCase("ItemF", DateTimeType.valueOf("2015-11-11T18:23:12+00:00[Australia/Eucla]"), SOURCE, "{\"type\":\"DateTime\",\"value\":\"2015-11-12T03:08:12+08:45[Australia/Eucla]\"}",
+                    DateTimeType.valueOf("2015-11-12T03:08:12+08:45[Australia/Eucla]"), ZoneId.of("America/Manaus")),
+            new StateTestCase("ItemG", new DecimalType("666.666E6", Locale.ROOT), SOURCE, "{\"type\":\"Decimal\",\"value\":\"666666000\"}",
+                    new DecimalType(666666000), null),
+            new StateTestCase("ItemH", new PercentType("99", Locale.ROOT), SOURCE, "{\"type\":\"Percent\",\"value\":\"99\"}",
+                    new PercentType(99), null),
+            new StateTestCase("ItemI", HSBType.BLUE, SOURCE, "{\"type\":\"HSB\",\"value\":\"240,100,100\"}",
+                    HSBType.BLUE, null),
+            new StateTestCase("ItemJ", new RawType(new byte[] {(byte) 0xe5, (byte) 0x6b, (byte) 0xf3, (byte) 0x24}, "application/octet-stream"), SOURCE, "{\"type\":\"Raw\",\"value\":\"data:application/octet-stream;base64,5WvzJA\\u003d\\u003d\"}",
+                    RawType.valueOf("data:application/octet-stream;base64,5WvzJA=="), null),
+            new StateTestCase("ItemK", UnDefType.NULL, SOURCE, "{\"type\":\"UnDef\",\"value\":\"NULL\"}",
+                    UnDefType.NULL, null),
+            new StateTestCase("ItemL", UnDefType.UNDEF, SOURCE, "{\"type\":\"UnDef\",\"value\":\"UNDEF\"}",
+                    UnDefType.UNDEF, null),
+            new StateTestCase("ItemM", OpenClosedType.OPEN, SOURCE, "{\"type\":\"OpenClosed\",\"value\":\"OPEN\"}",
+                    OpenClosedType.OPEN, null),
+            new StateTestCase("ItemN", PlayPauseType.PAUSE, SOURCE, "{\"type\":\"PlayPause\",\"value\":\"PAUSE\"}",
+                    PlayPauseType.PAUSE, null),
+            new StateTestCase("ItemO", new PointType("52.4791061,62.1830008,385"), SOURCE, "{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\"}",
+                    new PointType("52.4791061,62.1830008,385"), null),
+            new StateTestCase("ItemP", new QuantityType<>("366kPa", Locale.ROOT), SOURCE, "{\"type\":\"Quantity\",\"value\":\"366 kPa\"}",
+                    new QuantityType<>(366, Units.PASCAL.prefix(MetricPrefix.KILO)), null),
+            new StateTestCase("ItemQ", RewindFastforwardType.REWIND, SOURCE, "{\"type\":\"RewindFastforward\",\"value\":\"REWIND\"}",
+                    RewindFastforwardType.REWIND, null),
+            new StateTestCase("ItemR", UpDownType.UP, SOURCE, "{\"type\":\"UpDown\",\"value\":\"UP\"}",
+                    UpDownType.UP, null),
+            new StateTestCase("ItemS", StringListType.valueOf("Foo,Bar,Neva"), SOURCE, "{\"type\":\"StringList\",\"value\":\"Foo,Bar,Neva\"}",
+                    new StringListType(List.of("Foo", "Bar", "Neva")), null),
+            new StateTestCase("ItemT", StringType.valueOf("Boofar"), SOURCE, "{\"type\":\"String\",\"value\":\"Boofar\"}",
+                    new StringType("Boofar"), null)
     );
 
     @ParameterizedTest
@@ -193,64 +242,28 @@ public class ItemEventFactoryTest {
         assertEquals(testCase.expectedCommand, itemCommandEvent.getItemCommand());
     }
 
-    @Test
-    public void testCreateEventItemCommandEventOnOffType() throws Exception {
-        Event event = factory.createEvent(ITEM_COMMAND_EVENT_TYPE, ITEM_COMMAND_EVENT_TOPIC, ITEM_COMMAND_EVENT_PAYLOAD,
-                SOURCE);
-
-        assertEquals(ItemCommandEvent.class, event.getClass());
-        ItemCommandEvent itemCommandEvent = (ItemCommandEvent) event;
-        assertEquals(ITEM_COMMAND_EVENT_TYPE, itemCommandEvent.getType());
-        assertEquals(ITEM_COMMAND_EVENT_TOPIC, itemCommandEvent.getTopic());
-        assertEquals(ITEM_COMMAND_EVENT_PAYLOAD, itemCommandEvent.getPayload());
-        assertEquals(ITEM_NAME, itemCommandEvent.getItemName());
-        assertEquals(SOURCE, itemCommandEvent.getSource());
-        assertEquals(OnOffType.class, itemCommandEvent.getItemCommand().getClass());
-        assertEquals(ITEM_COMMAND, itemCommandEvent.getItemCommand());
-    }
-
-    @Test
-    public void testCreateCommandEventOnOffType() throws Exception {
-        ItemCommandEvent event = ItemEventFactory.createCommandEvent(ITEM_NAME, ITEM_COMMAND, SOURCE);
-
-        assertEquals(ITEM_COMMAND_EVENT_TYPE, event.getType());
-        assertEquals(ITEM_COMMAND_EVENT_TOPIC, event.getTopic());
-        assertEquals(JsonParser.parseString(ITEM_COMMAND_EVENT_PAYLOAD), JsonParser.parseString(event.getPayload()));
-        assertEquals(ITEM_NAME, event.getItemName());
-        assertEquals(SOURCE, event.getSource());
-        assertEquals(OnOffType.class, event.getItemCommand().getClass());
-        assertEquals(ITEM_COMMAND, event.getItemCommand());
-    }
-
-    @Test
-    public void testCreateEventItemCommandEventRefreshType() throws Exception {
-        Event event = factory.createEvent(ITEM_COMMAND_EVENT_TYPE, ITEM_COMMAND_EVENT_TOPIC,
-                ITEM_REFRESH_COMMAND_EVENT_PAYLOAD, SOURCE);
-
-        assertEquals(ItemCommandEvent.class, event.getClass());
-        ItemCommandEvent itemCommandEvent = (ItemCommandEvent) event;
-        assertEquals(ITEM_COMMAND_EVENT_TYPE, itemCommandEvent.getType());
-        assertEquals(ITEM_COMMAND_EVENT_TOPIC, itemCommandEvent.getTopic());
-        assertEquals(ITEM_REFRESH_COMMAND_EVENT_PAYLOAD, itemCommandEvent.getPayload());
-        assertEquals(ITEM_NAME, itemCommandEvent.getItemName());
-        assertEquals(SOURCE, itemCommandEvent.getSource());
-        assertEquals(RefreshType.REFRESH, itemCommandEvent.getItemCommand());
-    }
-
-    @Test
-    public void testCreateEventItemStateEventUnDefType() throws Exception {
-        Event event = factory.createEvent(ITEM_STATE_EVENT_TYPE, ITEM_STATE_EVENT_TOPIC, ITEM_UNDEF_STATE_EVENT_PAYLOAD,
-                SOURCE);
+    @ParameterizedTest
+    @FieldSource("STATE_TEST_SOURCE")
+    public void testCreateEventItemStateEvent(StateTestCase testCase) throws Exception {
+        String topic = "openhab/items/" + testCase.itemName + "/state";
+        ZoneId zone = testCase.zone;
+        if (zone != null) {
+            when(timeZoneProvider.getTimeZone()).thenReturn(zone);
+        }
+        ItemStateEvent stateEvent = ItemEventFactory.createStateEvent(testCase.itemName, testCase.state, testCase.source);
+        Event event = factory.createEvent(stateEvent.getType(), stateEvent.getTopic(), stateEvent.getPayload(),
+                stateEvent.getSource());
 
         assertEquals(ItemStateEvent.class, event.getClass());
         ItemStateEvent itemStateEvent = (ItemStateEvent) event;
-
         assertEquals(ITEM_STATE_EVENT_TYPE, itemStateEvent.getType());
-        assertEquals(ITEM_STATE_EVENT_TOPIC, itemStateEvent.getTopic());
-        assertEquals(ITEM_UNDEF_STATE_EVENT_PAYLOAD, itemStateEvent.getPayload());
-        assertEquals(ITEM_NAME, itemStateEvent.getItemName());
-        assertEquals(SOURCE, itemStateEvent.getSource());
-        assertEquals(UnDefType.UNDEF, itemStateEvent.getItemState());
+        assertEquals(topic, itemStateEvent.getTopic());
+        assertEquals(testCase.expectedPayload, itemStateEvent.getPayload());
+        assertEquals(testCase.itemName, itemStateEvent.getItemName());
+        assertEquals(testCase.source, itemStateEvent.getSource());
+        assertEquals(testCase.state.getClass(), itemStateEvent.getItemState().getClass());
+        assertEquals(testCase.expectedState.toFullString(), itemStateEvent.getItemState().toFullString());
+        assertEquals(testCase.expectedState, itemStateEvent.getItemState());
     }
 
     @Test
@@ -269,22 +282,6 @@ public class ItemEventFactoryTest {
         assertNull(groupItemStateChangedEvent.getSource());
         assertEquals(NEW_ITEM_STATE, groupItemStateChangedEvent.getItemState());
         assertEquals(ITEM_STATE, groupItemStateChangedEvent.getOldItemState());
-    }
-
-    @Test
-    public void testCreateEventItemStateEventOnOffType() throws Exception {
-        Event event = factory.createEvent(ITEM_STATE_EVENT_TYPE, ITEM_STATE_EVENT_TOPIC, ITEM_STATE_EVENT_PAYLOAD,
-                SOURCE);
-
-        assertEquals(ItemStateEvent.class, event.getClass());
-        ItemStateEvent itemStateEvent = (ItemStateEvent) event;
-        assertEquals(ITEM_STATE_EVENT_TYPE, itemStateEvent.getType());
-        assertEquals(ITEM_STATE_EVENT_TOPIC, itemStateEvent.getTopic());
-        assertEquals(ITEM_STATE_EVENT_PAYLOAD, itemStateEvent.getPayload());
-        assertEquals(ITEM_NAME, itemStateEvent.getItemName());
-        assertEquals(SOURCE, itemStateEvent.getSource());
-        assertEquals(OnOffType.class, itemStateEvent.getItemState().getClass());
-        assertEquals(ITEM_STATE, itemStateEvent.getItemState());
     }
 
     @Test
