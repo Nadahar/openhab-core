@@ -292,13 +292,16 @@ public class ItemEventFactory extends AbstractEventFactory {
                 if (DATE_TIME_TYPE_TYPE.equals(iscep.type) && iscep.value != null && iscep.value.charAt(0) == '?') {
                     iscep.value = new DateTimeType(iscep.value, timeZoneProvider.getTimeZone()).toFullString();
                 }
-                if (DATE_TIME_TYPE_TYPE.equals(iscep.oldType) && iscep.value != null && iscep.oldValue.charAt(0) == '?') {
+                if (DATE_TIME_TYPE_TYPE.equals(iscep.oldType) && iscep.value != null
+                        && iscep.oldValue.charAt(0) == '?') {
                     iscep.oldValue = new DateTimeType(iscep.oldValue, timeZoneProvider.getTimeZone()).toFullString();
                 }
                 break;
             case ItemStatePredictedEventPayloadBean ispep:
-                if (DATE_TIME_TYPE_TYPE.equals(ispep.predictedType) && ispep.predictedValue != null && ispep.predictedValue.charAt(0) == '?') {
-                    ispep.predictedValue = new DateTimeType(ispep.predictedValue, timeZoneProvider.getTimeZone()).toFullString();
+                if (DATE_TIME_TYPE_TYPE.equals(ispep.predictedType) && ispep.predictedValue != null
+                        && ispep.predictedValue.charAt(0) == '?') {
+                    ispep.predictedValue = new DateTimeType(ispep.predictedValue, timeZoneProvider.getTimeZone())
+                            .toFullString();
                 }
                 break;
             case ItemTimeSeriesEventPayloadBean itsep:
@@ -315,7 +318,6 @@ public class ItemEventFactory extends AbstractEventFactory {
                 break;
         }
         return result;
-
     }
 
     /**
