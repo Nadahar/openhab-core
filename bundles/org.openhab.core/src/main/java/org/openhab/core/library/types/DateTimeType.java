@@ -15,6 +15,7 @@ package org.openhab.core.library.types;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -33,6 +34,12 @@ import org.openhab.core.types.PrimitiveType;
 import org.openhab.core.types.State;
 
 /**
+ * A primitive immutable type that holds a date, time and timezone using the Christian/Gregorian calendar.
+ *
+ * @implNote This type has the concept of <i>authoritative</i> timezone. An authoritative timezone is the originating
+ * timezone for the date and time data. If the originating timezone is unknown, an arbitrary timezone can be used,
+ * in which case the timezone is non-authoritative. A non-authoritative {@link DateTimeType} will be converted to
+ * the configured timezone, and made authoritative, before being published on the event bus.
  *
  * @author Kai Kreuzer - Initial contribution
  * @author Erdoan Hadzhiyusein - Refactored to use ZonedDateTime
@@ -42,6 +49,7 @@ import org.openhab.core.types.State;
  * @author Gaël L'hopital - added ability to use second and milliseconds unix time
  * @author Jimmy Tanagra - implement Comparable
  * @author Jacob Laursen - Refactored to use {@link Instant} internally
+ * @author Ravi Nadahar - Resurrected timezone
  */
 @NonNullByDefault
 public class DateTimeType implements PrimitiveType, State, Command, Comparable<DateTimeType> {
@@ -82,17 +90,15 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     private final boolean authoritativeZone;
 
     /**
-     * Creates a new {@link DateTimeType} representing the current
-     * instant from the system clock.
+     * Creates a new {@link DateTimeType} representing the current instant from the system clock with a
+     * non-authoritative timezone.
      */
     public DateTimeType() {
         this(Instant.now());
     }
 
     /**
-     * Creates a new {@link DateTimeType} with the given value without an authoritative timezone.
-     * <p>
-     * <b>Note:</b> For the timezone to be preserved, use one of the other constructors.
+     * Creates a new {@link DateTimeType} representing the specified instant with a non-authoritative timezone.
      *
      * @param instant the moment in time.
      */
@@ -108,21 +114,42 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         this.authoritativeZone = false;
     }
 
-    // TODO: (Nad) JavaDocs everywhere
+    /**
+     * Creates a new {@link DateTimeType} representing the specified instant and an authoritative timezone or offset.
+     *
+     * @param instant the moment in time.
+     * @param zoneId the {@link ZoneId} or {@link ZoneOffset}.
+     */
     public DateTimeType(Instant instant, ZoneId zoneId) {
         this.instant = instant;
-        this.zoneId = zoneId;
+        ZoneId resolvedZoneId;
+        ZoneOffset resolvedOffset;
         if (zoneId instanceof ZoneOffset offset) {
-            this.zoneOffset = offset;
+            resolvedZoneId = zoneId;
+            resolvedOffset = offset;
         } else {
-            this.zoneOffset = zoneId.getRules().getOffset(instant);
+            resolvedZoneId = zoneId;
+            resolvedOffset = zoneId.getRules().getOffset(instant);
         }
+
+        this.zoneId = resolvedZoneId;
+        this.zoneOffset = resolvedOffset;
         this.authoritativeZone = true;
     }
 
-    // Doc: Authoritative unless both null
-    public DateTimeType(Instant instant, @Nullable ZoneId zoneId, @Nullable ZoneOffset zoneOffset) {
-        this.instant = instant;
+    /**
+     * Creates a new {@link DateTimeType} representing the instant dictated by the specified local date and time in
+     * combination with the specified or default timezone or offset.
+     * <p>
+     * <b>Note:</b> The resulting {@link DateTimeType} has an authoritative timezone of offset if {@code ZoneId} is
+     * specified.
+     * If {@code ZoneId} is {@code null}, the JVM default timezone will be used to interpret the local date and time,
+     * and the timezone will be non-authoritative.
+     *
+     * @param localDateTime the local date and time without timezone information.
+     * @param zoneId the {@link ZoneId} or {@link ZoneOffset}.
+     */
+    public DateTimeType(LocalDateTime localDateTime, @Nullable ZoneId zoneId) {
         ZoneId resolvedZoneId;
         ZoneOffset resolvedOffset;
         boolean resolvedAuthoritative;
@@ -131,25 +158,20 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
             resolvedOffset = offset;
             resolvedAuthoritative = true;
         } else if (zoneId == null) {
-            if (zoneOffset == null) {
-                resolvedZoneId = ZoneId.systemDefault();
-                if (resolvedZoneId instanceof ZoneOffset offset) {
-                    resolvedOffset = offset;
-                } else {
-                    resolvedOffset = resolvedZoneId.getRules().getOffset(instant);
-                }
-                resolvedAuthoritative = false;
+            resolvedZoneId = ZoneId.systemDefault();
+            if (resolvedZoneId instanceof ZoneOffset offset) {
+                resolvedOffset = offset;
             } else {
-                resolvedZoneId = zoneOffset;
-                resolvedOffset = zoneOffset;
-                resolvedAuthoritative = true;
+                resolvedOffset = resolvedZoneId.getRules().getOffset(localDateTime);
             }
+            resolvedAuthoritative = false;
         } else {
             resolvedZoneId = zoneId;
-            resolvedOffset = zoneId.getRules().getOffset(instant);
+            resolvedOffset = zoneId.getRules().getOffset(localDateTime);
             resolvedAuthoritative = true;
         }
 
+        this.instant = localDateTime.toInstant(resolvedOffset);
         this.zoneId = resolvedZoneId;
         this.zoneOffset = resolvedOffset;
         this.authoritativeZone = resolvedAuthoritative;
@@ -191,29 +213,42 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-     * Get object represented as a {@link ZonedDateTime} with system
-     * default time-zone applied
+     * Get this date and time represented as a {@link ZonedDateTime}.
+     * <p>
+     * <b>Note:</b> Since `ZonedDateTime` has no authoritative timezone concept, the current timezone will be used
+     * whether this {@link DateTimeType} is authoritative or not.
      *
-     * @return a {@link ZonedDateTime} representation of the object
+     * @return The {@link ZonedDateTime} representation.
      */
     public ZonedDateTime getZonedDateTime() {
         return getZonedDateTime(zoneId);
     }
 
     /**
-     * Get object represented as a {@link ZonedDateTime} with the
-     * the provided time-zone applied
+     * Get this date and time represented as a {@link ZonedDateTime} with the the provided timezone applied.
      *
-     * @return a {@link ZonedDateTime} representation of the object
+     * @return The {@link ZonedDateTime} representation.
      */
     public ZonedDateTime getZonedDateTime(ZoneId zoneId) {
         return instant.atZone(zoneId);
     }
 
     /**
-     * Get the current object represented in UTC as an {@link Instant}.
+     * Get this date and time represented as a {@link OffsetDateTime}.
+     * <p>
+     * <b>Note:</b> Since `OffsetDateTime` has no authoritative timezone concept, the current offset will be used
+     * whether this {@link DateTimeType} is authoritative or not.
      *
-     * @return The resulting UTC {@link Instant}.
+     * @return The {@link OffsetDateTime} representation.
+     */
+    public OffsetDateTime getOffsetDateTime() {
+        return OffsetDateTime.ofInstant(instant, zoneOffset);
+    }
+
+    /**
+     * Get the date and time represented in UTC as an {@link Instant}.
+     *
+     * @return The UTC-aligned {@link Instant}.
      */
     public Instant getInstant() {
         return instant;
@@ -271,7 +306,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     /**
      *
      * TODO: (Nad) Authoritative
-     * 
+     *
      * @param zone the target zone as a string
      * @return a {@link DateTimeType} translated to the given zone
      * @throws DateTimeException if the zone has an invalid format or the result exceeds the supported date range
@@ -281,17 +316,25 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return toZone(ZoneId.of(zone));
     }
 
+    public DateTimeType toOffset(ZoneOffset offset) throws DateTimeException {
+        return toZone(offset);
+    }
+
+    public DateTimeType toFixedOffset() {
+        return zoneId instanceof ZoneOffset ? this : toZone(zoneOffset);
+    }
+
     /**
      * Create a {@link DateTimeType} being the translation of the current object to a given zone
      * Create a {@link DateTimeType} being the translation of the current object to a given zone
      * TODO: (Nad) Authoritative
-     * 
+     *
      * @param zoneId the target {@link ZoneId}
      * @return a {@link DateTimeType} translated to the given zone
      * @throws DateTimeException if the result exceeds the supported date range
      */
     public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
-        return this.authoritativeZone && this.zoneId.equals(zoneId) ? this : new DateTimeType(instant, zoneId, null);
+        return this.authoritativeZone && this.zoneId.equals(zoneId) ? this : new DateTimeType(instant, zoneId);
     }
 
     @Override
