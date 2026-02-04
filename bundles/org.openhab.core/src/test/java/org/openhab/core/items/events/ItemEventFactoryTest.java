@@ -12,13 +12,11 @@
  */
 package org.openhab.core.items.events;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -63,10 +61,12 @@ import org.openhab.core.library.unit.SIUnits;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.State;
+import org.openhab.core.types.TimeSeries;
+import org.openhab.core.types.TimeSeries.Entry;
+import org.openhab.core.types.TimeSeries.Policy;
 import org.openhab.core.types.UnDefType;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonParser;
 
 import tech.units.indriya.unit.Units;
 
@@ -89,31 +89,14 @@ public class ItemEventFactoryTest {
     private static final String GROUP_NAME = "GroupA";
     private static final String SOURCE = "binding:type:id:channel";
 
-    private static final String ITEM_COMMAND_EVENT_TYPE = ItemCommandEvent.TYPE;
-    private static final String ITEM_STATE_EVENT_TYPE = ItemStateEvent.TYPE;
-    private static final String ITEM_STATE_UPDATED_EVENT_TYPE = ItemStateUpdatedEvent.TYPE;
-    private static final String ITEM_STATE_PREDICTED_EVENT_TYPE = ItemStatePredictedEvent.TYPE;
     private static final String ITEM_ADDED_EVENT_TYPE = ItemAddedEvent.TYPE;
     private static final String GROUPITEM_CHANGED_EVENT_TYPE = GroupItemStateChangedEvent.TYPE;
-    private static final String GROUPITEM_STATE_UPDATED_EVENT_TYPE = GroupStateUpdatedEvent.TYPE;
 
-    private static final String ITEM_COMMAND_EVENT_TOPIC = "openhab/items/" + ITEM_NAME + "/command";
-    private static final String ITEM_STATE_EVENT_TOPIC = "openhab/items/" + ITEM_NAME + "/state";
-    private static final String ITEM_STATE_PREDICTED_EVENT_TOPIC = "openhab/items/" + ITEM_NAME + "/statepredicted";
     private static final String ITEM_ADDED_EVENT_TOPIC = "openhab/items/" + ITEM_NAME + "/added";
     private static final String GROUPITEM_STATE_CHANGED_EVENT_TOPIC = "openhab/items/" + GROUP_NAME + "/" + ITEM_NAME
             + "/statechanged";
 
-    private static final Command ITEM_COMMAND = OnOffType.ON;
-    private static final String ITEM_COMMAND_EVENT_PAYLOAD = "{\"type\":\"OnOff\",\"value\":\"ON\"}";
-    private static final String ITEM_REFRESH_COMMAND_EVENT_PAYLOAD = "{\"type\":\"Refresh\", \"value\": \"REFRESH\"}";
-    private static final String ITEM_UNDEF_STATE_EVENT_PAYLOAD = "{\"type\":\"UnDef\", \"value\": \"UNDEF\"}";
-    private static final State ITEM_STATE = OnOffType.OFF;
-    private static final State NEW_ITEM_STATE = OnOffType.ON;
-    private static final String ITEM_STATE_EVENT_PAYLOAD = "{\"type\":\"OnOff\",\"value\":\"OFF\"}";
-    private static final String ITEM_STATE_PREDICTED_EVENT_PAYLOAD = "{\"predictedType\":\"OnOff\",\"predictedValue\":\"OFF\",\"isConfirmation\":\"false\"}";
     private static final String ITEM_ADDED_EVENT_PAYLOAD = new Gson().toJson(ItemDTOMapper.map(ITEM));
-    private static final String ITEM_STATE_CHANGED_EVENT_PAYLOAD = "{\"type\":\"OnOff\", \"value\": \"ON\", \"oldType\":\"OnOff\", \"oldValue\": \"OFF\"}";
 
     private static final State RAW_ITEM_STATE = new RawType(new byte[] { 1, 2, 3, 4, 5 }, RawType.DEFAULT_MIME_TYPE);
     private static final State NEW_RAW_ITEM_STATE = new RawType(new byte[] { 5, 4, 3, 2, 1 },
@@ -132,9 +115,16 @@ public class ItemEventFactoryTest {
             State expectedNewState, @Nullable ZoneId zone) {
     }
 
+    private record TimeSeriesTestEntry(Instant timestamp, State state, State expectedState) {
+    }
+
+    private record TimeSeriesTestCase(String itemName, Policy policy, List<TimeSeriesTestEntry> entries,
+            String expectedPayload, @Nullable String source, @Nullable ZoneId zone) {
+    }
+
     @BeforeEach
     public void init() {
-        when(timeZoneProvider.getTimeZone()).thenReturn(ZoneOffset.UTC);
+        when(timeZoneProvider.getTimeZone()).thenReturn(ZoneId.of("MIT", ZoneId.SHORT_IDS));
         factory = new ItemEventFactory(timeZoneProvider);
     }
 
@@ -345,6 +335,111 @@ public class ItemEventFactoryTest {
                     "{\"type\":\"String\",\"value\":\"Boofar\",\"oldType\":\"String\",\"oldValue\":\"Foobar\",\"lastStateUpdate\":\"2026-02-03T17:28:34-04:00\",\"lastStateChange\":\"2026-02-03T17:24:12-04:00\"}",
                     StringType.valueOf("Foobar"), StringType.valueOf("Boofar"), null));
 
+    public static final List<TimeSeriesTestCase> TIMESERIES_TEST_SOURCE = List.of(
+            new TimeSeriesTestCase("ItemA", Policy.ADD,
+                    List.of(new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:34Z"), OnOffType.OFF,
+                            OnOffType.OFF),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:35Z"), OnOffType.ON, OnOffType.ON),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:36Z"),
+                                    new DateTimeType("2019-11-11T13:50", ZoneId.of("Africa/Addis_Ababa")),
+                                    DateTimeType.valueOf("2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:37Z"),
+                                    DateTimeType.valueOf("?2019-11-11T13:50:23FJT"),
+                                    DateTimeType.valueOf("2019-11-11T14:50:23+14:00[Pacific/Apia]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:38Z"),
+                                    DateTimeType.valueOf("?2019-11-11T18:23:12GET"),
+                                    DateTimeType.valueOf("2019-11-12T04:23:12+14:00[Pacific/Apia]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:39Z"),
+                                    DateTimeType.valueOf("2015-11-11T18:23:12+00:00[Australia/Eucla]"),
+                                    DateTimeType.valueOf("2015-11-12T03:08:12+08:45[Australia/Eucla]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:40Z"),
+                                    new DecimalType("666.666E6", Locale.ROOT), new DecimalType(666666000)),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:41Z"),
+                                    new PercentType("99", Locale.ROOT), new PercentType(99)),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:42Z"), HSBType.BLUE, HSBType.BLUE),
+                            new TimeSeriesTestEntry(
+                                    Instant.parse("2026-02-03T10:28:43Z"),
+                                    new RawType(new byte[] { (byte) 0xe5, (byte) 0x6b, (byte) 0xf3, (byte) 0x24 },
+                                            "application/octet-stream"),
+                                    RawType.valueOf("data:application/octet-stream;base64,5WvzJA==")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:44Z"), UnDefType.NULL,
+                                    UnDefType.NULL),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:45Z"), UnDefType.UNDEF,
+                                    UnDefType.UNDEF),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:46Z"), OpenClosedType.OPEN,
+                                    OpenClosedType.OPEN),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:47Z"), PlayPauseType.PAUSE,
+                                    PlayPauseType.PAUSE),
+                            new TimeSeriesTestEntry(
+                                    Instant.parse("2026-02-03T10:28:48Z"), new PointType("52.4791061,62.1830008,385"),
+                                    new PointType("52.4791061,62.1830008,385")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:49Z"),
+                                    new QuantityType<>("366kPa", Locale.ROOT),
+                                    new QuantityType<>(366, Units.PASCAL.prefix(MetricPrefix.KILO))),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:50Z"), RewindFastforwardType.REWIND,
+                                    RewindFastforwardType.REWIND),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:51Z"), UpDownType.UP,
+                                    UpDownType.UP),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:52Z"),
+                                    StringListType.valueOf("Foo,Bar,Neva"),
+                                    new StringListType(List.of("Foo", "Bar", "Neva"))),
+                            new TimeSeriesTestEntry(
+                                    Instant.parse("2026-02-03T10:28:53Z"), StringType.valueOf("Boofar"),
+                                    new StringType("Boofar"))),
+                    "{\"timeSeries\":[{\"type\":\"OnOff\",\"value\":\"OFF\",\"timestamp\":\"2026-02-03T10:28:34Z\"},{\"type\":\"OnOff\",\"value\":\"ON\",\"timestamp\":\"2026-02-03T10:28:35Z\"},{\"type\":\"DateTime\",\"value\":\"2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]\",\"timestamp\":\"2026-02-03T10:28:36Z\"},{\"type\":\"DateTime\",\"value\":\"?2019-11-11T13:50:23+13:00[Pacific/Fiji]\",\"timestamp\":\"2026-02-03T10:28:37Z\"},{\"type\":\"DateTime\",\"value\":\"?2019-11-11T18:23:12+04:00[Asia/Tbilisi]\",\"timestamp\":\"2026-02-03T10:28:38Z\"},{\"type\":\"DateTime\",\"value\":\"2015-11-12T03:08:12+08:45[Australia/Eucla]\",\"timestamp\":\"2026-02-03T10:28:39Z\"},{\"type\":\"Decimal\",\"value\":\"666666000\",\"timestamp\":\"2026-02-03T10:28:40Z\"},{\"type\":\"Percent\",\"value\":\"99\",\"timestamp\":\"2026-02-03T10:28:41Z\"},{\"type\":\"HSB\",\"value\":\"240,100,100\",\"timestamp\":\"2026-02-03T10:28:42Z\"},{\"type\":\"Raw\",\"value\":\"data:application/octet-stream;base64,5WvzJA\\u003d\\u003d\",\"timestamp\":\"2026-02-03T10:28:43Z\"},{\"type\":\"UnDef\",\"value\":\"NULL\",\"timestamp\":\"2026-02-03T10:28:44Z\"},{\"type\":\"UnDef\",\"value\":\"UNDEF\",\"timestamp\":\"2026-02-03T10:28:45Z\"},{\"type\":\"OpenClosed\",\"value\":\"OPEN\",\"timestamp\":\"2026-02-03T10:28:46Z\"},{\"type\":\"PlayPause\",\"value\":\"PAUSE\",\"timestamp\":\"2026-02-03T10:28:47Z\"},{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\",\"timestamp\":\"2026-02-03T10:28:48Z\"},{\"type\":\"Quantity\",\"value\":\"366 kPa\",\"timestamp\":\"2026-02-03T10:28:49Z\"},{\"type\":\"RewindFastforward\",\"value\":\"REWIND\",\"timestamp\":\"2026-02-03T10:28:50Z\"},{\"type\":\"UpDown\",\"value\":\"UP\",\"timestamp\":\"2026-02-03T10:28:51Z\"},{\"type\":\"StringList\",\"value\":\"Foo,Bar,Neva\",\"timestamp\":\"2026-02-03T10:28:52Z\"},{\"type\":\"String\",\"value\":\"Boofar\",\"timestamp\":\"2026-02-03T10:28:53Z\"}],\"policy\":\"ADD\"}",
+                    SOURCE, null),
+            new TimeSeriesTestCase("ItemB", Policy.REPLACE,
+                    List.of(new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:34Z"), OnOffType.OFF,
+                            OnOffType.OFF),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:35Z"), OnOffType.ON, OnOffType.ON),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:36Z"),
+                                    new DateTimeType("2019-11-11T13:50", ZoneId.of("Africa/Addis_Ababa")),
+                                    DateTimeType.valueOf("2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:37Z"),
+                                    DateTimeType.valueOf("?2019-11-11T13:50:23FJT"),
+                                    DateTimeType.valueOf("2019-11-10T20:50:23-04:00[America/Manaus]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:38Z"),
+                                    DateTimeType.valueOf("?2019-11-11T18:23:12GET"),
+                                    DateTimeType.valueOf("2019-11-11T10:23:12-04:00[America/Manaus]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:39Z"),
+                                    DateTimeType.valueOf("2015-11-11T18:23:12+00:00[Australia/Eucla]"),
+                                    DateTimeType.valueOf("2015-11-12T03:08:12+08:45[Australia/Eucla]")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:40Z"),
+                                    new DecimalType("666.666E6", Locale.ROOT), new DecimalType(666666000)),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:41Z"),
+                                    new PercentType("99", Locale.ROOT), new PercentType(99)),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:42Z"), HSBType.BLUE, HSBType.BLUE),
+                            new TimeSeriesTestEntry(
+                                    Instant.parse("2026-02-03T10:28:43Z"),
+                                    new RawType(new byte[] { (byte) 0xe5, (byte) 0x6b, (byte) 0xf3, (byte) 0x24 },
+                                            "application/octet-stream"),
+                                    RawType.valueOf("data:application/octet-stream;base64,5WvzJA==")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:44Z"), UnDefType.NULL,
+                                    UnDefType.NULL),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:45Z"), UnDefType.UNDEF,
+                                    UnDefType.UNDEF),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:46Z"), OpenClosedType.OPEN,
+                                    OpenClosedType.OPEN),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:47Z"), PlayPauseType.PAUSE,
+                                    PlayPauseType.PAUSE),
+                            new TimeSeriesTestEntry(
+                                    Instant.parse("2026-02-03T10:28:48Z"), new PointType("52.4791061,62.1830008,385"),
+                                    new PointType("52.4791061,62.1830008,385")),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:49Z"),
+                                    new QuantityType<>("366kPa", Locale.ROOT),
+                                    new QuantityType<>(366, Units.PASCAL.prefix(MetricPrefix.KILO))),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:50Z"), RewindFastforwardType.REWIND,
+                                    RewindFastforwardType.REWIND),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:51Z"), UpDownType.UP,
+                                    UpDownType.UP),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:52Z"),
+                                    StringListType.valueOf("Foo,Bar,Neva"),
+                                    new StringListType(List.of("Foo", "Bar", "Neva"))),
+                            new TimeSeriesTestEntry(Instant.parse("2026-02-03T10:28:53Z"), StringType.valueOf("Boofar"),
+                                    new StringType("Boofar"))),
+                    "{\"timeSeries\":[{\"type\":\"OnOff\",\"value\":\"OFF\",\"timestamp\":\"2026-02-03T10:28:34Z\"},{\"type\":\"OnOff\",\"value\":\"ON\",\"timestamp\":\"2026-02-03T10:28:35Z\"},{\"type\":\"DateTime\",\"value\":\"2019-11-11T15:50:00+03:00[Africa/Addis_Ababa]\",\"timestamp\":\"2026-02-03T10:28:36Z\"},{\"type\":\"DateTime\",\"value\":\"?2019-11-11T13:50:23+13:00[Pacific/Fiji]\",\"timestamp\":\"2026-02-03T10:28:37Z\"},{\"type\":\"DateTime\",\"value\":\"?2019-11-11T18:23:12+04:00[Asia/Tbilisi]\",\"timestamp\":\"2026-02-03T10:28:38Z\"},{\"type\":\"DateTime\",\"value\":\"2015-11-12T03:08:12+08:45[Australia/Eucla]\",\"timestamp\":\"2026-02-03T10:28:39Z\"},{\"type\":\"Decimal\",\"value\":\"666666000\",\"timestamp\":\"2026-02-03T10:28:40Z\"},{\"type\":\"Percent\",\"value\":\"99\",\"timestamp\":\"2026-02-03T10:28:41Z\"},{\"type\":\"HSB\",\"value\":\"240,100,100\",\"timestamp\":\"2026-02-03T10:28:42Z\"},{\"type\":\"Raw\",\"value\":\"data:application/octet-stream;base64,5WvzJA\\u003d\\u003d\",\"timestamp\":\"2026-02-03T10:28:43Z\"},{\"type\":\"UnDef\",\"value\":\"NULL\",\"timestamp\":\"2026-02-03T10:28:44Z\"},{\"type\":\"UnDef\",\"value\":\"UNDEF\",\"timestamp\":\"2026-02-03T10:28:45Z\"},{\"type\":\"OpenClosed\",\"value\":\"OPEN\",\"timestamp\":\"2026-02-03T10:28:46Z\"},{\"type\":\"PlayPause\",\"value\":\"PAUSE\",\"timestamp\":\"2026-02-03T10:28:47Z\"},{\"type\":\"Point\",\"value\":\"52.4791061,62.1830008,385\",\"timestamp\":\"2026-02-03T10:28:48Z\"},{\"type\":\"Quantity\",\"value\":\"366 kPa\",\"timestamp\":\"2026-02-03T10:28:49Z\"},{\"type\":\"RewindFastforward\",\"value\":\"REWIND\",\"timestamp\":\"2026-02-03T10:28:50Z\"},{\"type\":\"UpDown\",\"value\":\"UP\",\"timestamp\":\"2026-02-03T10:28:51Z\"},{\"type\":\"StringList\",\"value\":\"Foo,Bar,Neva\",\"timestamp\":\"2026-02-03T10:28:52Z\"},{\"type\":\"String\",\"value\":\"Boofar\",\"timestamp\":\"2026-02-03T10:28:53Z\"}],\"policy\":\"REPLACE\"}",
+                    SOURCE, ZoneId.of("America/Manaus")));
+
     @ParameterizedTest
     @FieldSource("COMMAND_TEST_SOURCE")
     public void testCreateEventItemCommandEvent(CommandTestCase testCase) throws Exception {
@@ -504,17 +599,62 @@ public class ItemEventFactoryTest {
         assertEquals(testCase.lastStateUpdate, groupItemStateChangedEvent.getLastStateUpdate());
     }
 
-    @Test
-    public void testCreateStateEventOnOffType() {
-        ItemStateEvent event = ItemEventFactory.createStateEvent(ITEM_NAME, ITEM_STATE, SOURCE);
+    @ParameterizedTest
+    @FieldSource("TIMESERIES_TEST_SOURCE")
+    public void testCreateTimeSeriesEvent(TimeSeriesTestCase testCase) throws Exception {
+        String topic = "openhab/items/" + testCase.itemName + "/timeseries";
+        ZoneId zone = testCase.zone;
+        if (zone != null) {
+            when(timeZoneProvider.getTimeZone()).thenReturn(zone);
+        }
+        TimeSeries timeSeries = new TimeSeries(testCase.policy);
+        for (TimeSeriesTestEntry entry : testCase.entries) {
+            timeSeries.add(entry.timestamp, entry.state);
+        }
+        ItemTimeSeriesEvent timeSeriesEvent = ItemEventFactory.createTimeSeriesEvent(testCase.itemName, timeSeries,
+                testCase.source);
+        Event event = factory.createEvent(timeSeriesEvent.getType(), timeSeriesEvent.getTopic(),
+                timeSeriesEvent.getPayload(), timeSeriesEvent.getSource());
 
-        assertThat(event.getType(), is(ITEM_STATE_EVENT_TYPE));
-        assertThat(event.getTopic(), is(ITEM_STATE_EVENT_TOPIC));
-        assertThat(JsonParser.parseString(event.getPayload()), is(JsonParser.parseString(ITEM_STATE_EVENT_PAYLOAD)));
-        assertThat(event.getItemName(), is(ITEM_NAME));
-        assertThat(event.getSource(), is(SOURCE));
-        assertEquals(OnOffType.class, event.getItemState().getClass());
-        assertThat(event.getItemState(), is(ITEM_STATE));
+        assertEquals(ItemTimeSeriesEvent.class, event.getClass());
+        ItemTimeSeriesEvent itemTimeSeriesEvent = (ItemTimeSeriesEvent) event;
+        assertEquals(ItemTimeSeriesEvent.TYPE, itemTimeSeriesEvent.getType());
+        assertEquals(topic, itemTimeSeriesEvent.getTopic());
+        assertEquals(testCase.itemName, itemTimeSeriesEvent.getItemName());
+        assertEquals(testCase.expectedPayload, itemTimeSeriesEvent.getPayload());
+        assertNull(itemTimeSeriesEvent.getSource());
+        timeSeries = itemTimeSeriesEvent.getTimeSeries();
+        assertEquals(timeSeries.size(), testCase.entries.size());
+        TimeSeriesTestEntry testCaseEntry;
+        for (Entry entry : timeSeries.getStates().toList()) {
+            testCaseEntry = testCase.entries.stream().filter(e -> e.timestamp.equals(entry.timestamp())).findAny()
+                    .orElseThrow();
+            assertEquals(testCaseEntry.state.getClass(), entry.state().getClass());
+            assertEquals(testCaseEntry.expectedState.toFullString(), entry.state().toFullString());
+            assertEquals(testCaseEntry.expectedState, entry.state());
+        }
+
+        ItemTimeSeriesUpdatedEvent timeSeriesUpdatedEvent = ItemEventFactory
+                .createTimeSeriesUpdatedEvent(testCase.itemName, timeSeries, testCase.source);
+        event = factory.createEvent(timeSeriesUpdatedEvent.getType(), timeSeriesUpdatedEvent.getTopic(),
+                timeSeriesUpdatedEvent.getPayload(), timeSeriesUpdatedEvent.getSource());
+        topic += "updated";
+
+        assertEquals(ItemTimeSeriesUpdatedEvent.class, event.getClass());
+        ItemTimeSeriesUpdatedEvent itemTimeSeriesUpdatedEvent = (ItemTimeSeriesUpdatedEvent) event;
+        assertEquals(ItemTimeSeriesUpdatedEvent.TYPE, itemTimeSeriesUpdatedEvent.getType());
+        assertEquals(topic, itemTimeSeriesUpdatedEvent.getTopic());
+        assertEquals(testCase.itemName, itemTimeSeriesUpdatedEvent.getItemName());
+        assertNull(itemTimeSeriesUpdatedEvent.getSource());
+        timeSeries = itemTimeSeriesUpdatedEvent.getTimeSeries();
+        assertEquals(timeSeries.size(), testCase.entries.size());
+        for (Entry entry : timeSeries.getStates().toList()) {
+            testCaseEntry = testCase.entries.stream().filter(e -> e.timestamp.equals(entry.timestamp())).findAny()
+                    .orElseThrow();
+            assertEquals(testCaseEntry.state.getClass(), entry.state().getClass());
+            assertEquals(testCaseEntry.expectedState.toFullString(), entry.state().toFullString());
+            assertEquals(testCaseEntry.expectedState, entry.state());
+        }
     }
 
     @Test
