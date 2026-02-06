@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
+import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalUnit;
 import java.time.temporal.UnsupportedTemporalTypeException;
@@ -361,6 +362,98 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      */
     public DateTimeType truncatedTo(TemporalUnit unit) {
         return new DateTimeType(getZonedDateTime().truncatedTo(unit), authoritativeZone);
+    }
+
+    /**
+     * Calculate the amount of time between this and a {@link Temporal} object in terms of a single
+     * {@code TemporalUnit}. The start and end points are {@code this} and the specified date-time. The result will be
+     * negative if the end is before the start.
+     * <p>
+     * The {@code Temporal} passed to this method is converted to a {@code ZonedDateTime} using
+     * {@link #from(TemporalAccessor)}. If the time-zone differs between the two zoned date-times, the specified end
+     * date-time is normalized to have the same zone as this {@code ZonedDateTime}.
+     * <p>
+     * The calculation returns a whole number, representing the number of complete units between the two date-times. For
+     * example, the amount in months between {@code 2012-06-15T00:00Z} and {@code 2012-08-14T23:59Z} will only be one
+     * month as it is one minute short of two months.
+     * <p>
+     * The calculation is implemented in this method for {@link ChronoUnit}. The units {@code NANOS}, {@code MICROS},
+     * {@code MILLIS}, {@code SECONDS}, {@code MINUTES}, {@code HOURS} and {@code HALF_DAYS}, {@code DAYS},
+     * {@code WEEKS}, {@code MONTHS}, {@code YEARS}, {@code DECADES}, {@code CENTURIES}, {@code MILLENNIA} and
+     * {@code ERAS} are supported. Other {@code ChronoUnit} values will throw an exception.
+     * <p>
+     * The calculation for date and time units differ.
+     * <p>
+     * Date units operate on the local time-line, using the local date-time. For example, the period from noon on day 1
+     * to noon the following day in days will always be counted as exactly one day, irrespective of whether there was a
+     * daylight savings change or not.
+     * <p>
+     * Time units operate on the instant time-line. The calculation effectively converts both zoned date-times to
+     * instants and then calculates the period between the instants. For example, the period from noon on day 1 to noon
+     * the following day in hours may be 23, 24 or 25 hours (or some other amount) depending on whether there was a
+     * daylight savings change or not.
+     * <p>
+     * If the unit is not a {@code ChronoUnit}, then the result of this method is obtained by invoking
+     * {@code TemporalUnit.between(Temporal, Temporal)} passing {@link #getZonedDateTime()} as the first argument and
+     * the converted input temporal as the second argument.
+     *
+     * @param endExclusive the end date-time, exclusive.
+     * @param unit the unit to measure the amount in.
+     * @return the amount of time between this {@link DateTimeType} and the end date-time.
+     * @throws DateTimeException If the amount cannot be calculated, or the end temporal cannot be converted to a
+     *             {@code ZonedDateTime}.
+     * @throws UnsupportedTemporalTypeException If the unit is not supported.
+     * @throws ArithmeticException If numeric overflow occurs.
+     */
+    public long until(Temporal endExclusive, TemporalUnit unit) {
+        if (unit instanceof ChronoUnit && !unit.isDateBased()) {
+            return instant.until(endExclusive, unit);
+        }
+        return getZonedDateTime().until(endExclusive, unit);
+    }
+
+    /**
+     * Calculate the amount of time between this and another {@link DateTimeType} in terms of a single
+     * {@code TemporalUnit}. The start and end points are {@code this} and the specified {@link DateTimeType}. The
+     * result will be negative if the end is before the start.
+     * <p>
+     * The {@link DateTimeType} passed to this method is converted to a {@code ZonedDateTime} using
+     * {@link #getZonedDateTime()}. If the time-zone differs between the two zoned {@link DateTimeType}s, the specified
+     * end {@code DateTimeType} is normalized to have the same zone as this {@code DateTimeType}.
+     * <p>
+     * The calculation returns a whole number, representing the number of complete units between the two
+     * {@link DateTimeType}s. For example, the amount in months between {@code 2012-06-15T00:00Z} and
+     * {@code 2012-08-14T23:59Z} will only be one month as it is one minute short of two months.
+     * <p>
+     * The calculation is implemented in this method for {@link ChronoUnit}. The units {@code NANOS}, {@code MICROS},
+     * {@code MILLIS}, {@code SECONDS}, {@code MINUTES}, {@code HOURS} and {@code HALF_DAYS}, {@code DAYS},
+     * {@code WEEKS}, {@code MONTHS}, {@code YEARS}, {@code DECADES}, {@code CENTURIES}, {@code MILLENNIA} and
+     * {@code ERAS} are supported. Other {@code ChronoUnit} values will throw an exception.
+     * <p>
+     * The calculation for date and time units differ.
+     * <p>
+     * Date units operate on the local time-line, using the local date-time. For example, the period from noon on day 1
+     * to noon the following day in days will always be counted as exactly one day, irrespective of whether there was a
+     * daylight savings change or not.
+     * <p>
+     * Time units operate on the instant time-line. The calculation effectively converts both {@link DateTimeType}s to
+     * instants and then calculates the period between the instants. For example, the period from noon on day 1 to noon
+     * the following day in hours may be 23, 24 or 25 hours (or some other amount) depending on whether there was a
+     * daylight savings change or not.
+     * <p>
+     * If the unit is not a {@code ChronoUnit}, then the result of this method is obtained by invoking
+     * {@code TemporalUnit.between(Temporal, Temporal)} passing {@link #getZonedDateTime()} as the first argument and
+     * {@code endExclusive.getZonedDateTime()} as the second argument.
+     *
+     * @param endExclusive the end {@link DateTimeType}, exclusive.
+     * @param unit the unit to measure the amount in.
+     * @return the amount of time between this and the other {@link DateTimeType}s.
+     * @throws DateTimeException If the amount cannot be calculated.
+     * @throws UnsupportedTemporalTypeException If the unit is not supported.
+     * @throws ArithmeticException If numeric overflow occurs.
+     */
+    public long until(DateTimeType endExclusive, TemporalUnit unit) {
+        return until(endExclusive.getZonedDateTime(), unit);
     }
 
     /**
