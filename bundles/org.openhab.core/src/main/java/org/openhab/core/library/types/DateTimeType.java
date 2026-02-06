@@ -13,15 +13,22 @@
 package org.openhab.core.library.types;
 
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.time.chrono.ChronoZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
+import java.time.temporal.TemporalAmount;
+import java.time.temporal.TemporalUnit;
+import java.time.temporal.UnsupportedTemporalTypeException;
 import java.time.zone.ZoneRulesException;
 import java.util.Locale;
 import java.util.Objects;
@@ -121,6 +128,19 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      * @param zoneId the {@link ZoneId} or {@link ZoneOffset}.
      */
     public DateTimeType(Instant instant, ZoneId zoneId) {
+        this(instant, zoneId, true);
+    }
+
+    /**
+     * Creates a new {@link DateTimeType} representing the specified instant and timezone or offset. Whether the
+     * timezone is considered authoritative is decided by the specified parameter.
+     *
+     * @param instant the moment in time.
+     * @param zoneId the {@link ZoneId} or {@link ZoneOffset}.
+     * @param authoritativeZone {@code true} if the timezone should be considered authoritative, {@code false} if it
+     *            shouldn't.
+     */
+    public DateTimeType(Instant instant, ZoneId zoneId, boolean authoritativeZone) {
         this.instant = instant;
         ZoneId resolvedZoneId;
         ZoneOffset resolvedOffset;
@@ -134,7 +154,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
 
         this.zoneId = resolvedZoneId;
         this.zoneOffset = resolvedOffset;
-        this.authoritativeZone = true;
+        this.authoritativeZone = authoritativeZone;
     }
 
     /**
@@ -178,14 +198,23 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-     * Creates a new {@link DateTimeType} with the given value with an authoritative timezone.
+     * Creates a new {@link DateTimeType} representing the instant and authoritative timezone provided by the specified
+     * {@link ZonedDateTime}.
      *
-     * @param zoned the moment in time.
+     * @param zoned the moment in time and timezone.
      */
     public DateTimeType(ZonedDateTime zoned) {
         this(zoned, true);
     }
 
+    /**
+     * Creates a new {@link DateTimeType} representing the instant and timezone provided by the specified
+     * {@link ZonedDateTime}. Whether the timezone is considered authoritative is decided by the specified parameter.
+     *
+     * @param zoned the moment in time and timezone.
+     * @param authoritativeZone {@code true} if the timezone should be considered authoritative, {@code false} if it
+     *            shouldn't.
+     */
     public DateTimeType(ZonedDateTime zoned, boolean authoritativeZone) {
         this.instant = zoned.toInstant();
         this.zoneId = zoned.getZone();
@@ -194,8 +223,14 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     // doc: throws
-    public DateTimeType(String zonedValue) throws IllegalArgumentException {
-        ParsedDateTimeResult result = parseDateTime(zonedValue);
+    /**
+     * Creates a new {@link DateTimeType} representing the date, time and potentially timezone or offset parsed from the provided string.
+     *
+     * @param value
+     * @throws IllegalArgumentException
+     */
+    public DateTimeType(String value) throws IllegalArgumentException {
+        ParsedDateTimeResult result = parseDateTime(value);
         authoritativeZone = result.authoritativeZone;
         instant = result.zdt.toInstant();
         zoneId = result.zdt.getZone();
@@ -203,8 +238,8 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     // doc: throws, always auth
-    public DateTimeType(String zonedValue, ZoneId zoneId) throws IllegalArgumentException {
-        ParsedDateTimeResult result = parseDateTime(zonedValue);
+    public DateTimeType(String value, ZoneId zoneId) throws IllegalArgumentException {
+        ParsedDateTimeResult result = parseDateTime(value);
         ZonedDateTime zdt = result.zdt.withZoneSameInstant(zoneId);
         this.authoritativeZone = true;
         this.instant = zdt.toInstant();
@@ -304,6 +339,142 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
+     * Truncation returns a copy of this {@code DateTimeType} with fields smaller than the specified unit set to zero.
+     * For example, truncating with the {@link ChronoUnit#MINUTES minutes} unit will set the second-of-minute and
+     * nano-of-second field to zero.
+     * <p>
+     * The unit must have a {@linkplain TemporalUnit#getDuration() duration} that divides into the length of a standard
+     * day without remainder. This includes all supplied time units on {@link ChronoUnit} and {@link ChronoUnit#DAYS
+     * DAYS}. Other units throw an exception.
+     * <p>
+     * This operates on the local time-line, {@link LocalDateTime#truncatedTo(TemporalUnit) truncating}, which is then
+     * converted back to a {@link DateTimeType} using the zone ID to obtain the offset.
+     * <p>
+     * When converting back to {@code DateTimeType}, if the local date-time is in an overlap, then the offset will be
+     * retained if possible, otherwise the earlier offset will be used. If in a gap, the local date-time will be
+     * adjusted forward by the length of the gap.
+     *
+     * @param unit the unit to truncate to.
+     * @return The resulting {@code DateTimeType}.
+     * @throws DateTimeException if unable to truncate.
+     * @throws UnsupportedTemporalTypeException if the unit is not supported.
+     */
+    public DateTimeType truncatedTo(TemporalUnit unit) {
+        return new DateTimeType(getZonedDateTime().truncatedTo(unit), authoritativeZone);
+    }
+
+    /**
+     * This returns a new {@link DateTimeType}, based on this one, with the specified amount added. The amount is
+     * typically {@link Period} or {@link Duration} but may be any other type implementing the {@link TemporalAmount}
+     * interface.
+     *
+     * @param amountToAdd the amount to add.
+     * @return The resulting {@code DateTimeType}.
+     * @throws DateTimeException if the addition cannot be made.
+     * @throws ArithmeticException if numeric overflow occurs.
+     */
+    public DateTimeType plus(TemporalAmount amountToAdd) {
+        return new DateTimeType(getZonedDateTime().plus(amountToAdd), authoritativeZone);
+    }
+
+    /**
+     * This returns a new {@link DateTimeType}, based on this one, with the specified amount subtracted. The amount is
+     * typically {@link Period} or {@link Duration} but may be any other type implementing the {@link TemporalAmount}
+     * interface.
+     *
+     * @param amountToSubtract the amount to subtract.
+     * @return The resulting {@code DateTimeType}.
+     * @throws DateTimeException if the subtraction cannot be made.
+     * @throws ArithmeticException if numeric overflow occurs.
+     */
+    public DateTimeType minus(TemporalAmount amountToSubtract) {
+        return new DateTimeType(getZonedDateTime().minus(amountToSubtract), authoritativeZone);
+    }
+
+    /**
+     * This returns a new {@link DateTimeType}, based on this one, with the amount in terms of the unit added. If it is
+     * not possible to add the amount, because the unit is not supported or for some other reason, an exception is
+     * thrown.
+     * <p>
+     * The calculation for date and time units differ. Date units operate on the local time-line. The period is first
+     * added to the local date-time, then converted back to a zoned date-time using the zone ID.
+     * <p>
+     * Time units operate on the instant time-line.
+     * <p>
+     * If the field is not a {@code ChronoUnit}, then the result of this method is obtained by invoking
+     * {@code TemporalUnit.addTo(Temporal, long)}. In this case, the unit determines whether and how to perform the
+     * addition.
+     *
+     * @param amountToAdd the amount of the unit to add to the result, may be negative.
+     * @param unit the unit of the amount to add.
+     * @return The resulting {@code DateTimeType}.
+     * @throws DateTimeException if the addition cannot be made.
+     * @throws UnsupportedTemporalTypeException if the unit is not supported.
+     * @throws ArithmeticException if numeric overflow occurs.
+     */
+    public DateTimeType plus(long amountToAdd, TemporalUnit unit) {
+        if (unit instanceof ChronoUnit && !unit.isDateBased()) {
+            return new DateTimeType(instant.plus(amountToAdd, unit), zoneId, authoritativeZone);
+        }
+        return new DateTimeType(getZonedDateTime().plus(amountToAdd, unit), authoritativeZone);
+    }
+
+    /**
+     * This returns a new {@link DateTimeType}, based on this one, with the amount in terms of the unit subtracted. If
+     * it is not possible to subtract the amount, because the unit is not supported or for some other reason, an
+     * exception is thrown.
+     * <p>
+     * The calculation for date and time units differ. Date units operate on the local time-line. The period is first
+     * subtracted from the local date-time, then converted back to a zoned date-time using the zone ID.
+     * <p>
+     * Time units operate on the instant time-line.
+     * <p>
+     * This method is equivalent to {@link #plus(long, TemporalUnit)} with the amount negated.
+     *
+     * @param amountToSubtract the amount of the unit to subtract.
+     * @param unit the unit of the amount to subtract.
+     * @return The resulting {@code DateTimeType}.
+     * @throws DateTimeException if the subtracted cannot be made.
+     * @throws UnsupportedTemporalTypeException if the unit is not supported.
+     * @throws ArithmeticException if numeric overflow occurs.
+     */
+    public DateTimeType minus(long amountToSubtract, TemporalUnit unit) {
+        return (amountToSubtract == Long.MIN_VALUE ? plus(Long.MAX_VALUE, unit).plus(1, unit) : plus(-amountToSubtract, unit));
+    }
+
+    public boolean isAfter(DateTimeType instant) { //TODO: (Nad) Between?
+        return getZonedDateTime().isAfter(instant.getZonedDateTime());
+    }
+
+    public boolean isAfter(ChronoZonedDateTime<?> instant) {
+        return getZonedDateTime().isAfter(instant);
+    }
+
+    public boolean isAfter(Instant instant) {
+        return this.instant.isAfter(instant);
+    }
+
+    public boolean isBefore(DateTimeType instant) {
+        return getZonedDateTime().isBefore(instant.getZonedDateTime());
+    }
+
+    public boolean isBefore(ChronoZonedDateTime<?> instant) {
+        return getZonedDateTime().isBefore(instant);
+    }
+
+    public boolean isBefore(Instant instant) {
+        return this.instant.isBefore(instant);
+    }
+
+    public DateTimeType toOffset(ZoneOffset offset) throws DateTimeException {
+        return toZone(offset);
+    }
+
+    public DateTimeType toFixedOffset() {
+        return zoneId instanceof ZoneOffset ? this : toZone(zoneOffset);
+    }
+
+    /**
      *
      * TODO: (Nad) Authoritative
      *
@@ -314,14 +485,6 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      */
     public DateTimeType toZone(String zone) throws DateTimeException, ZoneRulesException {
         return toZone(ZoneId.of(zone));
-    }
-
-    public DateTimeType toOffset(ZoneOffset offset) throws DateTimeException {
-        return toZone(offset);
-    }
-
-    public DateTimeType toFixedOffset() {
-        return zoneId instanceof ZoneOffset ? this : toZone(zoneOffset);
     }
 
     /**
@@ -470,26 +633,38 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         }
     }
 
+    /**
+     * Attempt to parse the specified string using 4 different parsing patterns in the following order:
+     * <ul>
+     * <li> {@code 2022-12-22T12:22+00:00} / {@code 2022-12-22T12:22:11+0000} / {@code 2022-12-22T12:22:11.000+00:00}<br>The zone offset is always 4 digits, with or without {@code :}</li>
+     * <li> {@code 2022-12-22T12:22Z} / {@code 2022-12-22T12:22:11+0000} / {@code 2022-12-22T12:22:11.000+00:00}<br>The zone offset is the letter Z for UTC, or 2, 4 or 6 digits, with or without {@code :}</li>
+     * <li> {@code 2022-12-22T12:22PST} / {@code 2022-12-22T12:22:11CET} / {@code 2022-12-22T12:22:11.000Central European Time}<br>The time zone is the time zone name in either abbreviated or full form</li>
+     * <li> {@code 2022-12-22T12:22} / {@code 2022-12-22T12:22:11} / {@code 2022-12-22T12:22:11.000}<br>No time zone information, results in a {@link LocalDateTime}</li>
+     * </ul>
+     *
+     * The result is always a {@link ZonedDateTime} or a {@link LocalDateTime}.
+     *
+     * @param value the string to parse.
+     * @return the resulting {@link ZonedDateTime} or {@link LocalDateTime}.
+     * @throws DateTimeParseException If the parsing fails.
+     */
     private static Temporal parse(String value) throws DateTimeParseException {
-        ZonedDateTime result;
         try {
-            result = ZonedDateTime.parse(value, PARSER_TZ_RFC);
+            return ZonedDateTime.parse(value, PARSER_TZ_RFC);
         } catch (DateTimeParseException tzMsRfcException) {
             try {
-                result = ZonedDateTime.parse(value, PARSER_TZ_ISO);
+                return ZonedDateTime.parse(value, PARSER_TZ_ISO);
             } catch (DateTimeParseException tzMsIsoException) {
                 try {
-                    result = ZonedDateTime.parse(value, PARSER_TZ);
+                    return ZonedDateTime.parse(value, PARSER_TZ);
                 } catch (DateTimeParseException tzException) {
                     try {
-                        result = ZonedDateTime.parse(value);
+                        return ZonedDateTime.parse(value);
                     } catch (DateTimeParseException e) {
                         return LocalDateTime.parse(value, PARSER);
                     }
                 }
             }
         }
-
-        return result;
     }
 }
