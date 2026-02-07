@@ -280,27 +280,27 @@ public class ItemEventFactory extends AbstractEventFactory {
         switch (result) {
             case ItemEventPayloadBean iep:
                 if (DATE_TIME_TYPE_TYPE.equals(iep.type) && iep.value != null && iep.value.charAt(0) == '?') {
-                    iep.value = new DateTimeType(iep.value, timeZoneProvider.getTimeZone()).toFullString();
+                    iep.value = new DateTimeType(iep.value).toZone(timeZoneProvider.getTimeZone()).toFullString();
                 }
                 break;
             case ItemStateUpdatedEventPayloadBean isuep:
                 if (DATE_TIME_TYPE_TYPE.equals(isuep.type) && isuep.value != null && isuep.value.charAt(0) == '?') {
-                    isuep.value = new DateTimeType(isuep.value, timeZoneProvider.getTimeZone()).toFullString();
+                    isuep.value = new DateTimeType(isuep.value).toZone(timeZoneProvider.getTimeZone()).toFullString();
                 }
                 break;
             case ItemStateChangedEventPayloadBean iscep:
                 if (DATE_TIME_TYPE_TYPE.equals(iscep.type) && iscep.value != null && iscep.value.charAt(0) == '?') {
-                    iscep.value = new DateTimeType(iscep.value, timeZoneProvider.getTimeZone()).toFullString();
+                    iscep.value = new DateTimeType(iscep.value).toZone(timeZoneProvider.getTimeZone()).toFullString();
                 }
                 if (DATE_TIME_TYPE_TYPE.equals(iscep.oldType) && iscep.value != null
                         && iscep.oldValue.charAt(0) == '?') {
-                    iscep.oldValue = new DateTimeType(iscep.oldValue, timeZoneProvider.getTimeZone()).toFullString();
+                    iscep.oldValue = new DateTimeType(iscep.oldValue).toZone(timeZoneProvider.getTimeZone()).toFullString();
                 }
                 break;
             case ItemStatePredictedEventPayloadBean ispep:
                 if (DATE_TIME_TYPE_TYPE.equals(ispep.predictedType) && ispep.predictedValue != null
                         && ispep.predictedValue.charAt(0) == '?') {
-                    ispep.predictedValue = new DateTimeType(ispep.predictedValue, timeZoneProvider.getTimeZone())
+                    ispep.predictedValue = new DateTimeType(ispep.predictedValue).toZone(timeZoneProvider.getTimeZone())
                             .toFullString();
                 }
                 break;
@@ -309,7 +309,7 @@ public class ItemEventFactory extends AbstractEventFactory {
                 if (series != null) {
                     for (ItemTimeSeriesEventPayloadBean.TimeSeriesPayload tsp : series) {
                         if (DATE_TIME_TYPE_TYPE.equals(tsp.type) && tsp.value != null && tsp.value.charAt(0) == '?') {
-                            tsp.value = new DateTimeType(tsp.value, timeZoneProvider.getTimeZone()).toFullString();
+                            tsp.value = new DateTimeType(tsp.value).toZone(timeZoneProvider.getTimeZone()).toFullString();
                         }
                     }
                 }

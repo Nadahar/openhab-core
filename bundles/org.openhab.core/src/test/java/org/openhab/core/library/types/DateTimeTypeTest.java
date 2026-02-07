@@ -360,9 +360,9 @@ public class DateTimeTypeTest {
     public void epochTest() {
         DateTimeType zdtEpoch = new DateTimeType("1970-01-01T00:00:00+0000");
         DateTimeType zdtStandard = new DateTimeType("2014-03-30T10:58:47+0000");
-        DateTimeType epochSecond = new DateTimeType("0", ZoneOffset.UTC);
-        DateTimeType epochStandard = new DateTimeType("1396177127", ZoneOffset.UTC);
-        DateTimeType epochMilliseconds = new DateTimeType("000000000000", ZoneOffset.UTC);
+        DateTimeType epochSecond = new DateTimeType("0").toZone(ZoneOffset.UTC);
+        DateTimeType epochStandard = new DateTimeType("1396177127").toZone(ZoneOffset.UTC);
+        DateTimeType epochMilliseconds = new DateTimeType("000000000000").toZone(ZoneOffset.UTC);
         assertThat(epochSecond, is(zdtEpoch));
         assertThat(epochMilliseconds, is(zdtEpoch));
         assertThat(epochStandard, is(zdtStandard));
@@ -385,8 +385,7 @@ public class DateTimeTypeTest {
             ZonedDateTime zonedDate = ZonedDateTime.of(dateTime, inputTimeZone.toZoneId());
             dt1 = new DateTimeType(zonedDate);
             dt3 = new DateTimeType(
-                    zonedDate.format((DateTimeFormatter.ofPattern(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS))),
-                    inputTimeZone.toZoneId());
+                    zonedDate.format((DateTimeFormatter.ofPattern(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS)))).toZone(inputTimeZone.toZoneId());
             zonedDate = ZonedDateTime.of(dateTime, inputTimeZone.toZoneId()).toInstant()
                     .atZone(parameterSet.defaultTimeZone.toZoneId());
             dt2 = new DateTimeType(zonedDate);
@@ -408,7 +407,7 @@ public class DateTimeTypeTest {
 
     @ParameterizedTest
     @MethodSource("parameters")
-    @SuppressWarnings("PMD.SetDefaultTimeZone")
+    @SuppressWarnings({ "PMD.SetDefaultTimeZone", "deprecation" })
     public void formattingTest(ParameterSet parameterSet) {
         TimeZone.setDefault(parameterSet.defaultTimeZone);
         DateTimeType dt = createDateTimeType(parameterSet);
@@ -442,6 +441,7 @@ public class DateTimeTypeTest {
         assertThrows(DateTimeException.class, () -> dt.toZone("XXX"));
     }
 
+    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("provideTestCasesForFormatWithZone")
     void formatWithZone(String instant, @Nullable String pattern, ZoneId zoneId, String expected) {
