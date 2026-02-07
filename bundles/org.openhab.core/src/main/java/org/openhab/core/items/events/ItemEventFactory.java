@@ -294,7 +294,8 @@ public class ItemEventFactory extends AbstractEventFactory {
                 }
                 if (DATE_TIME_TYPE_TYPE.equals(iscep.oldType) && iscep.value != null
                         && iscep.oldValue.charAt(0) == '?') {
-                    iscep.oldValue = new DateTimeType(iscep.oldValue).toZone(timeZoneProvider.getTimeZone()).toFullString();
+                    iscep.oldValue = new DateTimeType(iscep.oldValue).toZone(timeZoneProvider.getTimeZone())
+                            .toFullString();
                 }
                 break;
             case ItemStatePredictedEventPayloadBean ispep:
@@ -309,7 +310,8 @@ public class ItemEventFactory extends AbstractEventFactory {
                 if (series != null) {
                     for (ItemTimeSeriesEventPayloadBean.TimeSeriesPayload tsp : series) {
                         if (DATE_TIME_TYPE_TYPE.equals(tsp.type) && tsp.value != null && tsp.value.charAt(0) == '?') {
-                            tsp.value = new DateTimeType(tsp.value).toZone(timeZoneProvider.getTimeZone()).toFullString();
+                            tsp.value = new DateTimeType(tsp.value).toZone(timeZoneProvider.getTimeZone())
+                                    .toFullString();
                         }
                     }
                 }

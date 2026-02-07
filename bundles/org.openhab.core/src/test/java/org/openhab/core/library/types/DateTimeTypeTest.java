@@ -385,7 +385,8 @@ public class DateTimeTypeTest {
             ZonedDateTime zonedDate = ZonedDateTime.of(dateTime, inputTimeZone.toZoneId());
             dt1 = new DateTimeType(zonedDate);
             dt3 = new DateTimeType(
-                    zonedDate.format((DateTimeFormatter.ofPattern(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS)))).toZone(inputTimeZone.toZoneId());
+                    zonedDate.format((DateTimeFormatter.ofPattern(DateTimeType.DATE_PATTERN_WITH_TZ_AND_MS))))
+                    .toZone(inputTimeZone.toZoneId());
             zonedDate = ZonedDateTime.of(dateTime, inputTimeZone.toZoneId()).toInstant()
                     .atZone(parameterSet.defaultTimeZone.toZoneId());
             dt2 = new DateTimeType(zonedDate);
