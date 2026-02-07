@@ -302,14 +302,23 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         return instant;
     }
 
+    /**
+     * @return The {@link ZoneId} of this {@link DateTimeType}.
+     */
     public ZoneId getZoneId() {
         return zoneId;
     }
 
+    /**
+     * @return The {@link ZoneOffset} of this {@link DateTimeType}.
+     */
     public ZoneOffset getZoneOffset() {
         return zoneOffset;
     }
 
+    /**
+     * @return {@code true} if this {@link DateTimeType} has an authoritative timezone, {@code false} otherwise.
+     */
     public boolean isZoneAuthoritative() {
         return authoritativeZone;
     }
@@ -538,20 +547,6 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
-     * This returns a new {@link DateTimeType}, based on this one, with the specified amount subtracted. The amount is
-     * typically {@link Period} or {@link Duration} but may be any other type implementing the {@link TemporalAmount}
-     * interface.
-     *
-     * @param amountToSubtract the amount to subtract.
-     * @return The resulting {@code DateTimeType}.
-     * @throws ArithmeticException If numeric overflow occurs.
-     * @throws DateTimeException If the subtraction cannot be made or if the result exceeds the supported range.
-     */
-    public DateTimeType minus(TemporalAmount amountToSubtract) throws ArithmeticException, DateTimeException {
-        return new DateTimeType(getZonedDateTime().minus(amountToSubtract), authoritativeZone);
-    }
-
-    /**
      * This returns a new {@link DateTimeType}, based on this one, with the amount in terms of the unit added. If it is
      * not possible to add the amount, because the unit is not supported or for some other reason, an exception is
      * thrown.
@@ -578,6 +573,20 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
             return new DateTimeType(instant.plus(amountToAdd, unit), zoneId, authoritativeZone);
         }
         return new DateTimeType(getZonedDateTime().plus(amountToAdd, unit), authoritativeZone);
+    }
+
+    /**
+     * This returns a new {@link DateTimeType}, based on this one, with the specified amount subtracted. The amount is
+     * typically {@link Period} or {@link Duration} but may be any other type implementing the {@link TemporalAmount}
+     * interface.
+     *
+     * @param amountToSubtract the amount to subtract.
+     * @return The resulting {@code DateTimeType}.
+     * @throws ArithmeticException If numeric overflow occurs.
+     * @throws DateTimeException If the subtraction cannot be made or if the result exceeds the supported range.
+     */
+    public DateTimeType minus(TemporalAmount amountToSubtract) throws ArithmeticException, DateTimeException {
+        return new DateTimeType(getZonedDateTime().minus(amountToSubtract), authoritativeZone);
     }
 
     /**
@@ -672,39 +681,39 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
     }
 
     /**
+     * Parse the specified timezone (zone ID, zone offset or zone name), and returns a new {@link DateTimeType} that
+     * represents the same moment in time, expressed in the parsed timezone. For details about the supported format,
+     * see {@link ZoneId#of(String)}.
+     * <p>
+     * The new {@link DateTimeType} has an authoritative timezone.
      *
-     * TODO: (Nad) Authoritative
-     *
-     * @param zone the target zone as a string
-     * @return a {@link DateTimeType} translated to the given zone
-     * @throws DateTimeException if the zone has an invalid format or the result exceeds the supported date range
-     * @throws ZoneRulesException if the zone is a region ID that cannot be found
+     * @param zone the target zone as a string.
+     * @return The new {@link DateTimeType} translated to the given zone.
+     * @throws DateTimeException If the zone has an invalid format or the result exceeds the supported date range.
+     * @throws ZoneRulesException If the zone is a region ID that cannot be found or if no rules are available for the
+     *             zone ID.
      */
     public DateTimeType toZone(String zone) throws DateTimeException, ZoneRulesException {
         return toZone(ZoneId.of(zone));
     }
 
     /**
-     * Create a {@link DateTimeType} being the translation of the current object to a given zone
-     * Create a {@link DateTimeType} being the translation of the current object to a given zone
-     * TODO: (Nad) Authoritative
+     * Create a new {@link DateTimeType} that represents the same moment in time, expressed in the specified timezone.
+     * <p>
+     * The new {@link DateTimeType} has an authoritative timezone.
      *
-     * @param zoneId the target {@link ZoneId}
-     * @return a {@link DateTimeType} translated to the given zone
-     * @throws DateTimeException if the result exceeds the supported date range
+     * @param zoneId the target {@link ZoneId} or {@link ZoneOffset}.
+     * @return The new {@link DateTimeType} translated to the given zone.
+     * @throws DateTimeException If the result exceeds the supported date range.
+     * @throws ZoneRulesException If no rules are available for the zone ID.
      */
-    public DateTimeType toZone(ZoneId zoneId) throws DateTimeException {
+    public DateTimeType toZone(ZoneId zoneId) throws DateTimeException, ZoneRulesException {
         return this.authoritativeZone && this.zoneId.equals(zoneId) ? this : new DateTimeType(instant, zoneId);
     }
 
     @Override
     public String toString() {
         return toString(zoneId);
-    }
-
-    @Override
-    public String toFullString() {
-        return toFullString(zoneId);
     }
 
     public String toString(ZoneId zoneId) {
@@ -727,6 +736,11 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
         } catch (DateTimeException e) {
             return "DateTimeException: " + e.getMessage();
         }
+    }
+
+    @Override
+    public String toFullString() {
+        return toFullString(zoneId);
     }
 
     public String toFullString(ZoneId zoneId) {
