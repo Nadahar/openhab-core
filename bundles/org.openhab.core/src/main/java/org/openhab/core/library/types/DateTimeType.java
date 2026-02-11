@@ -252,10 +252,10 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      */
     public DateTimeType(String value) throws DateTimeException, IllegalArgumentException, ZoneRulesException {
         ParsedDateTimeResult result = parseDateTime(value);
-        authoritativeZone = result.authoritativeZone;
         instant = result.zdt.toInstant();
         zoneId = result.zdt.getZone();
         zoneOffset = result.zdt.getOffset();
+        authoritativeZone = result.authoritativeZone;
     }
 
     /**
@@ -872,6 +872,9 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      * The zone offset is always 4 digits, with or without {@code :}</li>
      * <li>{@code 2022-12-22T12:22Z} / {@code 2022-12-22T12:22:11+0000} / {@code 2022-12-22T12:22:11.000+00:00}<br>
      * The zone offset is the letter Z for UTC, or 2, 4 or 6 digits, with or without {@code :}</li>
+     * <li>{@code 2022-12-22T12:22} / {@code 2022-12-22T12:22:11+01:00} /
+     * {@code 2022-12-22T12:22:11.000+01:00[Europe/Paris]}<br>
+     * The time zone is specified both as an offset and optionally as a zone ID</li>
      * <li>{@code 2022-12-22T12:22PST} / {@code 2022-12-22T12:22:11CET} /
      * {@code 2022-12-22T12:22:11.000Central European Time}<br>
      * The time zone is the time zone name in either abbreviated or full form</li>
@@ -964,6 +967,9 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
      * The zone offset is always 4 digits, with or without {@code :}</li>
      * <li>{@code 2022-12-22T12:22Z} / {@code 2022-12-22T12:22:11+0000} / {@code 2022-12-22T12:22:11.000+00:00}<br>
      * The zone offset is the letter Z for UTC, or 2, 4 or 6 digits, with or without {@code :}</li>
+     * <li>{@code 2022-12-22T12:22} / {@code 2022-12-22T12:22:11+01:00} /
+     * {@code 2022-12-22T12:22:11.000+01:00[Europe/Paris]}<br>
+     * The time zone is specified both as an offset and optionally as a zone ID</li>
      * <li>{@code 2022-12-22T12:22PST} / {@code 2022-12-22T12:22:11CET} /
      * {@code 2022-12-22T12:22:11.000Central European Time}<br>
      * The time zone is the time zone name in either abbreviated or full form</li>
@@ -985,12 +991,16 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
                 return ZonedDateTime.parse(value, PARSER_TZ_ISO);
             } catch (DateTimeParseException tzMsIsoException) {
                 try {
-                    return ZonedDateTime.parse(value, PARSER_TZ);
+                    return (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(value, ZonedDateTime::from, LocalDateTime::from);
                 } catch (DateTimeParseException tzException) {
                     try {
-                        return ZonedDateTime.parse(value);
-                    } catch (DateTimeParseException e) {
-                        return LocalDateTime.parse(value, PARSER);
+                        return ZonedDateTime.parse(value, PARSER_TZ);
+                    } catch (DateTimeParseException isoException) {
+                        try {
+                            return ZonedDateTime.parse(value);
+                        } catch (DateTimeParseException e) {
+                            return LocalDateTime.parse(value, PARSER);
+                        }
                     }
                 }
             }
