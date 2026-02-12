@@ -800,10 +800,14 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
 
     @Override
     public String toFullString() {
-        return toFullString(zoneId);
+        return toFullString(zoneId, false);
     }
 
     public String toFullString(ZoneId zoneId) {
+        return toFullString(zoneId, true);
+    }
+
+    private String toFullString(ZoneId zoneId, boolean explicitZone) {
         try {
             String formatted = instant.atZone(zoneId).format(DateTimeFormatter.ISO_DATE_TIME);
             if (formatted.contains(".")) {
@@ -819,7 +823,7 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
                     return formatted.replace("000" + sign, sign).replace("000" + sign, sign);
                 }
             }
-            return authoritativeZone ? formatted : '?' + formatted;
+            return explicitZone || authoritativeZone ? formatted : '?' + formatted;
         } catch (DateTimeException e) {
             return "DateTimeException: " + e.getMessage();
         }
