@@ -991,7 +991,8 @@ public class DateTimeType implements PrimitiveType, State, Command, Comparable<D
                 return ZonedDateTime.parse(value, PARSER_TZ_ISO);
             } catch (DateTimeParseException tzMsIsoException) {
                 try {
-                    return (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(value, ZonedDateTime::from, LocalDateTime::from);
+                    return (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(value, ZonedDateTime::from,
+                            LocalDateTime::from);
                 } catch (DateTimeParseException tzException) {
                     try {
                         return ZonedDateTime.parse(value, PARSER_TZ);
