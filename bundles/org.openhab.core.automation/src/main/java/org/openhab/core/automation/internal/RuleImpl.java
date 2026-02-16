@@ -49,7 +49,7 @@ public class RuleImpl implements Rule {
     protected Configuration configuration;
     protected List<ConfigDescriptionParameter> configDescriptions;
     protected @Nullable String templateUID;
-    protected TemplateState templateStatus;
+    protected TemplateState templateState;
     protected String uid;
     protected @Nullable String name;
     protected Set<String> tags;
@@ -105,7 +105,7 @@ public class RuleImpl implements Rule {
         this.configuration = configuration == null ? new Configuration()
                 : new Configuration(configuration.getProperties());
         this.templateUID = templateUID;
-        this.templateStatus = templateStatus;
+        this.templateState = templateStatus;
         this.visibility = visibility == null ? Visibility.VISIBLE : visibility;
     }
 
@@ -130,7 +130,7 @@ public class RuleImpl implements Rule {
 
     @Override
     public TemplateState getTemplateState() {
-        return templateStatus;
+        return templateState;
     }
 
     /**
@@ -138,8 +138,8 @@ public class RuleImpl implements Rule {
      *
      * @param templateState the {@link TemplateState} to set.
      */
-    public void setTemplateStatus(TemplateState templateState) {
-        this.templateStatus = Objects.requireNonNull(templateState);
+    public void setTemplateState(TemplateState templateState) {
+        this.templateState = Objects.requireNonNull(templateState);
     }
 
     @Override
