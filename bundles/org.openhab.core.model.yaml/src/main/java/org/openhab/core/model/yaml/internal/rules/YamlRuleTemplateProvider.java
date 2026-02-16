@@ -70,6 +70,10 @@ public class YamlRuleTemplateProvider extends AbstractYamlRuleProvider<RuleTempl
         return getTemplates(null);
     }
 
+    public Collection<RuleTemplate> getAllFromModel(String modelName) {
+        return ruleTemplatesMap.getOrDefault(modelName, List.of());
+    }
+
     @Override
     public @Nullable RuleTemplate getTemplate(String uid, @Nullable Locale locale) {
         return ruleTemplatesMap.values().stream().flatMap(list -> list.stream()).filter(t -> uid.equals(t.getUID()))

@@ -17,6 +17,7 @@ import static org.openhab.core.config.discovery.inbox.InboxPredicates.forThingUI
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -44,6 +45,10 @@ import javax.ws.rs.core.Response;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.auth.Role;
+import org.openhab.core.automation.Rule;
+import org.openhab.core.automation.RuleRegistry;
+import org.openhab.core.automation.converter.RuleParser;
+import org.openhab.core.automation.converter.RuleSerializer;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
@@ -257,10 +262,13 @@ public class FileFormatResource implements RESTResource {
     private final ThingTypeRegistry thingTypeRegistry;
     private final ChannelTypeRegistry channelTypeRegistry;
     private final ConfigDescriptionRegistry configDescRegistry;
+    private final RuleRegistry ruleRegistry;
     private final Map<String, ItemSerializer> itemSerializers = new ConcurrentHashMap<>();
     private final Map<String, ItemParser> itemParsers = new ConcurrentHashMap<>();
     private final Map<String, ThingSerializer> thingSerializers = new ConcurrentHashMap<>();
     private final Map<String, ThingParser> thingParsers = new ConcurrentHashMap<>();
+    private final Map<String, RuleSerializer> ruleSerializers = new ConcurrentHashMap<>();
+    private final Map<String, RuleParser> ruleParsers = new ConcurrentHashMap<>();
 
     private int counter;
 
@@ -274,7 +282,8 @@ public class FileFormatResource implements RESTResource {
             final @Reference Inbox inbox, //
             final @Reference ThingTypeRegistry thingTypeRegistry, //
             final @Reference ChannelTypeRegistry channelTypeRegistry, //
-            final @Reference ConfigDescriptionRegistry configDescRegistry) {
+            final @Reference ConfigDescriptionRegistry configDescRegistry, //
+            @Reference RuleRegistry ruleRegistry) {
         this.itemBuilderFactory = itemBuilderFactory;
         this.itemRegistry = itemRegistry;
         this.metadataRegistry = metadataRegistry;
@@ -284,6 +293,7 @@ public class FileFormatResource implements RESTResource {
         this.thingTypeRegistry = thingTypeRegistry;
         this.channelTypeRegistry = channelTypeRegistry;
         this.configDescRegistry = configDescRegistry;
+        this.ruleRegistry = ruleRegistry;
     }
 
     @Deactivate
@@ -324,6 +334,24 @@ public class FileFormatResource implements RESTResource {
 
     protected void removeThingParser(ThingParser thingParser) {
         thingParsers.remove(thingParser.getParserFormat());
+    }
+
+    @Reference(policy = ReferencePolicy.DYNAMIC, cardinality = ReferenceCardinality.MULTIPLE)
+    protected void addRuleSerializer(RuleSerializer ruleSerializer) {
+        ruleSerializers.put(ruleSerializer.getGeneratedFormat(), ruleSerializer);
+    }
+
+    protected void removeRuleSerializer(RuleSerializer ruleSerializer) {
+        ruleSerializers.remove(ruleSerializer.getGeneratedFormat());
+    }
+
+    @Reference(policy = ReferencePolicy.DYNAMIC, cardinality = ReferenceCardinality.MULTIPLE)
+    protected void addRuleParser(RuleParser ruleParser) {
+        ruleParsers.put(ruleParser.getParserFormat(), ruleParser);
+    }
+
+    protected void removeRuleParser(RuleParser ruleParser) {
+        ruleParsers.remove(ruleParser.getParserFormat());
     }
 
     @POST
@@ -414,6 +442,54 @@ public class FileFormatResource implements RESTResource {
         serializer.setThingsToBeSerialized(genId, things, true, hideDefaultParameters);
         serializer.generateFormat(genId, outputStream);
         return Response.ok(new String(outputStream.toByteArray())).build();
+    }
+
+    @POST
+    @RolesAllowed({ Role.ADMIN })
+    @Path("/rules")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces({ "text/vnd.openhab.dsl.rule", "application/yaml" }) //TODO: (Nad) DSL?
+    @Operation(operationId = "createFileFormatForRules", summary = "Create file format for a list of rules in the registry.", security = {
+            @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
+                    @ApiResponse(responseCode = "200", description = "OK", content = {
+                            @Content(mediaType = "text/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
+                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_EXAMPLE)) }), //TODO: (Nad) Examples
+                    @ApiResponse(responseCode = "404", description = "One or more rules not found in the registry."),
+                    @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
+    public Response createFileFormatForRules(@Context HttpHeaders httpHeaders,
+            @DefaultValue("true") @QueryParam("hideDefaultParameters") @Parameter(description = "hide the configuration parameters having the default value") boolean hideDefaultParameters, //TODO: (Nad) Keep?
+            @Parameter(description = "Array of rule UIDs. If empty or omitted, return all rules.") @Nullable List<String> ruleUIDs) {
+        String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
+        logger.debug("createFileFormatForRules: mediaType = {}, ruleUIDs = {}", acceptHeader, ruleUIDs);
+        RuleSerializer serializer = getRuleSerializer(acceptHeader);
+        if (serializer == null) {
+            return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
+                    .entity("Unsupported media type '" + acceptHeader + "'!").build();
+        }
+        List<Rule> rules;
+        if (ruleUIDs == null || ruleUIDs.isEmpty()) {
+            Collection<Rule> all = ruleRegistry.getAll();
+            if (all instanceof List<Rule> allList) {
+                rules = allList;
+            } else {
+                rules = new ArrayList<>(all);
+            }
+        } else {
+            rules = new ArrayList<>();
+            for (String ruleUID : ruleUIDs) {
+                Rule rule = ruleRegistry.get(ruleUID);
+                if (rule == null) {
+                    return Response.status(Response.Status.NOT_FOUND)
+                            .entity("Rule with ID '" + ruleUID + "' not found in the rule registry!").build();
+                }
+                rules.add(rule);
+            }
+        }
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        String genId = newIdForSerialization();
+        serializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+        serializer.generateFormat(genId, outputStream);
+        return Response.ok(new String(outputStream.toByteArray(), StandardCharsets.UTF_8)).build();
     }
 
     @POST
@@ -764,6 +840,13 @@ public class FileFormatResource implements RESTResource {
         };
     }
 
+    private @Nullable RuleSerializer getRuleSerializer(String mediaType) {
+        switch (mediaType) {
+            case "application/yaml": return ruleSerializers.get("YAML");
+            default: return null; //TODO: (Nad) DSL?
+        }
+    }
+
     private @Nullable ItemParser getItemParser(String contentType) {
         return switch (contentType) {
             case "text/vnd.openhab.dsl.item" -> itemParsers.get("DSL");
@@ -779,6 +862,13 @@ public class FileFormatResource implements RESTResource {
             case "application/yaml" -> thingParsers.get("YAML");
             default -> null;
         };
+    }
+
+    private @Nullable RuleParser getRuleParser(String contentType) {
+        switch (contentType) {
+            case "application/yaml": return ruleParsers.get("YAML");
+            default: return null; //TODO: (Nad) DSL?
+        }
     }
 
     private List<Thing> getThingsOrDiscoveryResult(List<String> thingUIDs) {

@@ -71,6 +71,10 @@ public class YamlRuleProvider extends AbstractYamlRuleProvider<Rule>
                 .flatMap(entry -> entry.getValue().stream()).toList();
     }
 
+    public Collection<Rule> getAllFromModel(String modelName) {
+        return rulesMap.getOrDefault(modelName, List.of());
+    }
+
     @Override
     public Class<YamlRuleDTO> getElementClass() {
         return YamlRuleDTO.class;
