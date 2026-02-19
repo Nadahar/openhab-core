@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.model.rule.runtime.internal;
+package org.openhab.core.model.rule.internal;
 
 import java.util.ArrayList;
 import java.util.Collection;
