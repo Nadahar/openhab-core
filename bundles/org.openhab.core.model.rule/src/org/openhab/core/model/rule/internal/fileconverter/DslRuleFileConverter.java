@@ -20,6 +20,7 @@ import org.openhab.core.automation.fileconverter.RuleSerializer;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
 import org.openhab.core.i18n.LocaleProvider;
 import org.openhab.core.model.core.ModelRepository;
+import org.openhab.core.model.rule.internal.DSLRuleProvider;
 import org.openhab.core.model.rule.rules.RuleModel;
 import org.openhab.core.model.rule.rules.RulesFactory;
 import org.osgi.service.component.annotations.Activate;
@@ -35,19 +36,18 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
     private final Logger logger = LoggerFactory.getLogger(DslRuleFileConverter.class);
 
     private final ModelRepository modelRepository;
-//    private final DSLRuleProvider ruleProvider;
-//    private final GenericItemChannelLinkProvider itemChannelLinkProvider;
+    private final DSLRuleProvider ruleProvider;
     private final LocaleProvider localeProvider;
 
     private final Map<String, RuleModel> elementsToGenerate = new ConcurrentHashMap<>();
 
     @Activate
     public DslRuleFileConverter(@Reference ModelRepository modelRepository,
-            final @Reference ConfigDescriptionRegistry configDescRegistry,
-            final @Reference LocaleProvider localeProvider) {
+            @Reference DSLRuleProvider ruleProvider,
+            @Reference ConfigDescriptionRegistry configDescRegistry,
+            @Reference LocaleProvider localeProvider) {
         this.modelRepository = modelRepository;
-//        this.thingProvider = thingProvider;
-//        this.itemChannelLinkProvider = itemChannelLinkProvider;
+        this.ruleProvider = ruleProvider;
         this.localeProvider = localeProvider;
     }
 

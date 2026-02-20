@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
  * No rule conditions are used as this concept does not exist for DSL rules.
  *
  * @author Kai Kreuzer - Initial contribution
+ * @author Ravi Nadahar - Add method getAllFromModel + do not notify the rule registry for isolated models
  */
 @NonNullByDefault
 @Component(immediate = true, service = { DSLRuleProvider.class, RuleProvider.class, DSLScriptContextProvider.class })
@@ -124,6 +125,10 @@ public class DSLRuleProvider
     public Collection<Rule> getAll() {
         return rules.values();
     }
+
+//    public Collection<Rule> getAllFromModel(String modelName) {
+//        return rules.getOrDefault(modelName, List.of());
+//    }
 
     @Override
     public void removeProviderChangeListener(ProviderChangeListener<Rule> listener) {
