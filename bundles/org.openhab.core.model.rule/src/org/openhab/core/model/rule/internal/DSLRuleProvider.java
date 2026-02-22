@@ -12,6 +12,8 @@
  */
 package org.openhab.core.model.rule.internal;
 
+import static org.openhab.core.model.core.ModelCoreConstants.isIsolatedModel;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -123,12 +125,12 @@ public class DSLRuleProvider
 
     @Override
     public Collection<Rule> getAll() {
-        return rules.values();
+        return rules.entrySet().stream().filter(e -> !isIsolatedModel(e.getKey())).map(e -> e.getValue()).toList();
     }
 
-//    public Collection<Rule> getAllFromModel(String modelName) {
-//        return rules.getOrDefault(modelName, List.of());
-//    }
+    public Collection<Rule> getAllFromModel(String modelName) {
+        return rules.entrySet().stream().filter(e -> e.getKey().startsWith(modelName)).map(e -> e.getValue()).toList();
+    }
 
     @Override
     public void removeProviderChangeListener(ProviderChangeListener<Rule> listener) {
@@ -454,13 +456,19 @@ public class DSLRuleProvider
     private void notifyProviderChangeListeners(List<ModelRulePair> modelRules) {
         modelRules.forEach(rulePair -> {
             Rule oldRule = rulePair.oldRule();
+            Rule newRule = rulePair.newRule();
+            boolean isolated = isIsolatedModel(newRule.getUID());
             if (oldRule != null) {
                 rules.remove(oldRule.getUID());
-                rules.put(rulePair.newRule().getUID(), rulePair.newRule());
-                listeners.forEach(listener -> listener.updated(this, oldRule, rulePair.newRule()));
+                rules.put(newRule.getUID(), rulePair.newRule());
+                if (!isolated) {
+                    listeners.forEach(listener -> listener.updated(this, oldRule, rulePair.newRule()));
+                }
             } else {
-                rules.put(rulePair.newRule().getUID(), rulePair.newRule());
-                listeners.forEach(listener -> listener.added(this, rulePair.newRule()));
+                rules.put(newRule.getUID(), rulePair.newRule());
+                if (!isolated) {
+                    listeners.forEach(listener -> listener.added(this, rulePair.newRule()));
+                }
             }
         });
     }

@@ -42,8 +42,8 @@ import org.openhab.core.automation.module.script.internal.handler.AbstractScript
 import org.openhab.core.automation.module.script.internal.handler.ScriptActionHandler;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.model.core.ModelRepository;
+import org.openhab.core.model.rule.internal.DSLRuleProvider;
 import org.openhab.core.model.rule.jvmmodel.RulesRefresher;
-import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
 import org.openhab.core.model.script.runtime.internal.engine.DSLScriptEngine;
 import org.openhab.core.service.ReadyMarker;
 import org.openhab.core.service.ReadyService;

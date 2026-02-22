@@ -17,15 +17,11 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.fileconverter.RuleParser;
 import org.openhab.core.automation.fileconverter.RuleSerializer;
-import org.openhab.core.config.core.ConfigDescriptionRegistry;
-import org.openhab.core.i18n.LocaleProvider;
 import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.internal.DSLRuleProvider;
 import org.openhab.core.model.rule.rules.RuleModel;
 import org.openhab.core.model.rule.rules.RulesFactory;
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,21 +31,19 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
 
     private final Logger logger = LoggerFactory.getLogger(DslRuleFileConverter.class);
 
-    private final ModelRepository modelRepository;
-    private final DSLRuleProvider ruleProvider;
-    private final LocaleProvider localeProvider;
+    public @Nullable ModelRepository modelRepository;
+
+    public @Nullable DSLRuleProvider ruleProvider;
+//    private final LocaleProvider localeProvider;
 
     private final Map<String, RuleModel> elementsToGenerate = new ConcurrentHashMap<>();
 
-    @Activate
-    public DslRuleFileConverter(@Reference ModelRepository modelRepository,
-            @Reference DSLRuleProvider ruleProvider,
-            @Reference ConfigDescriptionRegistry configDescRegistry,
-            @Reference LocaleProvider localeProvider) {
-        this.modelRepository = modelRepository;
-        this.ruleProvider = ruleProvider;
-        this.localeProvider = localeProvider;
-    }
+//    @Activate
+//    public DslRuleFileConverter(@Reference ModelRepository modelRepository,
+//            @Reference DSLRuleProvider ruleProvider) {
+//        this.modelRepository = modelRepository;
+//        this.ruleProvider = ruleProvider;
+//    }
 
     @Override
     public @NonNull String getParserFormat() {
