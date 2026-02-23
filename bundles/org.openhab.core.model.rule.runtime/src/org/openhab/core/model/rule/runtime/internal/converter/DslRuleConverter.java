@@ -1,0 +1,283 @@
+package org.openhab.core.model.rule.runtime.internal.converter;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+
+import org.eclipse.emf.common.util.EList;
+import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.ecore.EObject;
+import org.eclipse.emf.ecore.resource.Resource;
+import org.eclipse.emf.ecore.resource.ResourceSet;
+import org.eclipse.emf.ecore.resource.Resource.Diagnostic;
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.xtext.diagnostics.Severity;
+import org.eclipse.xtext.resource.XtextResource;
+import org.eclipse.xtext.resource.XtextResourceSet;
+import org.eclipse.xtext.util.CancelIndicator;
+import org.eclipse.xtext.util.StringInputStream;
+import org.eclipse.xtext.validation.CheckMode;
+import org.eclipse.xtext.validation.IResourceValidator;
+import org.eclipse.xtext.validation.Issue;
+import org.eclipse.xtext.xbase.XBlockExpression;
+import org.openhab.core.automation.Rule;
+import org.openhab.core.automation.Trigger;
+import org.openhab.core.automation.converter.RuleParser;
+import org.openhab.core.automation.converter.RuleSerializer;
+import org.openhab.core.io.dto.SerializationException;
+import org.openhab.core.model.core.ModelRepository;
+import org.openhab.core.model.rule.rules.EventTrigger;
+import org.openhab.core.model.rule.rules.RuleModel;
+import org.openhab.core.model.rule.rules.RulesFactory;
+import org.openhab.core.model.rule.rules.impl.CommandEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.GroupMemberCommandEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.SystemStartlevelTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.ValidCommandImpl;
+import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
+import org.openhab.core.model.script.ScriptStandaloneSetup;
+import org.openhab.core.model.script.engine.Script;
+import org.openhab.core.model.script.engine.ScriptParsingException;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Reference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@NonNullByDefault
+@Component(immediate = true, service = { RuleSerializer.class, RuleParser.class })
+public class DslRuleConverter implements RuleSerializer, RuleParser {
+
+    private final Logger logger = LoggerFactory.getLogger(DslRuleConverter.class);
+
+    private final ModelRepository modelRepository;
+    private final DSLRuleProvider ruleProvider;
+//    private final ScriptParser scriptParser;
+//    private final GenericItemChannelLinkProvider itemChannelLinkProvider;
+//    private final LocaleProvider localeProvider;
+
+    private final Map<String, RuleModel> elementsToGenerate = new ConcurrentHashMap<>();
+
+    @Activate
+    public DslRuleConverter(@Reference ModelRepository modelRepository,
+            @Reference DSLRuleProvider ruleProvider
+//            @Reference ScriptParser scriptParser
+            /*,
+            final @Reference ConfigDescriptionRegistry configDescRegistry,
+            final @Reference LocaleProvider localeProvider*/) {
+        this.modelRepository = modelRepository;
+        this.ruleProvider = ruleProvider;
+//        this.scriptParser = scriptParser;
+//        this.thingProvider = thingProvider;
+//        this.itemChannelLinkProvider = itemChannelLinkProvider;
+//        this.localeProvider = localeProvider;
+    }
+
+    @Override
+    public @NonNull String getParserFormat() {
+        return "DSL";
+    }
+
+    @Override
+    public String getGeneratedFormat() {
+        return "DSL";
+    }
+
+    @Override
+    public void setRulesToBeSerialized(String id, List<Rule> rules, boolean hideDefaultParameters) {
+        if (rules.isEmpty()) {
+            return;
+        }
+        RuleModel model = RulesFactory.eINSTANCE.createRuleModel();
+        Set<Rule> handledRules = new HashSet<>();
+        for (Rule rule : rules) {
+            if (handledRules.contains(rule)) {
+                continue;
+            }
+            model.getRules().add(buildModelRule(rule, hideDefaultParameters, handledRules));
+        }
+        elementsToGenerate.put(id, model);
+    }
+
+    @Override
+    public void generateFormat(String id, OutputStream out) {
+        RuleModel model = elementsToGenerate.remove(id);
+        if (model != null) { //TODO: (Nad) Check everything
+            // Double quotes are unexpectedly generated in thing UID when the segment contains a -.
+            // Fix that by removing these double quotes. Requires to first build the generated syntax as a String
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            modelRepository.generateFileFormat(outputStream, "rules", model);
+            String syntax = new String(outputStream.toByteArray()).replaceAll(":\"([a-zA-Z0-9_][a-zA-Z0-9_-]*)\"",
+                    ":$1");
+            try {
+                out.write(syntax.getBytes());
+            } catch (IOException e) {
+                logger.warn("Exception when writing the generated syntax {}", e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public @Nullable String startParsingFormat(String syntax, List<String> errors, List<String> warnings) {
+        ByteArrayInputStream inputStream = new ByteArrayInputStream(syntax.getBytes());
+        return modelRepository.createIsolatedModel("rules", inputStream, errors, warnings);
+    }
+
+    @Override
+    public @NonNull Collection<Rule> getParsedObjects(String modelName) {
+        return ruleProvider.getAllFromModel(modelName);
+    }
+
+    @Override
+    public void finishParsingFormat(String modelName) {
+        modelRepository.removeModel(modelName);
+    }
+
+    private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, boolean hideDefaultParameters,
+            Set<Rule> handledRules) {
+        org.openhab.core.model.rule.rules.Rule model;
+        model = RulesFactory.eINSTANCE.createRule();
+        model.setName(rule.getName());
+        XBlockExpression exp;
+        try {
+            exp = parseScriptIntoXTextEObject(rule.getActions().getFirst().getConfiguration().get("script").toString());
+            logger.debug("exp={}", exp);
+            model.setScript(exp);
+        } catch (ScriptParsingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        SystemStartlevelTriggerImpl trigger = (SystemStartlevelTriggerImpl) RulesFactory.eINSTANCE.createSystemStartlevelTrigger();
+        model.getEventtrigger().add(trigger);
+
+        handledRules.add(rule);
+
+        return model;
+    }
+
+    private @Nullable EventTrigger buildModeTrigger(Trigger trigger) throws SerializationException {
+        String type = trigger.getTypeUID();
+        Object value;
+        RulesFactory factory = RulesFactory.eINSTANCE;
+        switch (type) {
+            case "core.SystemStartlevelTrigger":
+                value = trigger.getConfiguration().get("startlevel");
+                if (value instanceof Number num) {
+                    int level = num.intValue();
+                    if (level == 40) {
+                        return factory.createSystemOnStartupTrigger();
+                    } else {
+                        SystemStartlevelTriggerImpl result = (SystemStartlevelTriggerImpl) factory.createSystemStartlevelTrigger();
+                        result.setLevel(level);
+                        return result;
+                    }
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "core.ItemCommandTrigger":
+                value = trigger.getConfiguration().get("itemName");
+                if (value instanceof String str) {
+                    CommandEventTriggerImpl result = (CommandEventTriggerImpl) factory.createCommandEventTrigger();
+                    result.setItem(str);
+                    value = trigger.getConfiguration().get("command");
+                    if (value instanceof String command) {
+                        ValidCommandImpl cmd = (ValidCommandImpl) factory.createValidCommand();
+                        cmd.setValue(command);
+                        result.setCommand(cmd);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "core.GroupCommandTrigger":
+                value = trigger.getConfiguration().get("groupName");
+                if (value instanceof String str) {
+                    GroupMemberCommandEventTriggerImpl result = (GroupMemberCommandEventTriggerImpl) factory.createGroupMemberCommandEventTrigger();
+                    result.setGroup(str);                    value = trigger.getConfiguration().get("command");
+                    if (value instanceof String command) {
+                        ValidCommandImpl cmd = (ValidCommandImpl) factory.createValidCommand();
+                        cmd.setValue(command);
+                        result.setCommand(cmd);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+        }
+        return null; //TODO: (Nad) Keep?
+    }
+
+    private @Nullable XBlockExpression parseScriptIntoXTextEObject(String scriptAsString) throws ScriptParsingException {
+        XtextResourceSet resourceSet = ScriptStandaloneSetup.getInjector().getInstance(XtextResourceSet.class);
+        resourceSet.addLoadOption(XtextResource.OPTION_RESOLVE_ALL, Boolean.FALSE);
+
+        Resource resource = resourceSet.createResource(computeUnusedUri(resourceSet)); // IS-A XtextResource
+        try {
+            resource.load(new StringInputStream(scriptAsString, StandardCharsets.UTF_8.name()),
+                    resourceSet.getLoadOptions());
+        } catch (IOException e) {
+            throw new ScriptParsingException(
+                    "Unexpected IOException; from close() of a String-based ByteArrayInputStream, no real I/O; how is that possible???",
+                    scriptAsString, e);
+        }
+
+        List<Diagnostic> errors = resource.getErrors();
+        if (!errors.isEmpty()) {
+            deleteResource(resource);
+            throw new ScriptParsingException("Failed to parse expression (due to managed SyntaxError/s)",
+                    scriptAsString).addDiagnosticErrors(errors);
+        }
+
+        EList<EObject> contents = resource.getContents();
+        if (!contents.isEmpty()) {
+            return (XBlockExpression) contents.getFirst();
+        } else {
+            deleteResource(resource);
+            return null;
+        }
+    }
+
+    protected URI computeUnusedUri(ResourceSet resourceSet) {
+        String name = "__synthetic";
+        final int MAX_TRIES = 1000;
+        for (int i = 0; i < MAX_TRIES; i++) {
+            // NOTE: The "filename extension" (".script") must match the file.extensions in the *.mwe2
+            URI syntheticUri = URI
+                    .createURI(name + ThreadLocalRandom.current().nextDouble() + "." + Script.SCRIPT_FILEEXT);
+            if (resourceSet.getResource(syntheticUri, false) == null) {
+                return syntheticUri;
+            }
+        }
+        throw new IllegalStateException();
+    }
+
+    protected Iterable<Issue> getValidationErrors(final EObject model) {
+        final List<Issue> validate = validate(model);
+        return validate.stream().filter(input -> Severity.ERROR == input.getSeverity()).toList();
+    }
+
+    protected List<Issue> validate(EObject model) {
+        IResourceValidator validator = ((XtextResource) model.eResource()).getResourceServiceProvider()
+                .getResourceValidator();
+        return validator.validate(model.eResource(), CheckMode.ALL, CancelIndicator.NullImpl);
+    }
+
+    private void deleteResource(Resource resource) {
+        try {
+            resource.delete(Map.of());
+        } catch (IOException e) {
+            // Ignore
+        }
+    }
+}

@@ -12,6 +12,7 @@ Export-Package: org.openhab.core.model.rule,\
  org.openhab.core.model.rule.services,\
  org.openhab.core.model.rule.validation
 Import-Package: \
+ org.openhab.core.automation.converter,\
  org.openhab.core.automation.module.script.rulesupport.shared,\
  org.openhab.core.common,\
  org.openhab.core.common.registry,\
@@ -32,6 +33,7 @@ Import-Package: \
  org.openhab.core.thing.binding,\
  org.openhab.core.thing.events,\
  org.openhab.core.types,\
+ org.openhab.core.types.util,\
  com.google.common.base;version="14",\
  javax.measure,\
  javax.measure.quantity,\
