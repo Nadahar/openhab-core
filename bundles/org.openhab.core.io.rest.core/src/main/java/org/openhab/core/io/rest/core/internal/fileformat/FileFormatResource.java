@@ -448,11 +448,11 @@ public class FileFormatResource implements RESTResource {
     @RolesAllowed({ Role.ADMIN })
     @Path("/rules")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces({ "text/vnd.openhab.dsl.rule", "application/yaml" }) //TODO: (Nad) DSL?
+    @Produces({ "application/vnd.openhab.dsl.rule", "application/yaml" }) //TODO: (Nad) DSL?
     @Operation(operationId = "createFileFormatForRules", summary = "Create file format for a list of rules in the registry.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
                     @ApiResponse(responseCode = "200", description = "OK", content = {
-                            @Content(mediaType = "text/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
+                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
                             @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_EXAMPLE)) }), //TODO: (Nad) Examples
                     @ApiResponse(responseCode = "404", description = "One or more rules not found in the registry."),
                     @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
@@ -843,6 +843,7 @@ public class FileFormatResource implements RESTResource {
     private @Nullable RuleSerializer getRuleSerializer(String mediaType) {
         switch (mediaType) {
             case "application/yaml": return ruleSerializers.get("YAML");
+            case "application/vnd.openhab.dsl.rule": return ruleSerializers.get("DSL");
             default: return null; //TODO: (Nad) DSL?
         }
     }
