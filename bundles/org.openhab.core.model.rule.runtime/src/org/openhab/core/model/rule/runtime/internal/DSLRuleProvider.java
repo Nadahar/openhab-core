@@ -355,8 +355,10 @@ public class DSLRuleProvider
         List<Action> actions = List.of(ActionBuilder.create().withId("script").withTypeUID(ScriptActionHandler.TYPE_ID)
                 .withConfiguration(cfg).build());
 
-        return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers)
-                .withActions(actions).withConditions(conditions).build();
+        Configuration ruleCfg = new Configuration();
+        ruleCfg.put("source", NodeModelUtils.findActualNodeFor(rule).getParent().getText());
+        ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
+        return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers).withActions(actions).withConditions(conditions).withConfiguration(ruleCfg).build();
     }
 
     private String removeIndentation(String script) {
