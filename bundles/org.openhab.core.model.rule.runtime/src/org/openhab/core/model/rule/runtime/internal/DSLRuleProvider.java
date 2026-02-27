@@ -113,7 +113,7 @@ import org.slf4j.LoggerFactory;
 public class DSLRuleProvider
         implements RuleProvider, ModelRepositoryChangeListener, DSLScriptContextProvider, ReadyTracker {
 
-    static final String MIMETYPE_OPENHAB_DSL_RULE = "application/vnd.openhab.dsl.rule";
+    public static final String MIMETYPE_OPENHAB_DSL_RULE = "application/vnd.openhab.dsl.rule";
 
     private final Logger logger = LoggerFactory.getLogger(DSLRuleProvider.class);
     private final Collection<ProviderChangeListener<Rule>> listeners = new ArrayList<>();
@@ -355,8 +355,10 @@ public class DSLRuleProvider
         List<Action> actions = List.of(ActionBuilder.create().withId("script").withTypeUID(ScriptActionHandler.TYPE_ID)
                 .withConfiguration(cfg).build());
 
-        return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers)
-                .withActions(actions).withConditions(conditions).build();
+        Configuration ruleCfg = new Configuration();
+        ruleCfg.put("source", NodeModelUtils.findActualNodeFor(rule).getParent().getText().replaceFirst("^\\R+", ""));
+        ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
+        return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers).withActions(actions).withConditions(conditions).withConfiguration(ruleCfg).build();
     }
 
     private String removeIndentation(String script) {
