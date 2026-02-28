@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.xtext.nodemodel.ILeafNode;
+import org.eclipse.xtext.nodemodel.INode;
 import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.eclipse.xtext.xbase.XBlockExpression;
 import org.eclipse.xtext.xbase.XExpression;
@@ -59,6 +61,7 @@ import org.openhab.core.model.rule.rules.ThingStateChangedEventTrigger;
 import org.openhab.core.model.rule.rules.ThingStateUpdateEventTrigger;
 import org.openhab.core.model.rule.rules.TimerTrigger;
 import org.openhab.core.model.rule.rules.UpdateEventTrigger;
+import org.openhab.core.model.rule.rules.impl.RuleImpl;
 import org.openhab.core.model.script.runtime.DSLScriptContextProvider;
 import org.openhab.core.model.script.script.Script;
 import org.openhab.core.service.ReadyMarker;
@@ -287,10 +290,40 @@ public class DSLRuleProvider
         List<Action> actions = List.of(ActionBuilder.create().withId("script").withTypeUID("script.ScriptAction")
                 .withConfiguration(cfg).build());
 
+        INode ruleNode = NodeModelUtils.findActualNodeFor(rule);
+        boolean sharedContext = hasSharedContext(ruleNode);
         Configuration ruleCfg = new Configuration();
-        ruleCfg.put("source", NodeModelUtils.findActualNodeFor(rule).getParent().getText());
+        if (sharedContext) {
+            ruleCfg.put("sharedContext", Boolean.TRUE);
+        }
+        ruleCfg.put("source", sharedContext ? ruleNode.getParent().getText() : ruleNode.getText());
         ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
         return RuleBuilder.create(uid).withName(name).withTriggers(triggers).withActions(actions).withConfiguration(ruleCfg).build();
+    }
+
+    private boolean hasSharedContext(INode ruleNode) {
+        INode node = ruleNode;
+        EObject eObject;
+        while ((node = node.getPreviousSibling()) != null) {
+            if (node instanceof ILeafNode leaf && leaf.isHidden()) {
+                continue;
+            }
+            if ((eObject = node.getSemanticElement()) != null && !(eObject instanceof RuleImpl)) {
+                return true;
+            }
+        }
+
+        node = ruleNode;
+        while ((node = node.getNextSibling()) != null) {
+            if (node instanceof ILeafNode leaf && leaf.isHidden()) {
+                continue;
+            }
+            if ((eObject = node.getSemanticElement()) != null && !(eObject instanceof RuleImpl)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private String removeIndentation(String script) {
