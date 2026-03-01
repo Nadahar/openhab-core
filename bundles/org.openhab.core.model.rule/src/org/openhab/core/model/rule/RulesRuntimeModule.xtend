@@ -38,6 +38,8 @@ import org.eclipse.xtext.scoping.impl.AbstractDeclarativeScopeProvider
 import org.eclipse.xtext.xbase.interpreter.IExpressionInterpreter
 import org.eclipse.xtext.xbase.scoping.batch.ImplicitlyImportedFeatures
 import org.eclipse.xtext.xbase.typesystem.computation.ITypeComputer
+import org.eclipse.xtext.formatting.IFormatter
+import org.openhab.core.model.rule.formatting.RulesFormatter
 
 /** 
  * Use this class to register components to be used at runtime / without the Equinox extension registry.
@@ -59,6 +61,10 @@ import org.eclipse.xtext.xbase.typesystem.computation.ITypeComputer
 
     def Class<StateAndCommandProvider> bindStateAndCommandProvider() {
         return StateAndCommandProvider
+    }
+    
+    override Class<? extends IFormatter> bindIFormatter() {
+        return RulesFormatter;
     }
 
     override Class<? extends IGenerator> bindIGenerator() {
