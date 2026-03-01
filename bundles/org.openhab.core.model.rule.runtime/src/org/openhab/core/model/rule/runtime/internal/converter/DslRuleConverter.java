@@ -19,6 +19,8 @@ import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.Resource.Diagnostic;
+import org.eclipse.emf.ecore.util.Diagnostician;
+import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -40,10 +42,22 @@ import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.rules.EventTrigger;
 import org.openhab.core.model.rule.rules.RuleModel;
 import org.openhab.core.model.rule.rules.RulesFactory;
+import org.openhab.core.model.rule.rules.ValidState;
+import org.openhab.core.model.rule.rules.impl.ChangedEventTriggerImpl;
 import org.openhab.core.model.rule.rules.impl.CommandEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.DateTimeTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.EventEmittedTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.GroupMemberChangedEventTriggerImpl;
 import org.openhab.core.model.rule.rules.impl.GroupMemberCommandEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.GroupMemberUpdateEventTriggerImpl;
 import org.openhab.core.model.rule.rules.impl.SystemStartlevelTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.ThingStateChangedEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.ThingStateUpdateEventTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.TimerTriggerImpl;
+import org.openhab.core.model.rule.rules.impl.UpdateEventTriggerImpl;
 import org.openhab.core.model.rule.rules.impl.ValidCommandImpl;
+import org.openhab.core.model.rule.rules.impl.ValidStateImpl;
+import org.openhab.core.model.rule.rules.impl.ValidTriggerImpl;
 import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
 import org.openhab.core.model.script.ScriptStandaloneSetup;
 import org.openhab.core.model.script.engine.Script;
@@ -99,12 +113,22 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             return;
         }
         RuleModel model = RulesFactory.eINSTANCE.createRuleModel();
+
+        // Ensure that the variables collection is not null, calling get() creates an empty collection.
+        model.getVariables();
+
         Set<Rule> handledRules = new HashSet<>();
         for (Rule rule : rules) {
             if (handledRules.contains(rule)) {
                 continue;
             }
-            model.getRules().add(buildModelRule(rule, hideDefaultParameters, handledRules));
+            try {
+                org.openhab.core.model.rule.rules.Rule modelRule = RulesFactory.eINSTANCE.createRule();
+                model.getRules().add(modelRule);
+                buildModelRule(rule, modelRule, handledRules);
+            } catch (SerializationException e) {
+                logger.error("Invalid rule: {}", e.getMessage(), e); //TODO: (Nad) Figure out how to handle
+            }
         }
         elementsToGenerate.put(id, model);
     }
@@ -113,6 +137,15 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     public void generateFormat(String id, OutputStream out) {
         RuleModel model = elementsToGenerate.remove(id);
         if (model != null) { //TODO: (Nad) Check everything
+            if (logger.isDebugEnabled()) {
+                org.eclipse.emf.common.util.Diagnostic diagnostic = Diagnostician.INSTANCE.validate(model);
+                if (diagnostic.getSeverity() != org.eclipse.emf.common.util.Diagnostic.OK) {
+                    for (org.eclipse.emf.common.util.Diagnostic child : diagnostic.getChildren()) {
+                        logger.warn("Model Validation Error: {}", child.getMessage());
+                    }
+                }
+            }
+
             // Double quotes are unexpectedly generated in thing UID when the segment contains a -.
             // Fix that by removing these double quotes. Requires to first build the generated syntax as a String
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -143,14 +176,31 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         modelRepository.removeModel(modelName);
     }
 
-    private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, boolean hideDefaultParameters,
-            Set<Rule> handledRules) {
-        org.openhab.core.model.rule.rules.Rule model;
-        model = RulesFactory.eINSTANCE.createRule();
+    private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, org.openhab.core.model.rule.rules.Rule model,
+            Set<Rule> handledRules) throws SerializationException {
+//        org.openhab.core.model.rule.rules.Rule model; //TODO: (Nad) Create everything in the same resource
+//        model = RulesFactory.eINSTANCE.createRule();
         model.setName(rule.getName());
+
+        model.getEventtrigger().add(buildModelTrigger(rule.getTriggers().getFirst()));
+
+//        XBlockExpression placeholder = XbaseFactory.eINSTANCE.createXBlockExpression();
+//
+//         // A block usually needs at least one child to be 'sequencable'
+//         XStringLiteral marker = XbaseFactory.eINSTANCE.createXStringLiteral();
+//         marker.setValue("SCRIPT_MARKER");
+//
+//         // This satisfies the 'XBlockExpression' requirement in the Rule model
+//         placeholder.getExpressions().add(marker);
+//
+//         model.setScript(placeholder);
+//        XStringLiteral marker = XbaseFactory.eINSTANCE.createXStringLiteral();
+//        marker.setValue("SCRIPT_CONTENT_PLACEHOLDER");
+//        model.setScript(marker);
         XBlockExpression exp;
         try {
-            exp = parseScriptIntoXTextEObject(rule.getActions().getFirst().getConfiguration().get("script").toString());
+//            exp = (XBlockExpression) parseScriptIntoXTextEObject(rule.getActions().getFirst().getConfiguration().get("script").toString());
+            exp = (XBlockExpression) parseScriptIntoXTextEObject("\"SCRIPT_MARKER\"");
             logger.debug("exp={}", exp);
             model.setScript(exp);
         } catch (ScriptParsingException e) {
@@ -158,15 +208,12 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             e.printStackTrace();
         }
 
-        SystemStartlevelTriggerImpl trigger = (SystemStartlevelTriggerImpl) RulesFactory.eINSTANCE.createSystemStartlevelTrigger();
-        model.getEventtrigger().add(trigger);
-
         handledRules.add(rule);
 
         return model;
     }
 
-    private @Nullable EventTrigger buildModeTrigger(Trigger trigger) throws SerializationException {
+    private EventTrigger buildModelTrigger(Trigger trigger) throws SerializationException {
         String type = trigger.getTypeUID();
         Object value;
         RulesFactory factory = RulesFactory.eINSTANCE;
@@ -214,13 +261,189 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
                 }
+            case "core.ItemStateUpdateTrigger":
+                value = trigger.getConfiguration().get("itemName");
+                if (value instanceof String str) {
+                    UpdateEventTriggerImpl result = (UpdateEventTriggerImpl) factory.createUpdateEventTrigger();
+                    result.setItem(str);
+                    value = trigger.getConfiguration().get("state");
+                    if (value instanceof String state) {
+                        ValidStateImpl st = (ValidStateImpl) factory.createValidState();
+                        st.setValue(state);
+                        result.setState(st);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "core.GroupStateUpdateTrigger":
+                value = trigger.getConfiguration().get("groupName");
+                if (value instanceof String str) {
+                    GroupMemberUpdateEventTriggerImpl result = (GroupMemberUpdateEventTriggerImpl) factory.createGroupMemberUpdateEventTrigger();
+                    result.setGroup(str);
+                    value = trigger.getConfiguration().get("state");
+                    if (value instanceof String state) {
+                        ValidStateImpl st = (ValidStateImpl) factory.createValidState();
+                        st.setValue(state);
+                        result.setState(st);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "core.ItemStateChangeTrigger":
+                value = trigger.getConfiguration().get("itemName");
+                if (value instanceof String str) {
+                    ChangedEventTriggerImpl result = (ChangedEventTriggerImpl) factory.createChangedEventTrigger();
+                    result.setItem(str);
+                    value = trigger.getConfiguration().get("state");
+                    if (value instanceof String state) {
+                        ValidState st = /*createValidStateFromDsl(state); */factory.createValidStateString();
+                        st.setValue(state);
+                        result.setNewState(st);
+                    }
+                    value = trigger.getConfiguration().get("previousState");
+                    if (value instanceof String prevState) {
+                        ValidState st = /*createValidStateFromDsl(prevState); */ factory.createValidStateString();
+                        st.setValue(prevState);
+                        result.setOldState(st);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "core.GroupStateChangeTrigger":
+                value = trigger.getConfiguration().get("groupName");
+                if (value instanceof String str) {
+                    GroupMemberChangedEventTriggerImpl result = (GroupMemberChangedEventTriggerImpl) factory.createGroupMemberChangedEventTrigger();
+                    result.setGroup(str);
+                    value = trigger.getConfiguration().get("state");
+                    if (value instanceof String state) {
+                        ValidStateImpl st = (ValidStateImpl) factory.createValidState();
+                        st.setValue(state);
+                        result.setNewState(st);
+                    }
+                    value = trigger.getConfiguration().get("previousState");
+                    if (value instanceof String state) {
+                        ValidStateImpl st = (ValidStateImpl) factory.createValidState();
+                        st.setValue(state);
+                        result.setOldState(st);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "timer.GenericCronTrigger":
+                value = trigger.getConfiguration().get("cronExpression");
+                if (value instanceof String str) {
+                    TimerTriggerImpl result = (TimerTriggerImpl) factory.createTimerTrigger();
+                    if ("0 0 12 * * ?".equals(str)) {
+                        result.setTime("noon");
+                    } else if ("0 0 0 * * ?".equals(str)) {
+                        result.setTime("midnight");
+                    } else {
+                        result.setCron(str);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                }
+            case "timer.DateTimeTrigger":
+                value = trigger.getConfiguration().get("itemName");
+                if (value instanceof String str) {
+                    DateTimeTriggerImpl result = (DateTimeTriggerImpl) factory.createDateTimeTrigger();
+                    result.setItem(str);
+                    value = trigger.getConfiguration().get("timeOnly");
+                    if (value instanceof Boolean timeOnly) {
+                        result.setTimeOnly(timeOnly);
+                    }
+                    value = trigger.getConfiguration().get("offset");
+                    if (value instanceof String offset) {
+                        result.setOffset(offset);
+                        return result;
+                    }
+                }
+                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+            case "core.ChannelEventTrigger":
+                value = trigger.getConfiguration().get("channelUID");
+                if (value instanceof String str) {
+                    EventEmittedTriggerImpl result = (EventEmittedTriggerImpl) factory.createEventEmittedTrigger();
+                    result.setChannel(str);
+                    value = trigger.getConfiguration().get("event");
+                    if (value instanceof String event) {
+                        ValidTriggerImpl trg = (ValidTriggerImpl) factory.createValidTrigger();
+                        trg.setValue(event);
+                        result.setTrigger(trg);
+                    }
+                    return result;
+                }
+                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+            case "core.ThingStatusUpdateTrigger":
+                value = trigger.getConfiguration().get("thingUID");
+                if (value instanceof String str) {
+                    ThingStateUpdateEventTriggerImpl result = (ThingStateUpdateEventTriggerImpl) factory.createThingStateUpdateEventTrigger();
+                    result.setThing(str);
+                    value = trigger.getConfiguration().get("status");
+                    if (value instanceof String status) {
+                        result.setState(status);
+                        return result;
+                    }
+                }
+                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+            case "core.ThingStatusChangeTrigger":
+                value = trigger.getConfiguration().get("thingUID");
+                if (value instanceof String str) {
+                    ThingStateChangedEventTriggerImpl result = (ThingStateChangedEventTriggerImpl) factory.createThingStateChangedEventTrigger();
+                    result.setThing(str);
+                    value = trigger.getConfiguration().get("status");
+                    if (value instanceof String status) {
+                        result.setNewState(status);
+                        value = trigger.getConfiguration().get("previousStatus");
+                        if (value instanceof String previousStatus) {
+                            result.setOldState(previousStatus);
+                            return result;
+                        }
+                    }
+                }
+                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+            default:
+                throw new SerializationException("Unsupported trigger: " + trigger);
         }
-        return null; //TODO: (Nad) Keep?
     }
 
-    private @Nullable XBlockExpression parseScriptIntoXTextEObject(String scriptAsString) throws ScriptParsingException {
+    private ValidState createValidStateFromDsl(String stateValue) {
+        // 1. Create a minimal DSL string that the parser understands
+        String dummyDsl = "rule 'temp' when Item x changed to " + stateValue + " then end";
+
+        // 2. Use your existing resourceSet to parse it
         XtextResourceSet resourceSet = ScriptStandaloneSetup.getInjector().getInstance(XtextResourceSet.class);
-        resourceSet.addLoadOption(XtextResource.OPTION_RESOLVE_ALL, Boolean.FALSE);
+        Resource resource = resourceSet.createResource(computeUnusedUri(resourceSet)); // IS-A XtextResource
+
+        try (StringInputStream is = new StringInputStream(dummyDsl)) {
+            resource.load(is, null);
+
+            // 3. Navigate the model to find the trigger
+//            RuleModel model = (RuleModel) resource.getContents().get(0);
+            org.openhab.core.model.script.script.impl.ScriptImpl s = (org.openhab.core.model.script.script.impl.ScriptImpl) resource.getContents().getFirst();
+
+//            org.openhab.core.model.rule.rules.Rule rule = model.getRules().getFirst();
+//            ChangedEventTrigger trigger = (ChangedEventTrigger) rule.getEventtrigger().get(0);
+
+            // 4. Copy the state object. EcoreUtil.copy is essential here
+            // to detach it from the temporary resource.
+//            return EcoreUtil.copy(trigger.getNewState());
+            return (ValidState) EcoreUtil.copy(s.getExpressions().get(7));
+        } catch (Exception e) {
+            logger.error("Failed to parse state value: {}", stateValue, e);
+            throw new RuntimeException("Failed to parse state value");
+        } finally {
+            resource.unload();
+        }
+    }
+
+    private @Nullable EObject parseScriptIntoXTextEObject(String scriptAsString) throws ScriptParsingException {
+        XtextResourceSet resourceSet = ScriptStandaloneSetup.getInjector().getInstance(XtextResourceSet.class);
+        resourceSet.addLoadOption(XtextResource.OPTION_RESOLVE_ALL, Boolean.TRUE);
 
         Resource resource = resourceSet.createResource(computeUnusedUri(resourceSet)); // IS-A XtextResource
         try {
@@ -241,7 +464,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
 
         EList<EObject> contents = resource.getContents();
         if (!contents.isEmpty()) {
-            return (XBlockExpression) contents.getFirst();
+            return contents.getFirst();
         } else {
             deleteResource(resource);
             return null;

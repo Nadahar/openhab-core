@@ -17,8 +17,9 @@ package org.openhab.core.model.rule.formatting
 
 import org.eclipse.xtext.formatting.impl.AbstractDeclarativeFormatter
 import org.eclipse.xtext.formatting.impl.FormattingConfig
-// import com.google.inject.Inject;
-// import org.openhab.core.model.rule.services.RulesGrammarAccess
+ import com.google.inject.Inject;
+ import org.openhab.core.model.rule.services.RulesGrammarAccess
+import org.openhab.core.model.rule.services.RulesGrammarAccess.RuleElements
 
 /**
  * This class contains custom formatting description.
@@ -30,13 +31,67 @@ import org.eclipse.xtext.formatting.impl.FormattingConfig
  */
 class RulesFormatter extends AbstractDeclarativeFormatter {
 
-//	@Inject extension RulesGrammarAccess
+	@Inject extension RulesGrammarAccess
 	
 	override protected void configureFormatting(FormattingConfig c) {
-// It's usually a good idea to activate the following three statements.
-// They will add and preserve newlines around comments
-//		c.setLinewrap(0, 1, 2).before(SL_COMMENTRule)
-//		c.setLinewrap(0, 1, 2).before(ML_COMMENTRule)
-//		c.setLinewrap(0, 1, 1).after(ML_COMMENTRule)
+	    
+//        c.setLinewrap(1, 1, 2).before("Bridge", "Things:", "Channels:")
+        c.setLinewrap(1, 1, 2).before(ruleModelRule)
+        c.setLinewrap(1, 1, 2).after(ruleModelRule)
+        c.setLinewrap(1, 1, 2).after(XImportDeclarationRule)
+        c.setLinewrap(1, 1, 2).after(XFunctionTypeRefRule)
+        c.setLinewrap(1, 1, 2).after(XBlockExpressionRule)
+        c.setLinewrap(1, 1, 2).after(getRuleAccess.group)
+        c.setLinewrap(1, 1, 2).before(getRuleAccess.whenKeyword_2)
+        c.setLinewrap(1, 1, 2).after(getRuleAccess.whenKeyword_2)
+        c.setLinewrap(1, 1, 2).before(getRuleAccess.thenKeyword_5)
+        c.setLinewrap(1, 1, 2).after(getRuleAccess.thenKeyword_5)
+        c.setLinewrap(1, 1, 2).before(getRuleAccess.endKeyword_7)
+
+        c.setIndentationIncrement.after("{")
+        c.setIndentationDecrement.before("}")
+        c.setIndentationIncrement.after(getRuleAccess.whenKeyword_2)
+        c.setIndentationDecrement.before(getRuleAccess.thenKeyword_5)
+        c.setIndentationIncrement.after(getRuleAccess.thenKeyword_5)
+        c.setIndentationDecrement.before(getRuleAccess.endKeyword_7)
+
+        c.setLinewrap().before("}")
+
+        c.setNoSpace().withinKeywordPairs("(", ")")
+        c.setNoSpace().withinKeywordPairs("[", "]")
+        c.setNoSpace().around("=")
+        c.setNoSpace().around(".")
+        c.setNoSpace().before(",")
+
+        c.autoLinewrap = 120
+	    
+		c.setLinewrap(0, 1, 2).before(SL_COMMENTRule)
+		c.setLinewrap(0, 1, 2).before(ML_COMMENTRule)
+		c.setLinewrap(0, 1, 1).after(ML_COMMENTRule)
 	}
+	
+    def withinKeywordPairs(FormattingConfig.NoSpaceLocator locator, String leftKW, String rightKW) {
+        for (pair : findKeywordPairs(leftKW, rightKW)) {
+            locator.after(pair.first)
+            locator.before(pair.second)
+        }
+    }
+
+    def around(FormattingConfig.ElementLocator locator, String ... listKW) {
+        for (keyword : findKeywords(listKW)) {
+            locator.around(keyword)
+        }
+    }
+
+    def after(FormattingConfig.ElementLocator locator, String ... listKW) {
+        for (keyword : findKeywords(listKW)) {
+            locator.after(keyword)
+        }
+    }
+
+    def before(FormattingConfig.ElementLocator locator, String ... listKW) {
+        for (keyword : findKeywords(listKW)) {
+            locator.before(keyword)
+        }
+    }
 }
