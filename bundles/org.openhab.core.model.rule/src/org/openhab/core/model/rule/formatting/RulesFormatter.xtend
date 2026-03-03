@@ -15,11 +15,12 @@
  */
 package org.openhab.core.model.rule.formatting
 
+import com.google.inject.Inject
 import org.eclipse.xtext.formatting.impl.AbstractDeclarativeFormatter
+import org.eclipse.xtext.formatting.impl.AbstractFormattingConfig
 import org.eclipse.xtext.formatting.impl.FormattingConfig
- import com.google.inject.Inject;
- import org.openhab.core.model.rule.services.RulesGrammarAccess
-import org.openhab.core.model.rule.services.RulesGrammarAccess.RuleElements
+import org.eclipse.xtext.xtext.XtextFormatter
+import org.openhab.core.model.rule.services.RulesGrammarAccess
 
 /**
  * This class contains custom formatting description.
@@ -27,7 +28,7 @@ import org.openhab.core.model.rule.services.RulesGrammarAccess.RuleElements
  * see : http://www.eclipse.org/Xtext/documentation.html#formatting
  * on how and when to use it 
  * 
- * Also see {@link org.eclipse.xtext.xtext.XtextFormatter} as an example
+ * Also see {@link XtextFormatter} as an example
  */
 class RulesFormatter extends AbstractDeclarativeFormatter {
 
@@ -35,13 +36,13 @@ class RulesFormatter extends AbstractDeclarativeFormatter {
 	
 	override protected void configureFormatting(FormattingConfig c) {
 	    
-//        c.setLinewrap(1, 1, 2).before("Bridge", "Things:", "Channels:")
         c.setLinewrap(1, 1, 2).before(ruleModelRule)
         c.setLinewrap(1, 1, 2).after(ruleModelRule)
         c.setLinewrap(1, 1, 2).after(XImportDeclarationRule)
         c.setLinewrap(1, 1, 2).after(XFunctionTypeRefRule)
         c.setLinewrap(1, 1, 2).after(XBlockExpressionRule)
         c.setLinewrap(1, 1, 2).after(getRuleAccess.group)
+        c.setLinewrap(1, 1, 2).after(getRuleAccess.orKeyword_4_0)
         c.setLinewrap(1, 1, 2).before(getRuleAccess.whenKeyword_2)
         c.setLinewrap(1, 1, 2).after(getRuleAccess.whenKeyword_2)
         c.setLinewrap(1, 1, 2).before(getRuleAccess.thenKeyword_5)
@@ -77,19 +78,19 @@ class RulesFormatter extends AbstractDeclarativeFormatter {
         }
     }
 
-    def around(FormattingConfig.ElementLocator locator, String ... listKW) {
+    def around(AbstractFormattingConfig.ElementLocator locator, String ... listKW) {
         for (keyword : findKeywords(listKW)) {
             locator.around(keyword)
         }
     }
 
-    def after(FormattingConfig.ElementLocator locator, String ... listKW) {
+    def after(AbstractFormattingConfig.ElementLocator locator, String ... listKW) {
         for (keyword : findKeywords(listKW)) {
             locator.after(keyword)
         }
     }
 
-    def before(FormattingConfig.ElementLocator locator, String ... listKW) {
+    def before(AbstractFormattingConfig.ElementLocator locator, String ... listKW) {
         for (keyword : findKeywords(listKW)) {
             locator.before(keyword)
         }

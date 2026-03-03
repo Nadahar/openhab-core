@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.core.model.rule.runtime.fileconverter;
 
 import java.io.ByteArrayInputStream;
@@ -8,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,18 +37,12 @@ import org.eclipse.emf.ecore.resource.Resource;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.emf.ecore.resource.Resource.Diagnostic;
 import org.eclipse.emf.ecore.util.Diagnostician;
-import org.eclipse.emf.ecore.util.EcoreUtil;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.xtext.diagnostics.Severity;
 import org.eclipse.xtext.resource.XtextResource;
 import org.eclipse.xtext.resource.XtextResourceSet;
-import org.eclipse.xtext.util.CancelIndicator;
 import org.eclipse.xtext.util.StringInputStream;
-import org.eclipse.xtext.validation.CheckMode;
-import org.eclipse.xtext.validation.IResourceValidator;
-import org.eclipse.xtext.validation.Issue;
 import org.eclipse.xtext.xbase.XBlockExpression;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Trigger;
@@ -65,12 +72,21 @@ import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
 import org.openhab.core.model.script.ScriptStandaloneSetup;
 import org.openhab.core.model.script.engine.Script;
 import org.openhab.core.model.script.engine.ScriptParsingException;
+import org.openhab.core.model.script.scoping.StateAndCommandProvider;
+import org.openhab.core.types.Command;
+import org.openhab.core.types.State;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * {@link DslRuleFileConverter} is the DSL converter for {@link Rule} objects, which can parse and generate Rule DSL
+ * syntax.
+ *
+ * @author Ravi Nadahar - Initial contribution
+ */
 @NonNullByDefault
 @Component(immediate = true, service = { RuleSerializer.class, RuleParser.class })
 public class DslRuleFileConverter implements RuleSerializer, RuleParser {
@@ -79,14 +95,14 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("(?<=then\\R)^\\s*\"SCRIPT_PLACEHOLDER_(?<uid>[^\"]+)\"\\s*$\\R", Pattern.MULTILINE);
     private static final Pattern CONTEXT_COMMENT_PATTERN = Pattern.compile("^// context:.*$\\R", Pattern.MULTILINE);
     private static final Pattern INDENTATION_PATTERN = Pattern.compile("^(?=.)", Pattern.MULTILINE);
+    private static final Pattern NUMERIC_PATTERN = Pattern.compile("-?\\d+(\\.\\d+)?");
+    private final Set<String> enumStates;
+    private final Set<String> enumCommands;
 
     private final Logger logger = LoggerFactory.getLogger(DslRuleFileConverter.class);
 
     private final ModelRepository modelRepository;
     private final DSLRuleProvider ruleProvider;
-//    private final ScriptParser scriptParser;
-//    private final GenericItemChannelLinkProvider itemChannelLinkProvider;
-//    private final LocaleProvider localeProvider;
 
     private record ScriptElement(String placeholderLiteral, String scriptContent) {
     }
@@ -96,18 +112,22 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
     private final Map<String, List<ScriptElement>> scriptElements = new ConcurrentHashMap<>();
 
     @Activate
-    public DslRuleFileConverter(@Reference ModelRepository modelRepository,
-            @Reference DSLRuleProvider ruleProvider
-//            @Reference ScriptParser scriptParser
-            /*,
-            final @Reference ConfigDescriptionRegistry configDescRegistry,
-            final @Reference LocaleProvider localeProvider*/) {
+    public DslRuleFileConverter(@Reference ModelRepository modelRepository, @Reference DSLRuleProvider ruleProvider) {
         this.modelRepository = modelRepository;
         this.ruleProvider = ruleProvider;
-//        this.scriptParser = scriptParser;
-//        this.thingProvider = thingProvider;
-//        this.itemChannelLinkProvider = itemChannelLinkProvider;
-//        this.localeProvider = localeProvider;
+        StateAndCommandProvider provider = ScriptStandaloneSetup.getInjector().getInstance(StateAndCommandProvider.class);
+
+        Set<String> enums = new LinkedHashSet<>();
+        for (State state : provider.getAllStates()) {
+            enums.add(state.toString());
+        }
+        this.enumStates = Set.copyOf(enums);
+
+        enums = new LinkedHashSet<>();
+        for (Command command : provider.getAllCommands()) {
+            enums.add(command.toString());
+        }
+        this.enumCommands = Set.copyOf(enums);
     }
 
     @Override
@@ -227,16 +247,15 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
             String placeholderLiteral, Set<Rule> handledRules) throws SerializationException {
         model.setName(rule.getName());
 
-        model.getEventtrigger().add(buildModelTrigger(rule.getTriggers().getFirst()));
+        for (Trigger trigger : rule.getTriggers()) {
+            model.getEventtrigger().add(buildModelTrigger(trigger));
+        }
 
-        XBlockExpression exp;
         try {
-            exp = (XBlockExpression) parseScriptIntoXTextEObject(placeholderLiteral);
-            logger.debug("exp={}", exp);
+            XBlockExpression exp = (XBlockExpression) parseScriptIntoXTextEObject(placeholderLiteral);
             model.setScript(exp);
         } catch (ScriptParsingException e) {
-            // TODO: (Nad) Figure out
-            e.printStackTrace();
+            throw new SerializationException(e.getMessage(), e);
         }
 
         handledRules.add(rule);
@@ -261,7 +280,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                         return result;
                     }
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.ItemCommandTrigger":
                 value = trigger.getConfiguration().get("itemName");
@@ -270,13 +289,11 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setItem(str);
                     value = trigger.getConfiguration().get("command");
                     if (value instanceof String command) {
-                        ValidCommand cmd = factory.createValidCommand();
-                        cmd.setValue(command);
-                        result.setCommand(cmd);
+                        result.setCommand(createValidCommand(command));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.GroupCommandTrigger":
                 value = trigger.getConfiguration().get("groupName");
@@ -285,13 +302,11 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setGroup(str);
                     value = trigger.getConfiguration().get("command");
                     if (value instanceof String command) {
-                        ValidCommand cmd = factory.createValidCommand();
-                        cmd.setValue(command);
-                        result.setCommand(cmd);
+                        result.setCommand(createValidCommand(command));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.ItemStateUpdateTrigger":
                 value = trigger.getConfiguration().get("itemName");
@@ -300,13 +315,11 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setItem(str);
                     value = trigger.getConfiguration().get("state");
                     if (value instanceof String state) {
-                        ValidState st = factory.createValidState();
-                        st.setValue(state);
-                        result.setState(st);
+                        result.setState(createValidState(state));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.GroupStateUpdateTrigger":
                 value = trigger.getConfiguration().get("groupName");
@@ -315,13 +328,11 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setGroup(str);
                     value = trigger.getConfiguration().get("state");
                     if (value instanceof String state) {
-                        ValidState st = factory.createValidState();
-                        st.setValue(state);
-                        result.setState(st);
+                        result.setState(createValidState(state));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.ItemStateChangeTrigger":
                 value = trigger.getConfiguration().get("itemName");
@@ -330,19 +341,15 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setItem(str);
                     value = trigger.getConfiguration().get("state");
                     if (value instanceof String state) {
-                        ValidState st = /*createValidStateFromDsl(state); */factory.createValidStateString();
-                        st.setValue(state);
-                        result.setNewState(st);
+                        result.setNewState(createValidState(state));
                     }
                     value = trigger.getConfiguration().get("previousState");
-                    if (value instanceof String prevState) {
-                        ValidState st = /*createValidStateFromDsl(prevState); */ factory.createValidStateString();
-                        st.setValue(prevState);
-                        result.setOldState(st);
+                    if (value instanceof String state) {
+                        result.setOldState(createValidState(state));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "core.GroupStateChangeTrigger":
                 value = trigger.getConfiguration().get("groupName");
@@ -351,19 +358,15 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     result.setGroup(str);
                     value = trigger.getConfiguration().get("state");
                     if (value instanceof String state) {
-                        ValidState st = factory.createValidState();
-                        st.setValue(state);
-                        result.setNewState(st);
+                        result.setNewState(createValidState(state));
                     }
                     value = trigger.getConfiguration().get("previousState");
                     if (value instanceof String state) {
-                        ValidState st = factory.createValidState();
-                        st.setValue(state);
-                        result.setOldState(st);
+                        result.setOldState(createValidState(state));
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "timer.GenericCronTrigger":
                 value = trigger.getConfiguration().get("cronExpression");
@@ -378,7 +381,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     }
                     return result;
                 } else {
-                    throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                    throw new SerializationException("Invalid trigger: " + trigger);
                 }
             case "timer.DateTimeTrigger":
                 value = trigger.getConfiguration().get("itemName");
@@ -395,7 +398,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                         return result;
                     }
                 }
-                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                throw new SerializationException("Invalid trigger: " + trigger);
             case "core.ChannelEventTrigger":
                 value = trigger.getConfiguration().get("channelUID");
                 if (value instanceof String str) {
@@ -409,7 +412,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                     }
                     return result;
                 }
-                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                throw new SerializationException("Invalid trigger: " + trigger);
             case "core.ThingStatusUpdateTrigger":
                 value = trigger.getConfiguration().get("thingUID");
                 if (value instanceof String str) {
@@ -421,7 +424,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                         return result;
                     }
                 }
-                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                throw new SerializationException("Invalid trigger: " + trigger);
             case "core.ThingStatusChangeTrigger":
                 value = trigger.getConfiguration().get("thingUID");
                 if (value instanceof String str) {
@@ -437,40 +440,36 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
                         }
                     }
                 }
-                throw new SerializationException("Invalid trigger: " + trigger); //TODO: (Nad) Find suitable exception
+                throw new SerializationException("Invalid trigger: " + trigger);
             default:
                 throw new SerializationException("Unsupported trigger: " + trigger);
         }
     }
 
-    private ValidState createValidStateFromDsl(String stateValue) {
-        // 1. Create a minimal DSL string that the parser understands
-        String dummyDsl = "rule 'temp' when Item x changed to " + stateValue + " then end";
-
-        // 2. Use your existing resourceSet to parse it
-        XtextResourceSet resourceSet = ScriptStandaloneSetup.getInjector().getInstance(XtextResourceSet.class);
-        Resource resource = resourceSet.createResource(computeUnusedUri(resourceSet)); // IS-A XtextResource
-
-        try (StringInputStream is = new StringInputStream(dummyDsl)) {
-            resource.load(is, null);
-
-            // 3. Navigate the model to find the trigger
-//            RuleModel model = (RuleModel) resource.getContents().get(0);
-            org.openhab.core.model.script.script.impl.ScriptImpl s = (org.openhab.core.model.script.script.impl.ScriptImpl) resource.getContents().getFirst();
-
-//            org.openhab.core.model.rule.rules.Rule rule = model.getRules().getFirst();
-//            ChangedEventTrigger trigger = (ChangedEventTrigger) rule.getEventtrigger().get(0);
-
-            // 4. Copy the state object. EcoreUtil.copy is essential here
-            // to detach it from the temporary resource.
-//            return EcoreUtil.copy(trigger.getNewState());
-            return (ValidState) EcoreUtil.copy(s.getExpressions().get(7));
-        } catch (Exception e) {
-            logger.error("Failed to parse state value: {}", stateValue, e);
-            throw new RuntimeException("Failed to parse state value");
-        } finally {
-            resource.unload();
+    private ValidState createValidState(String stateValue) {
+        ValidState result;
+        if (NUMERIC_PATTERN.matcher(stateValue).matches()) {
+            result = RulesFactory.eINSTANCE.createValidStateNumber();
+        } else if (enumStates.contains(stateValue)) {
+            result = RulesFactory.eINSTANCE.createValidStateId();
+        } else {
+            result = RulesFactory.eINSTANCE.createValidStateString();
         }
+        result.setValue(stateValue);
+        return result;
+    }
+
+    private ValidCommand createValidCommand(String commandValue) {
+        ValidCommand result;
+        if (NUMERIC_PATTERN.matcher(commandValue).matches()) {
+            result = RulesFactory.eINSTANCE.createValidCommandNumber();
+        } else if (enumCommands.contains(commandValue)) {
+            result = RulesFactory.eINSTANCE.createValidCommandId();
+        } else {
+            result = RulesFactory.eINSTANCE.createValidCommandString();
+        }
+        result.setValue(commandValue);
+        return result;
     }
 
     private @Nullable EObject parseScriptIntoXTextEObject(String scriptAsString) throws ScriptParsingException {
@@ -503,7 +502,7 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
         }
     }
 
-    protected URI computeUnusedUri(ResourceSet resourceSet) {
+    private URI computeUnusedUri(ResourceSet resourceSet) {
         String name = "__synthetic";
         int MAX_TRIES = 1000;
         for (int i = 0; i < MAX_TRIES; i++) {
@@ -515,17 +514,6 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
             }
         }
         throw new IllegalStateException("Unable to find a unused URI after 1000 attempts");
-    }
-
-    protected Iterable<Issue> getValidationErrors(EObject model) {
-        List<Issue> validate = validate(model);
-        return validate.stream().filter(input -> Severity.ERROR == input.getSeverity()).toList();
-    }
-
-    protected List<Issue> validate(EObject model) {
-        IResourceValidator validator = ((XtextResource) model.eResource()).getResourceServiceProvider()
-                .getResourceValidator();
-        return validator.validate(model.eResource(), CheckMode.ALL, CancelIndicator.NullImpl);
     }
 
     private void deleteResource(Resource resource) {
