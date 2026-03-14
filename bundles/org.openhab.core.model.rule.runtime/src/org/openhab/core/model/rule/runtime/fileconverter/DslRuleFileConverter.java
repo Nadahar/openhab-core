@@ -20,9 +20,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,10 +46,13 @@ import org.eclipse.xtext.resource.XtextResource;
 import org.eclipse.xtext.resource.XtextResourceSet;
 import org.eclipse.xtext.util.StringInputStream;
 import org.eclipse.xtext.xbase.XBlockExpression;
+import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Trigger;
+import org.openhab.core.automation.Visibility;
 import org.openhab.core.automation.fileconverter.RuleParser;
 import org.openhab.core.automation.fileconverter.RuleSerializer;
+import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.rules.ChangedEventTrigger;
@@ -141,40 +146,120 @@ public class DslRuleFileConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public void setRulesToBeGenerated(String modelName, List<Rule> rules, boolean hideDefaultParameters) {
-        if (rules.isEmpty()) {
-            return;
+    public List<SerializabilityResult> checkSerializability(Collection<Rule> rules) {
+        List<SerializabilityResult> result = new ArrayList<>(rules.size());
+        List<String> errors = new ArrayList<>();
+        for (Rule rule : rules) {
+            if (rule instanceof SimpleRule) {
+                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                continue;
+            }
+            if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
+                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
+                continue;
+            }
+            errors.clear();
+            if (!rule.getTags().isEmpty()) {
+                errors.add("has tags");
+            }
+            if (rule.getVisibility() != Visibility.VISIBLE) {
+                errors.add("is invisible");
+            }
+            List<Trigger> triggers = rule.getTriggers();
+            if (triggers.isEmpty()) {
+                errors.add("has no triggers");
+            } else {
+                for (Trigger trigger : triggers) {
+                    try {
+                        buildModelTrigger(trigger);
+                    } catch (SerializationException e) {
+                        errors.add("trigger '" + trigger.getId() + "': " + e.getMessage());
+                    }
+                }
+            }
+
+            if (!rule.getConditions().isEmpty()) {
+                errors.add("has conditions");
+            }
+            if (rule.getActions().size() != 1) {
+                errors.add("has " + rule.getActions().size() + " actions; one is required");
+            } else {
+                Action action = rule.getActions().getFirst();
+                if (action.getConfiguration().get("type") instanceof String type) {
+                    if (DSLRuleProvider.MIMETYPE_OPENHAB_DSL_RULE.equals(type)) {
+                        if (action.getConfiguration().get("script") instanceof String script) {
+                            if (script.isBlank()) {
+                                errors.add("has an empty scripted DSL action");
+                            }
+                        } else {
+                            errors.add("has no action script");
+                        }
+                    } else {
+                        errors.add("doesn't have a scripted DSL action");
+                    }
+                } else {
+                    errors.add("doesn't have a scripted action");
+                }
+            }
+
+            if (errors.isEmpty()) {
+                result.add(new SerializabilityResult(true, ""));
+            } else {
+                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
+            }
         }
+
+        return result;
+    }
+
+    @Override
+    public List<SerializabilityResult> setRulesToBeGenerated(String modelName, List<Rule> rules, boolean hideDefaultParameters) {
+        if (rules.isEmpty()) {
+            return List.of();
+        }
+        List<SerializabilityResult> result = checkSerializability(rules);
+        Map<Integer, Rule> supportedRules = new LinkedHashMap<>();
+        for (int i = 0; i < result.size(); i++) {
+            if (result.get(i).ok()) {
+                supportedRules.put(Integer.valueOf(i), rules.get(i));
+            }
+        }
+
         RuleModel model = RulesFactory.eINSTANCE.createRuleModel();
 
-        // Ensure that the variables collection is not null, calling get() creates an empty collection.
+        // Ensure that the variable collection is not null, calling get() creates an empty collection.
         model.getVariables();
 
         Set<Rule> handledRules = new HashSet<>();
-        for (Rule rule : rules) {
+        for (Entry<Integer, Rule> entry : supportedRules.entrySet()) {
+            Rule rule = entry.getValue();
             if (handledRules.contains(rule)) {
                 continue;
             }
+            org.openhab.core.model.rule.rules.Rule modelRule = RulesFactory.eINSTANCE.createRule();
+            model.getRules().add(modelRule);
             try {
-                org.openhab.core.model.rule.rules.Rule modelRule = RulesFactory.eINSTANCE.createRule();
-                model.getRules().add(modelRule);
                 String placeholderUid = UUID.randomUUID().toString();
                 String placeholderLiteral = '"' + SCRIPT_PLACEHOLDER_PREFIX + placeholderUid  + '"';
                 buildModelRule(rule, modelRule, placeholderLiteral, handledRules);
                 scriptElements.compute(modelName, (k, v) -> {
-                    List<ScriptElement> result = v == null ? new ArrayList<>() : v;
+                    List<ScriptElement> r = v == null ? new ArrayList<>() : v;
                     if (rule.getActions().getFirst().getConfiguration().get("script") instanceof String script) {
-                        result.add(new ScriptElement(placeholderUid, script));
+                        r.add(new ScriptElement(placeholderUid, script));
                     } else {
-                        result.add(new ScriptElement(placeholderUid, ""));
+                        r.add(new ScriptElement(placeholderUid, ""));
                     }
-                    return result;
+                    return r;
                 });
             } catch (SerializationException e) {
-                logger.error("Invalid rule: {}", e.getMessage(), e); //TODO: (Nad) Figure out how to handle
+                model.getRules().remove(modelRule);
+                result.set(entry.getKey().intValue(),
+                new SerializabilityResult(false, "Rule '" + rule.getUID() + "': " + e.getMessage()));
+                logger.warn("Failed to serialize rule '{}': {}", rule.getUID(), e.getMessage());
             }
         }
         elementsToGenerate.put(modelName, model);
+        return result;
     }
 
     @Override

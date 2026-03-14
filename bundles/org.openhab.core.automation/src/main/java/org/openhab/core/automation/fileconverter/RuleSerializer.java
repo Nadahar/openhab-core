@@ -12,6 +12,7 @@
  */
 package org.openhab.core.automation.fileconverter;
 
+import java.util.Collection;
 import java.util.List;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.automation.Rule;
@@ -26,11 +27,37 @@ import org.openhab.core.common.ObjectSerializer;
 public interface RuleSerializer extends ObjectSerializer<Rule> {
 
     /**
+     * A container that holds the result of a serializability check.
+     */
+    public record SerializabilityResult(boolean ok, String failureReason) {
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("SerializabilityResult [ok=").append(ok);
+            if (!ok) {
+                sb.append(", failureReason=").append(failureReason);
+            }
+            sb.append("]");
+            return sb.toString();
+        }
+    }
+
+    /**
+     * Checks if the specified rules are serializable with this {@link RuleSerializer}. Returned results are in the same
+     * order as the specified rules, so avoid using an unordered collection if mapping a failure to a rule is desirable.
+     *
+     * @param rules the {@link List} of {@link Rule}s to check.
+     * @return The resulting {@link List} of {@link SerializabilityResult}s.
+     */
+    List<SerializabilityResult> checkSerializability(Collection<Rule> rules);
+
+    /**
      * Specify the {@link List} of {@link Rule}s to be serialized and associate them with an identifier.
      *
      * @param id the identifier of the {@link Rule} format generation.
      * @param rules the {@link List} of {@link Rule}s to serialize.
      * @param hideDefaultParameters {@code true} to hide the configuration parameters having a default value.
      */
-    void setRulesToBeGenerated(String id, List<Rule> rules, boolean hideDefaultParameters); //TODO: (Nad) Is hide relevant?
+    List<SerializabilityResult> setRulesToBeGenerated(String id, List<Rule> rules, boolean hideDefaultParameters); //TODO: (Nad) Is hide relevant?
 }

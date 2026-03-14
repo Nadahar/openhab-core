@@ -88,7 +88,7 @@ import org.slf4j.LoggerFactory;
 public class DSLRuleProvider
         implements RuleProvider, ModelRepositoryChangeListener, DSLScriptContextProvider, ReadyTracker {
 
-    static final String MIMETYPE_OPENHAB_DSL_RULE = "application/vnd.openhab.dsl.rule";
+    public static final String MIMETYPE_OPENHAB_DSL_RULE = "application/vnd.openhab.dsl.rule";
 
     private final Logger logger = LoggerFactory.getLogger(DSLRuleProvider.class);
     private final Collection<ProviderChangeListener<Rule>> listeners = new ArrayList<>();
