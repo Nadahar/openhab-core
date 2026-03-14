@@ -16,12 +16,18 @@ import java.io.ByteArrayInputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
+import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
 import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlModelRepository;
@@ -59,12 +65,43 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public void setRulesToBeSerialized(String id, List<Rule> rules, boolean hideDefaultParameters) {
-        List<YamlElement> elements = new ArrayList<>(rules.size());
+    public List<SerializabilityResult> checkSerializability(Collection<Rule> rules) {
+        List<SerializabilityResult> result = new ArrayList<>(rules.size());
         for (Rule rule : rules) {
-            elements.add(new YamlRuleDTO(rule));
+            if (rule instanceof SimpleRule) {
+                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                continue;
+            }
+            if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
+                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
+                continue;
+            }
+            result.add(new SerializabilityResult(true, ""));
+        }
+
+        return result;
+    }
+
+    @Override
+    public List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, boolean hideDefaultParameters) {
+        List<SerializabilityResult> result = checkSerializability(rules);
+        Map<Integer, Rule> supportedRules = new LinkedHashMap<>();
+        for (int i = 0; i < result.size(); i++) {
+            if (result.get(i).ok()) {
+                supportedRules.put(Integer.valueOf(i), rules.get(i));
+            }
+        }
+
+        Set<Rule> handledRules = new HashSet<>();
+        List<YamlElement> elements = new ArrayList<>(rules.size());
+        for (Rule rule : supportedRules.values()) {
+            if (handledRules.contains(rule)) {
+                continue;
+            }
+            elements.add(new YamlRuleDTO(rule)); // TODO: (Nad) Can this fail?
         }
         modelRepository.addElementsToBeGenerated(id, elements);
+        return result;
     }
 
     @Override

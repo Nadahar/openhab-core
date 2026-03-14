@@ -22,10 +22,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -49,6 +51,7 @@ import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
+import org.openhab.core.automation.converter.RuleSerializer.SerializabilityResult;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
@@ -270,7 +273,7 @@ public class FileFormatResource implements RESTResource {
     private final Map<String, RuleSerializer> ruleSerializers = new ConcurrentHashMap<>();
     private final Map<String, RuleParser> ruleParsers = new ConcurrentHashMap<>();
 
-    private int counter;
+    private final AtomicInteger counter = new AtomicInteger();
 
     @Activate
     public FileFormatResource(//
@@ -487,7 +490,8 @@ public class FileFormatResource implements RESTResource {
         }
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         String genId = newIdForSerialization();
-        serializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+        List<SerializabilityResult> result = serializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+        logger.error("Check result: {}", result); // TODO: (Nad) Temp test
         serializer.generateFormat(genId, outputStream);
         return Response.ok(new String(outputStream.toByteArray(), StandardCharsets.UTF_8)).build();
     }
@@ -677,7 +681,7 @@ public class FileFormatResource implements RESTResource {
     }
 
     private String newIdForSerialization() {
-        return GEN_ID_PATTERN.formatted(++counter);
+        return String.format(Locale.ROOT, GEN_ID_PATTERN, counter.incrementAndGet());
     }
 
     /*
