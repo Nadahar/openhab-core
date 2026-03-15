@@ -204,7 +204,8 @@ public class StateDescriptionFragmentImpl implements StateDescriptionFragment {
             Unit<?> newUnit = UnitUtils.parseUnit(newPattern);
             if (oldUnit != null && newUnit != null && !oldUnit.equals(newUnit)
                     && (oldUnit.isCompatible(newUnit) || oldUnit.inverse().isCompatible(newUnit))) {
-                BigDecimal newValue;
+                BigDecimal newValue, bd;
+                QuantityType<?> qt;
                 // when inverting, min and max will swap
                 if (oldUnit.inverse().isCompatible(newUnit)) {
                     // It's highly likely that an invertible unit conversion will end up with a very long decimal
@@ -220,22 +221,30 @@ public class StateDescriptionFragmentImpl implements StateDescriptionFragment {
                         }
                     }
 
-                    if (minimum == null && (newValue = fragment.getMaximum()) != null) {
-                        minimum = new QuantityType(newValue, newUnit).toInvertibleUnit(oldUnit).toBigDecimal();
-                        if (minimum.scale() > 0) {
-                            minimum = minimum.stripTrailingZeros();
-                        }
-                        if (scale != null && minimum.scale() > scale) {
-                            minimum = minimum.setScale(scale, RoundingMode.FLOOR);
+                    bd = minimum;
+                    if (bd == null && (newValue = fragment.getMaximum()) != null) {
+                        qt = new QuantityType<>(newValue, newUnit).toInvertibleUnit(oldUnit);
+                        if (qt != null) {
+                            minimum = bd = qt.toBigDecimal();
+                            if (bd.scale() > 0) {
+                                minimum = bd = bd.stripTrailingZeros();
+                            }
+                            if (scale != null && bd.scale() > scale) {
+                                minimum = bd.setScale(scale, RoundingMode.FLOOR);
+                            }
                         }
                     }
-                    if (maximum == null && (newValue = fragment.getMinimum()) != null) {
-                        maximum = new QuantityType(newValue, newUnit).toInvertibleUnit(oldUnit).toBigDecimal();
-                        if (maximum.scale() > 0) {
-                            maximum = maximum.stripTrailingZeros();
-                        }
-                        if (scale != null && maximum.scale() > scale) {
-                            maximum = maximum.setScale(scale, RoundingMode.CEILING);
+                    bd = maximum;
+                    if (bd == null && (newValue = fragment.getMinimum()) != null) {
+                        qt = new QuantityType<>(newValue, newUnit).toInvertibleUnit(oldUnit);
+                        if (qt != null) {
+                            maximum = bd = qt.toBigDecimal();
+                            if (bd.scale() > 0) {
+                                maximum = bd = bd.stripTrailingZeros();
+                            }
+                            if (scale != null && bd.scale() > scale) {
+                                maximum = bd.setScale(scale, RoundingMode.CEILING);
+                            }
                         }
                     }
 
@@ -243,22 +252,35 @@ public class StateDescriptionFragmentImpl implements StateDescriptionFragment {
                     // Make sure it doesn't get overwritten below with a non-sensical value
                     skipStep = true;
                 } else {
-                    if (minimum == null && (newValue = fragment.getMinimum()) != null) {
-                        minimum = new QuantityType(newValue, newUnit).toInvertibleUnit(oldUnit).toBigDecimal();
-                        if (minimum.scale() > 0) {
-                            minimum = minimum.stripTrailingZeros();
+                    bd = minimum;
+                    if (bd == null && (newValue = fragment.getMinimum()) != null) {
+                        qt = new QuantityType<>(newValue, newUnit).toInvertibleUnit(oldUnit);
+                        if (qt != null) {
+                            minimum = bd = qt.toBigDecimal();
+                            if (bd.scale() > 0) {
+                                minimum = bd.stripTrailingZeros();
+                            }
                         }
                     }
-                    if (maximum == null && (newValue = fragment.getMaximum()) != null) {
-                        maximum = new QuantityType(newValue, newUnit).toInvertibleUnit(oldUnit).toBigDecimal();
-                        if (maximum.scale() > 0) {
-                            maximum = maximum.stripTrailingZeros();
+                    bd = maximum;
+                    if (bd == null && (newValue = fragment.getMaximum()) != null) {
+                        qt = new QuantityType<>(newValue, newUnit).toInvertibleUnit(oldUnit);
+                        if (qt != null) {
+                            maximum = bd = qt.toBigDecimal();
+                            if (bd.scale() > 0) {
+                                maximum = bd.stripTrailingZeros();
+                            }
                         }
                     }
-                    if (step == null && (newValue = fragment.getStep()) != null) {
-                        step = new QuantityType(newValue, newUnit).toUnitRelative(oldUnit).toBigDecimal();
-                        if (step.scale() > 0) {
-                            step = step.stripTrailingZeros();
+                    bd = step;
+                    if (bd == null && (newValue = fragment.getStep()) != null) {
+                        @SuppressWarnings({ "rawtypes", "unchecked" })
+                        QuantityType<?> qt2 = new QuantityType(newValue, newUnit).toUnitRelative(oldUnit);
+                        if (qt2 != null) {
+                            step = bd = qt2.toBigDecimal();
+                            if (bd.scale() > 0) {
+                                step = bd.stripTrailingZeros();
+                            }
                         }
                     }
                 }
