@@ -120,16 +120,15 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     public DslRuleConverter(@Reference ModelRepository modelRepository, @Reference DSLRuleProvider ruleProvider) {
         this.modelRepository = modelRepository;
         this.ruleProvider = ruleProvider;
-        StateAndCommandProvider provider = ScriptStandaloneSetup.getInjector().getInstance(StateAndCommandProvider.class);
 
         Set<String> enums = new LinkedHashSet<>();
-        for (State state : provider.getAllStates()) {
+        for (State state : StateAndCommandProvider.getAllStates()) {
             enums.add(state.toString());
         }
         this.enumStates = Set.copyOf(enums);
 
         enums = new LinkedHashSet<>();
-        for (Command command : provider.getAllCommands()) {
+        for (Command command : StateAndCommandProvider.getAllCommands()) {
             enums.add(command.toString());
         }
         this.enumCommands = Set.copyOf(enums);
