@@ -70,7 +70,10 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
      * Map of scheduled tasks: to remove devices from the Inbox, and to de-bounce the consideration
      * of multiple service events.
      */
+    // All access must be guarded by "this"
     private final Map<String, ScheduledFuture<?>> deviceRemovalTasks = new HashMap<>();
+
+    // All access must be guarded by "this"
     private final Map<String, ScheduledFuture<?>> considerServiceTasks = new HashMap<>();
 
     private final MDNSClient mdnsClient;
@@ -102,18 +105,21 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
     protected void deactivate() {
         deactivating = true;
 
-        for (MDNSDiscoveryParticipant participant : participants) {
-            mdnsClient.removeServiceListener(participant.getServiceType(), this);
-        }
-
         super.deactivate();
 
+        Map<String, ScheduledFuture<?>> removalTasks, considerTasks;
         synchronized (this) {
-            deviceRemovalTasks.values().forEach(task -> task.cancel(false));
+            removalTasks = Map.copyOf(deviceRemovalTasks);
             deviceRemovalTasks.clear();
 
-            considerServiceTasks.values().forEach(task -> task.cancel(false));
+            considerTasks = Map.copyOf(considerServiceTasks);
             considerServiceTasks.clear();
+        }
+        for (ScheduledFuture<?> task : removalTasks.values()) {
+            task.cancel(false);
+        }
+        for (ScheduledFuture<?> task : considerTasks.values()) {
+            task.cancel(false);
         }
     }
 
@@ -205,7 +211,10 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
     }
 
     @Override
-    public void serviceAdded(@NonNullByDefault({}) ServiceEvent serviceEvent) {
+    public void serviceAdded(@Nullable ServiceEvent serviceEvent) {
+        if (serviceEvent == null || serviceEvent.getInfo() == null) {
+            return;
+        }
         /*
          * When a service is added its ServiceInfo may be either resolved or unresolved. In the resolved case
          * we may directly consider the ServiceInfo for discovery here. But we also explicitly request the service
@@ -218,20 +227,24 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
     }
 
     @Override
-    public void serviceRemoved(@NonNullByDefault({}) ServiceEvent serviceEvent) {
-        ServiceInfo serviceInfo = serviceEvent.getInfo();
-        if (serviceInfo != null) {
-            String serviceType = serviceEvent.getType();
-            for (MDNSDiscoveryParticipant participant : participants) {
-                if (participant.getServiceType().equals(serviceType)) {
-                    removeDiscoveryResult(participant, serviceInfo);
-                }
+    public void serviceRemoved(@Nullable ServiceEvent serviceEvent) {
+        ServiceInfo serviceInfo;
+        if (serviceEvent == null || (serviceInfo = serviceEvent.getInfo()) == null) {
+            return;
+        }
+        String serviceType = serviceEvent.getType();
+        for (MDNSDiscoveryParticipant participant : participants) {
+            if (participant.getServiceType().equals(serviceType)) {
+                removeDiscoveryResult(participant, serviceInfo);
             }
         }
     }
 
     @Override
-    public void serviceResolved(@NonNullByDefault({}) ServiceEvent serviceEvent) {
+    public void serviceResolved(@Nullable ServiceEvent serviceEvent) {
+        if (serviceEvent == null || serviceEvent.getInfo() == null) {
+            return;
+        }
         /*
          * This method may be called several times as additional information such as the IP v4 and v6 addresses
          * and TXT attribute records are added. The considerService method applies a short delay to de-bounce
@@ -250,14 +263,14 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
     private void considerService(ServiceEvent serviceEvent) {
         if (!deactivating && isBackgroundDiscoveryEnabled() && serviceEvent.getInfo() instanceof ServiceInfo serviceInfo
                 && serviceInfo.getKey() instanceof String lookupKey) {
+            ScheduledFuture<?> oldTask;
             synchronized (this) {
-                ScheduledFuture<?> considerServiceTask = considerServiceTasks.remove(lookupKey);
-                if (considerServiceTask != null) {
-                    considerServiceTask.cancel(false);
-                }
-                considerServiceTasks.put(lookupKey,
+                oldTask = considerServiceTasks.put(lookupKey,
                         scheduler.schedule(() -> considerServiceTask(serviceInfo, serviceEvent.getType(), lookupKey),
                                 CONSIDER_SERVICE_WINDOW_MSEC, TimeUnit.MILLISECONDS));
+            }
+            if (oldTask != null) {
+                oldTask.cancel(false);
             }
         }
     }
@@ -272,8 +285,12 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
      */
     private void considerServiceTask(ServiceInfo serviceInfo, String serviceType, String lookupKey) {
         if (!deactivating) {
+            ScheduledFuture<?> task;
             synchronized (this) {
-                considerServiceTasks.remove(lookupKey);
+                task = considerServiceTasks.remove(lookupKey);
+            }
+            if (task != null) {
+                task.cancel(false);
             }
             for (MDNSDiscoveryParticipant participant : participants) {
                 if (participant.getServiceType().equals(serviceType)) {
@@ -336,11 +353,15 @@ public class MDNSDiscoveryService extends AbstractDiscoveryService implements Se
      */
     private void scheduleRemovalTask(ThingUID thingUID, ServiceInfo serviceInfo, long gracePeriod) {
         if (!deactivating) {
+            ScheduledFuture<?> oldTask;
             synchronized (this) {
-                deviceRemovalTasks.put(serviceInfo.getKey(), scheduler.schedule(() -> {
+                oldTask = deviceRemovalTasks.put(serviceInfo.getKey(), scheduler.schedule(() -> {
                     thingRemoved(thingUID);
                     cancelRemovalTask(serviceInfo);
                 }, gracePeriod, TimeUnit.SECONDS));
+            }
+            if (oldTask != null) {
+                oldTask.cancel(false);
             }
         }
     }
