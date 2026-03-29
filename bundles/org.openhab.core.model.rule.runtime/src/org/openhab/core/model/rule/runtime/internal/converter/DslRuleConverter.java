@@ -28,24 +28,17 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.eclipse.emf.common.util.EList;
-import org.eclipse.emf.common.util.URI;
-import org.eclipse.emf.ecore.EObject;
-import org.eclipse.emf.ecore.resource.Resource;
-import org.eclipse.emf.ecore.resource.ResourceSet;
-import org.eclipse.emf.ecore.resource.Resource.Diagnostic;
 import org.eclipse.emf.ecore.util.Diagnostician;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.xtext.resource.XtextResource;
-import org.eclipse.xtext.resource.XtextResourceSet;
-import org.eclipse.xtext.util.StringInputStream;
 import org.eclipse.xtext.xbase.XBlockExpression;
+import org.eclipse.xtext.xbase.XStringLiteral;
+import org.eclipse.xtext.xbase.XVariableDeclaration;
+import org.eclipse.xtext.xbase.XbaseFactory;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Trigger;
@@ -74,9 +67,6 @@ import org.openhab.core.model.rule.rules.ValidCommand;
 import org.openhab.core.model.rule.rules.ValidState;
 import org.openhab.core.model.rule.rules.ValidTrigger;
 import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
-import org.openhab.core.model.script.ScriptStandaloneSetup;
-import org.openhab.core.model.script.engine.Script;
-import org.openhab.core.model.script.engine.ScriptParsingException;
 import org.openhab.core.model.script.scoping.StateAndCommandProvider;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.State;
@@ -97,7 +87,7 @@ import org.slf4j.LoggerFactory;
 public class DslRuleConverter implements RuleSerializer, RuleParser {
 
     private static final String SCRIPT_PLACEHOLDER_PREFIX = "SCRIPT_PLACEHOLDER_";
-    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("(?<=then\\R)^\\s*\"SCRIPT_PLACEHOLDER_(?<uid>[^\"]+)\"\\s*$\\R", Pattern.MULTILINE);
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("(?<=then\\R)^\\s*val\\splaceholder=\"SCRIPT_PLACEHOLDER_(?<uid>[^\"]+)\"\\s*$\\R", Pattern.MULTILINE);
     private static final Pattern CONTEXT_COMMENT_PATTERN = Pattern.compile("^// context:.*$\\R", Pattern.MULTILINE);
     private static final Pattern INDENTATION_PATTERN = Pattern.compile("^(?=.)", Pattern.MULTILINE);
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("-?\\d+(\\.\\d+)?");
@@ -239,7 +229,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             model.getRules().add(modelRule);
             try {
                 String placeholderUid = UUID.randomUUID().toString();
-                String placeholderLiteral = '"' + SCRIPT_PLACEHOLDER_PREFIX + placeholderUid  + '"';
+                String placeholderLiteral = SCRIPT_PLACEHOLDER_PREFIX + placeholderUid;
                 buildModelRule(rule, modelRule, placeholderLiteral, handledRules);
                 scriptElements.compute(modelName, (k, v) -> {
                     List<ScriptElement> r = v == null ? new ArrayList<>() : v;
@@ -331,17 +321,13 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             String placeholderLiteral, Set<Rule> handledRules) throws SerializationException {
         model.setName(rule.getName());
         model.getTags().add("Test"); // TODO: (Nad) Temp test
+        model.getTags().add("Test2"); // TODO: (Nad) Temp test
 
         for (Trigger trigger : rule.getTriggers()) {
             model.getEventtrigger().add(buildModelTrigger(trigger));
         }
 
-        try {
-            XBlockExpression exp = (XBlockExpression) parseScriptIntoXTextEObject(placeholderLiteral);
-            model.setScript(exp);
-        } catch (ScriptParsingException e) {
-            throw new SerializationException(e.getMessage(), e);
-        }
+        model.setScript(createPlaceholder(placeholderLiteral));
 
         handledRules.add(rule);
 
@@ -557,55 +543,16 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         return result;
     }
 
-    private @Nullable EObject parseScriptIntoXTextEObject(String scriptAsString) throws ScriptParsingException {
-        XtextResourceSet resourceSet = ScriptStandaloneSetup.getInjector().getInstance(XtextResourceSet.class);
-        resourceSet.addLoadOption(XtextResource.OPTION_RESOLVE_ALL, Boolean.TRUE);
-
-        Resource resource = resourceSet.createResource(computeUnusedUri(resourceSet)); // IS-A XtextResource
-        try {
-            resource.load(new StringInputStream(scriptAsString, StandardCharsets.UTF_8.name()),
-                    resourceSet.getLoadOptions());
-        } catch (IOException e) {
-            throw new ScriptParsingException(
-                    "Unexpected IOException; from close() of a String-based ByteArrayInputStream, no real I/O; how is that possible???",
-                    scriptAsString, e);
-        }
-
-        List<Diagnostic> errors = resource.getErrors();
-        if (!errors.isEmpty()) {
-            deleteResource(resource);
-            throw new ScriptParsingException("Failed to parse expression (due to managed SyntaxError/s)",
-                    scriptAsString).addDiagnosticErrors(errors);
-        }
-
-        EList<EObject> contents = resource.getContents();
-        if (!contents.isEmpty()) {
-            return contents.getFirst();
-        } else {
-            deleteResource(resource);
-            return null;
-        }
-    }
-
-    private URI computeUnusedUri(ResourceSet resourceSet) {
-        String name = "__synthetic";
-        int MAX_TRIES = 1000;
-        for (int i = 0; i < MAX_TRIES; i++) {
-            // NOTE: The "filename extension" (".script") must match the file.extensions in the *.mwe2
-            URI syntheticUri = URI
-                    .createURI(name + ThreadLocalRandom.current().nextDouble() + "." + Script.SCRIPT_FILEEXT);
-            if (resourceSet.getResource(syntheticUri, false) == null) {
-                return syntheticUri;
-            }
-        }
-        throw new IllegalStateException("Unable to find a unused URI after 1000 attempts");
-    }
-
-    private void deleteResource(Resource resource) {
-        try {
-            resource.delete(Map.of());
-        } catch (IOException e) {
-            // Ignore
-        }
+    private XBlockExpression createPlaceholder(String placeholderLiteral) {
+        // Creates expression: 'val placeholder="<placeholderLiteral>"'
+        XbaseFactory factory = XbaseFactory.eINSTANCE;
+        XBlockExpression result = factory.createXBlockExpression();
+        XVariableDeclaration varDecl = factory.createXVariableDeclaration();
+        varDecl.setName("placeholder");
+        XStringLiteral stringLit = factory.createXStringLiteral();
+        stringLit.setValue(placeholderLiteral);
+        varDecl.setRight(stringLit);
+        result.getExpressions().add(varDecl);
+        return result;
     }
 }
