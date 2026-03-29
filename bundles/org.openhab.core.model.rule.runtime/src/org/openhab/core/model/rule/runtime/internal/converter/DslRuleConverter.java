@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.eclipse.emf.common.util.EList;
 import org.eclipse.emf.ecore.util.Diagnostician;
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -130,7 +131,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public String getGeneratedFormat() {
+    public String getGeneratedFormat() { //TODO: (Nad) UI: Erase source on rule duplication, and //context for DSL
         return "DSL";
     }
 
@@ -148,9 +149,6 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 continue;
             }
             errors.clear();
-            if (!rule.getTags().isEmpty()) {
-                errors.add("has tags");
-            }
             if (rule.getVisibility() != Visibility.VISIBLE) {
                 errors.add("is invisible");
             }
@@ -320,8 +318,10 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, org.openhab.core.model.rule.rules.Rule model,
             String placeholderLiteral, Set<Rule> handledRules) throws SerializationException {
         model.setName(rule.getName());
-        model.getTags().add("Test"); // TODO: (Nad) Temp test
-        model.getTags().add("Test2"); // TODO: (Nad) Temp test
+        EList<String> tags = model.getTags();
+        for (String tag : rule.getTags()) {
+            tags.add(tag);
+        }
 
         for (Trigger trigger : rule.getTriggers()) {
             model.getEventtrigger().add(buildModelTrigger(trigger));

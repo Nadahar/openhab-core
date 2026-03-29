@@ -41,7 +41,7 @@ class RulesFormatter extends AbstractDeclarativeFormatter {
         c.setLinewrap(1, 1, 2).after(XImportDeclarationRule)
         c.setLinewrap(1, 1, 2).after(XFunctionTypeRefRule)
         c.setLinewrap(1, 1, 2).after(XBlockExpressionRule)
-        c.setLinewrap(1, 1, 2).after(getRuleAccess.group)
+        c.setLinewrap(1, 2, 2).before(getRuleAccess.ruleKeyword_0)
         c.setLinewrap(1, 1, 2).after(getRuleAccess.orKeyword_5_0)
         c.setLinewrap(1, 1, 2).before(getRuleAccess.whenKeyword_3)
         c.setLinewrap(1, 1, 2).after(getRuleAccess.whenKeyword_3)
