@@ -330,6 +330,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, org.openhab.core.model.rule.rules.Rule model,
             String placeholderLiteral, Set<Rule> handledRules) throws SerializationException {
         model.setName(rule.getName());
+        model.getTags().add("Test"); // TODO: (Nad) Temp test
 
         for (Trigger trigger : rule.getTriggers()) {
             model.getEventtrigger().add(buildModelTrigger(trigger));
