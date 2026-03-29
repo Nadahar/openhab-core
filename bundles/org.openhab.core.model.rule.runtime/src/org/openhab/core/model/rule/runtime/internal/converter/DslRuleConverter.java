@@ -46,6 +46,16 @@ import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
+import org.openhab.core.automation.internal.module.handler.ChannelEventTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.DateTimeTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.GenericCronTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.GroupCommandTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.GroupStateTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.ItemCommandTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.ItemStateTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.SystemTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.ThingStatusTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.TimeOfDayTriggerHandler;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.core.ModelRepository;
@@ -339,8 +349,8 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         Object value;
         RulesFactory factory = RulesFactory.eINSTANCE;
         switch (type) {
-            case "core.SystemStartlevelTrigger":
-                value = trigger.getConfiguration().get("startlevel");
+            case SystemTriggerHandler.STARTLEVEL_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(SystemTriggerHandler.CFG_STARTLEVEL);
                 if (value instanceof Number num) {
                     int level = num.intValue();
                     if (level == 40) {
@@ -353,12 +363,12 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "core.ItemCommandTrigger":
-                value = trigger.getConfiguration().get("itemName");
+            case ItemCommandTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ItemCommandTriggerHandler.CFG_ITEMNAME);
                 if (value instanceof String str) {
                     CommandEventTrigger result = factory.createCommandEventTrigger();
                     result.setItem(str);
-                    value = trigger.getConfiguration().get("command");
+                    value = trigger.getConfiguration().get(ItemCommandTriggerHandler.CFG_COMMAND);
                     if (value instanceof String command) {
                         result.setCommand(createValidCommand(command));
                     }
@@ -366,12 +376,12 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "core.GroupCommandTrigger":
-                value = trigger.getConfiguration().get("groupName");
+            case GroupCommandTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(GroupCommandTriggerHandler.CFG_GROUPNAME);
                 if (value instanceof String str) {
                     GroupMemberCommandEventTrigger result = factory.createGroupMemberCommandEventTrigger();
                     result.setGroup(str);
-                    value = trigger.getConfiguration().get("command");
+                    value = trigger.getConfiguration().get(GroupCommandTriggerHandler.CFG_COMMAND);
                     if (value instanceof String command) {
                         result.setCommand(createValidCommand(command));
                     }
@@ -379,12 +389,12 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "core.ItemStateUpdateTrigger":
-                value = trigger.getConfiguration().get("itemName");
+            case ItemStateTriggerHandler.UPDATE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ItemStateTriggerHandler.CFG_ITEMNAME);
                 if (value instanceof String str) {
                     UpdateEventTrigger result = factory.createUpdateEventTrigger();
                     result.setItem(str);
-                    value = trigger.getConfiguration().get("state");
+                    value = trigger.getConfiguration().get(ItemStateTriggerHandler.CFG_STATE);
                     if (value instanceof String state) {
                         result.setState(createValidState(state));
                     }
@@ -392,29 +402,16 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "core.GroupStateUpdateTrigger":
-                value = trigger.getConfiguration().get("groupName");
-                if (value instanceof String str) {
-                    GroupMemberUpdateEventTrigger result = factory.createGroupMemberUpdateEventTrigger();
-                    result.setGroup(str);
-                    value = trigger.getConfiguration().get("state");
-                    if (value instanceof String state) {
-                        result.setState(createValidState(state));
-                    }
-                    return result;
-                } else {
-                    throw new SerializationException("Invalid trigger: " + trigger);
-                }
-            case "core.ItemStateChangeTrigger":
-                value = trigger.getConfiguration().get("itemName");
+            case ItemStateTriggerHandler.CHANGE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ItemStateTriggerHandler.CFG_ITEMNAME);
                 if (value instanceof String str) {
                     ChangedEventTrigger result = factory.createChangedEventTrigger();
                     result.setItem(str);
-                    value = trigger.getConfiguration().get("state");
+                    value = trigger.getConfiguration().get(ItemStateTriggerHandler.CFG_STATE);
                     if (value instanceof String state) {
                         result.setNewState(createValidState(state));
                     }
-                    value = trigger.getConfiguration().get("previousState");
+                    value = trigger.getConfiguration().get(ItemStateTriggerHandler.CFG_PREVIOUS_STATE);
                     if (value instanceof String state) {
                         result.setOldState(createValidState(state));
                     }
@@ -422,16 +419,29 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "core.GroupStateChangeTrigger":
-                value = trigger.getConfiguration().get("groupName");
+            case GroupStateTriggerHandler.UPDATE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(GroupStateTriggerHandler.CFG_GROUPNAME);
+                if (value instanceof String str) {
+                    GroupMemberUpdateEventTrigger result = factory.createGroupMemberUpdateEventTrigger();
+                    result.setGroup(str);
+                    value = trigger.getConfiguration().get(GroupStateTriggerHandler.CFG_STATE);
+                    if (value instanceof String state) {
+                        result.setState(createValidState(state));
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger);
+                }
+            case GroupStateTriggerHandler.CHANGE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(GroupStateTriggerHandler.CFG_GROUPNAME);
                 if (value instanceof String str) {
                     GroupMemberChangedEventTrigger result = factory.createGroupMemberChangedEventTrigger();
                     result.setGroup(str);
-                    value = trigger.getConfiguration().get("state");
+                    value = trigger.getConfiguration().get(GroupStateTriggerHandler.CFG_STATE);
                     if (value instanceof String state) {
                         result.setNewState(createValidState(state));
                     }
-                    value = trigger.getConfiguration().get("previousState");
+                    value = trigger.getConfiguration().get(GroupStateTriggerHandler.CFG_PREVIOUS_STATE);
                     if (value instanceof String state) {
                         result.setOldState(createValidState(state));
                     }
@@ -439,8 +449,8 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "timer.GenericCronTrigger":
-                value = trigger.getConfiguration().get("cronExpression");
+            case GenericCronTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(GenericCronTriggerHandler.CFG_CRON_EXPRESSION);
                 if (value instanceof String str) {
                     TimerTrigger result = factory.createTimerTrigger();
                     if ("0 0 12 * * ?".equals(str)) {
@@ -454,28 +464,43 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 } else {
                     throw new SerializationException("Invalid trigger: " + trigger);
                 }
-            case "timer.DateTimeTrigger":
-                value = trigger.getConfiguration().get("itemName");
+            case TimeOfDayTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(TimeOfDayTriggerHandler.CFG_TIME);
+                if (value instanceof String str) {
+                    TimerTrigger result = factory.createTimerTrigger();
+                    if ("12:00".equals(str)) {
+                        result.setTime("noon");
+                    } else if ("00:00".equals(str)) {
+                        result.setTime("midnight");
+                    } else {
+                        result.setTime(str);
+                    }
+                    return result;
+                } else {
+                    throw new SerializationException("Invalid trigger: " + trigger);
+                }
+            case DateTimeTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(DateTimeTriggerHandler.CONFIG_ITEM_NAME);
                 if (value instanceof String str) {
                     DateTimeTrigger result = factory.createDateTimeTrigger();
                     result.setItem(str);
-                    value = trigger.getConfiguration().get("timeOnly");
+                    value = trigger.getConfiguration().get(DateTimeTriggerHandler.CONFIG_TIME_ONLY);
                     if (value instanceof Boolean timeOnly) {
                         result.setTimeOnly(timeOnly);
                     }
-                    value = trigger.getConfiguration().get("offset");
+                    value = trigger.getConfiguration().get(DateTimeTriggerHandler.CONFIG_OFFSET);
                     if (value instanceof String offset) {
                         result.setOffset(offset);
                         return result;
                     }
                 }
                 throw new SerializationException("Invalid trigger: " + trigger);
-            case "core.ChannelEventTrigger":
-                value = trigger.getConfiguration().get("channelUID");
+            case ChannelEventTriggerHandler.MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ChannelEventTriggerHandler.CFG_CHANNEL);
                 if (value instanceof String str) {
                     EventEmittedTrigger result = factory.createEventEmittedTrigger();
                     result.setChannel(str);
-                    value = trigger.getConfiguration().get("event");
+                    value = trigger.getConfiguration().get(ChannelEventTriggerHandler.CFG_CHANNEL_EVENT);
                     if (value instanceof String event) {
                         ValidTrigger trg = factory.createValidTrigger();
                         trg.setValue(event);
@@ -484,27 +509,27 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     return result;
                 }
                 throw new SerializationException("Invalid trigger: " + trigger);
-            case "core.ThingStatusUpdateTrigger":
-                value = trigger.getConfiguration().get("thingUID");
+            case ThingStatusTriggerHandler.UPDATE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ThingStatusTriggerHandler.CFG_THING_UID);
                 if (value instanceof String str) {
                     ThingStateUpdateEventTrigger result = factory.createThingStateUpdateEventTrigger();
                     result.setThing(str);
-                    value = trigger.getConfiguration().get("status");
+                    value = trigger.getConfiguration().get(ThingStatusTriggerHandler.CFG_STATUS);
                     if (value instanceof String status) {
                         result.setState(status);
                         return result;
                     }
                 }
                 throw new SerializationException("Invalid trigger: " + trigger);
-            case "core.ThingStatusChangeTrigger":
-                value = trigger.getConfiguration().get("thingUID");
+            case ThingStatusTriggerHandler.CHANGE_MODULE_TYPE_ID:
+                value = trigger.getConfiguration().get(ThingStatusTriggerHandler.CFG_THING_UID);
                 if (value instanceof String str) {
                     ThingStateChangedEventTrigger result = factory.createThingStateChangedEventTrigger();
                     result.setThing(str);
-                    value = trigger.getConfiguration().get("status");
+                    value = trigger.getConfiguration().get(ThingStatusTriggerHandler.CFG_STATUS);
                     if (value instanceof String status) {
                         result.setNewState(status);
-                        value = trigger.getConfiguration().get("previousStatus");
+                        value = trigger.getConfiguration().get(ThingStatusTriggerHandler.CFG_PREVIOUS_STATUS);
                         if (value instanceof String previousStatus) {
                             result.setOldState(previousStatus);
                             return result;
