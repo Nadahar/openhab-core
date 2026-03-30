@@ -52,6 +52,8 @@ import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
 import org.openhab.core.automation.converter.RuleSerializer.SerializabilityResult;
+import org.openhab.core.automation.dto.RuleDTO;
+import org.openhab.core.automation.dto.RuleDTOMapper;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
@@ -500,12 +502,13 @@ public class FileFormatResource implements RESTResource {
     @RolesAllowed({ Role.ADMIN })
     @Path("/create")
     @Consumes({ MediaType.APPLICATION_JSON })
-    @Produces({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/yaml" })
+    @Produces({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/vnd.openhab.dsl.rule", "application/yaml" })
     @Operation(operationId = "create", summary = "Create file format.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
                     @ApiResponse(responseCode = "200", description = "OK", content = {
                             @Content(mediaType = "text/vnd.openhab.dsl.thing", schema = @Schema(example = DSL_THINGS_EXAMPLE)),
                             @Content(mediaType = "text/vnd.openhab.dsl.item", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
+                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)), // TODO: (NAd) DSL RULES EXAMPLE
                             @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_AND_THINGS_EXAMPLE)) }),
                     @ApiResponse(responseCode = "400", description = "Invalid JSON data."),
                     @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
@@ -521,13 +524,15 @@ public class FileFormatResource implements RESTResource {
         List<Item> items = new ArrayList<>();
         List<Metadata> metadata = new ArrayList<>();
         Map<String, String> stateFormatters = new HashMap<>();
+        List<Rule> rules = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        if (!convertFromFileFormatDTO(data, things, items, metadata, stateFormatters, errors)) {
+        if (!convertFromFileFormatDTO(data, things, items, metadata, stateFormatters, rules, errors)) {
             return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
         }
 
         ThingSerializer thingSerializer = getThingSerializer(acceptHeader);
         ItemSerializer itemSerializer = getItemSerializer(acceptHeader);
+        RuleSerializer ruleSerializer = getRuleSerializer(acceptHeader); // TODO: (Nad) Rule templates as well?
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         String genId = newIdForSerialization();
         switch (acceptHeader) {
@@ -552,6 +557,16 @@ public class FileFormatResource implements RESTResource {
                         stateFormatters, hideDefaultParameters);
                 itemSerializer.generateFormat(genId, outputStream);
                 break;
+            case "application/vnd.openhab.dsl.rule":
+                if (ruleSerializer == null) {
+                    return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
+                            .entity("Unsupported media type '" + acceptHeader + "'!").build();
+                } else if (rules.isEmpty()) {
+                    return Response.status(Response.Status.BAD_REQUEST).entity("No rule loaded from input").build();
+                }
+                ruleSerializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+                ruleSerializer.generateFormat(genId, outputStream);
+                break;
             case "application/yaml":
                 if (thingSerializer != null) {
                     thingSerializer.setThingsToBeSerialized(genId, things, hideDefaultChannels, hideDefaultParameters);
@@ -560,10 +575,15 @@ public class FileFormatResource implements RESTResource {
                     itemSerializer.setItemsToBeSerialized(genId, items,
                             hideChannelLinksAndMetadata ? List.of() : metadata, stateFormatters, hideDefaultParameters);
                 }
+                if (ruleSerializer != null) {
+                    ruleSerializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+                }
                 if (thingSerializer != null) {
                     thingSerializer.generateFormat(genId, outputStream);
                 } else if (itemSerializer != null) {
                     itemSerializer.generateFormat(genId, outputStream);
+                } else if (ruleSerializer != null) {
+                    ruleSerializer.generateFormat(genId, outputStream);
                 }
                 break;
             default:
@@ -576,7 +596,7 @@ public class FileFormatResource implements RESTResource {
     @POST
     @RolesAllowed({ Role.ADMIN })
     @Path("/parse")
-    @Consumes({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/yaml" })
+    @Consumes({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/vnd.openhab.dsl.rule", "application/yaml" }) // TODO: (Nad) Template as well..?
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "parse", summary = "Parse file format.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
@@ -587,6 +607,7 @@ public class FileFormatResource implements RESTResource {
             @RequestBody(description = "file format syntax", required = true, content = {
                     @Content(mediaType = "text/vnd.openhab.dsl.thing", schema = @Schema(example = DSL_THINGS_EXAMPLE)),
                     @Content(mediaType = "text/vnd.openhab.dsl.item", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
+                    @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)), // TODO: (Nad) Rule example
                     @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_AND_THINGS_EXAMPLE)) }) String input) {
         String contentTypeHeader = httpHeaders.getHeaderString(HttpHeaders.CONTENT_TYPE);
         logger.debug("parse: contentType = {}", contentTypeHeader);
@@ -597,12 +618,15 @@ public class FileFormatResource implements RESTResource {
         Collection<Metadata> metadata = List.of();
         Collection<ItemChannelLink> channelLinks = List.of();
         Map<String, String> stateFormatters = Map.of();
+        Collection<Rule> rules = List.of();
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         ThingParser thingParser = getThingParser(contentTypeHeader);
         ItemParser itemParser = getItemParser(contentTypeHeader);
+        RuleParser ruleParser = getRuleParser(contentTypeHeader);
         String modelName = null;
         String modelName2 = null;
+        String ruleModelName = null;
         switch (contentTypeHeader) {
             case "text/vnd.openhab.dsl.thing":
                 if (thingParser == null) {
@@ -641,6 +665,21 @@ public class FileFormatResource implements RESTResource {
                     channelLinks = thingParser.getParsedChannelLinks(modelName2);
                 }
                 break;
+            case "application/vnd.openhab.dsl.rule": // TODO: (Nad) Rule template
+                if (ruleParser == null) {
+                    return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
+                            .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
+                }
+                ruleModelName = ruleParser.startParsingFormat(input, errors, warnings);
+                if (ruleModelName == null) {
+                    return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
+                }
+                rules = ruleParser.getParsedObjects(ruleModelName);
+                if (rules.isEmpty()) {
+                    ruleParser.finishParsingFormat(ruleModelName);
+                    return Response.status(Response.Status.BAD_REQUEST).entity("No rule loaded from input").build();
+                }
+                break;
             case "application/yaml":
                 if (thingParser != null) {
                     modelName = thingParser.startParsingFormat(input, errors, warnings);
@@ -670,12 +709,15 @@ public class FileFormatResource implements RESTResource {
                         .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
         }
         ExtendedFileFormatDTO result = convertToFileFormatDTO(things, items, metadata, stateFormatters, channelLinks,
-                warnings);
+                rules, warnings);
         if (modelName != null && thingParser != null) {
             thingParser.finishParsingFormat(modelName);
         }
         if (modelName2 != null && itemParser != null) {
             itemParser.finishParsingFormat(modelName2);
+        }
+        if (ruleModelName != null && ruleParser != null) {
+            ruleParser.finishParsingFormat(ruleModelName);
         }
         return Response.ok(result).build();
     }
@@ -848,7 +890,7 @@ public class FileFormatResource implements RESTResource {
         switch (mediaType) {
             case "application/yaml": return ruleSerializers.get("YAML");
             case "application/vnd.openhab.dsl.rule": return ruleSerializers.get("DSL");
-            default: return null; //TODO: (Nad) DSL?
+            default: return null;
         }
     }
 
@@ -872,7 +914,8 @@ public class FileFormatResource implements RESTResource {
     private @Nullable RuleParser getRuleParser(String contentType) {
         switch (contentType) {
             case "application/yaml": return ruleParsers.get("YAML");
-            default: return null; //TODO: (Nad) DSL?
+            case "application/vnd.openhab.dsl.rule": return ruleParsers.get("DSL");
+            default: return null;
         }
     }
 
@@ -898,7 +941,7 @@ public class FileFormatResource implements RESTResource {
     }
 
     private boolean convertFromFileFormatDTO(FileFormatDTO data, List<Thing> things, List<Item> items,
-            List<Metadata> metadata, Map<String, String> stateFormatters, List<String> errors) {
+            List<Metadata> metadata, Map<String, String> stateFormatters, List<Rule> rules, List<String> errors) {
         boolean ok = true;
         if (data.things != null) {
             for (ThingDTO thingData : data.things) {
@@ -981,12 +1024,17 @@ public class FileFormatResource implements RESTResource {
                 }
             }
         }
+        if (data.rules != null) {
+            for (RuleDTO ruleData : data.rules) { // TODO: (Nad) Any checks/validation to do?
+                rules.add(RuleDTOMapper.map(ruleData));
+            }
+        }
         return ok;
     }
 
     private ExtendedFileFormatDTO convertToFileFormatDTO(Collection<Thing> things, Collection<Item> items,
             Collection<Metadata> metadata, Map<String, String> stateFormatters,
-            Collection<ItemChannelLink> channelLinks, List<String> warnings) {
+            Collection<ItemChannelLink> channelLinks, Collection<Rule> rules, List<String> warnings) {
         ExtendedFileFormatDTO dto = new ExtendedFileFormatDTO();
         dto.warnings = warnings.isEmpty() ? null : warnings;
         if (!things.isEmpty()) {
@@ -1032,6 +1080,12 @@ public class FileFormatResource implements RESTResource {
                 dto.items.add(
                         FileFormatItemDTOMapper.map(item, metadata, stateFormatters.get(item.getName()), channelLinks));
             });
+        }
+        if (!rules.isEmpty()) {
+            dto.rules = new ArrayList<>();
+            for (Rule rule : rules) {
+                dto.rules.add(RuleDTOMapper.map(rule));
+            }
         }
         return dto;
     }

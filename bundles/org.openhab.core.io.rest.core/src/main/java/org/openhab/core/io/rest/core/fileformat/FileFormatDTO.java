@@ -14,13 +14,14 @@ package org.openhab.core.io.rest.core.fileformat;
 
 import java.util.List;
 
+import org.openhab.core.automation.dto.RuleDTO;
 import org.openhab.core.thing.dto.ThingDTO;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * This is a data transfer object to serialize the different components that can be contained
- * in a file format (items, things, ...).
+ * in a file format (items, things, rules, ...).
  *
  * @author Laurent Garnier - Initial contribution
  */
@@ -31,4 +32,6 @@ public class FileFormatDTO {
     public List<FileFormatItemDTO> items;
     @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     public List<ThingDTO> things;
+    @Schema(requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    public List<RuleDTO> rules;
 }
