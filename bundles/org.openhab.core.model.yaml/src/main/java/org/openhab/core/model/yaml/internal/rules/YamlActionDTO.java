@@ -14,9 +14,9 @@ package org.openhab.core.model.yaml.internal.rules;
 
 import java.util.Map;
 import java.util.Objects;
-
 import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.core.automation.Action;
+import org.openhab.core.model.yaml.internal.rules.YamlRuleDTO.SerializationOption;
 
 /**
  * The {@link YamlActionDTO} is a data transfer object used to serialize an action in a YAML configuration file.
@@ -31,8 +31,15 @@ public class YamlActionDTO extends YamlModuleDTO {
     }
 
     public YamlActionDTO(@NonNull Action action) {
+        this(action, SerializationOption.NORMAL);
+    }
+
+    public YamlActionDTO(@NonNull Action action, SerializationOption option) {
         super(action);
         this.inputs = action.getInputs();
+        if (option != SerializationOption.INCLUDE_ALL && this.inputs.isEmpty()) {
+            this.inputs = null;
+        }
     }
 
     @Override
