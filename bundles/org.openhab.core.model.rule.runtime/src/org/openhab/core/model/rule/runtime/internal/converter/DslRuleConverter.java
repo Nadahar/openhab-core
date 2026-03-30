@@ -151,11 +151,11 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         List<String> errors = new ArrayList<>();
         for (Rule rule : rules) {
             if (rule instanceof SimpleRule) {
-                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
                 continue;
             }
             if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
-                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
+                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
                 continue;
             }
             errors.clear();
@@ -200,9 +200,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             }
 
             if (errors.isEmpty()) {
-                result.add(new SerializabilityResult(true, ""));
+                result.add(new SerializabilityResult(rule.getUID(), true, ""));
             } else {
-                result.add(new SerializabilityResult(false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
+                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
             }
         }
 
@@ -251,7 +251,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             } catch (SerializationException e) {
                 model.getRules().remove(modelRule);
                 result.set(entry.getKey().intValue(),
-                new SerializabilityResult(false, "Rule '" + rule.getUID() + "': " + e.getMessage()));
+                new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + e.getMessage()));
                 logger.warn("Failed to serialize rule '{}': {}", rule.getUID(), e.getMessage());
             }
         }

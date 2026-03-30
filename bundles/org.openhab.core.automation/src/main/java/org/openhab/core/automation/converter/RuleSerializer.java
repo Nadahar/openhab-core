@@ -29,12 +29,12 @@ public interface RuleSerializer extends ObjectSerializer<Rule> {
     /**
      * A container that holds the result of a serializability check.
      */
-    public record SerializabilityResult(boolean ok, String failureReason) {
+    public record SerializabilityResult(String ruleUID, boolean ok, String failureReason) {
 
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append("SerializabilityResult [ok=").append(ok);
+            sb.append("SerializabilityResult [ruleUID=").append(ruleUID).append(", ok=").append(ok);
             if (!ok) {
                 sb.append(", failureReason=").append(failureReason);
             }
