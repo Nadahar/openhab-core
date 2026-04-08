@@ -57,6 +57,9 @@ import org.openhab.core.automation.internal.module.handler.SystemTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.ThingStatusTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.TimeOfDayTriggerHandler;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
+import org.openhab.core.automation.util.ActionBuilder;
+import org.openhab.core.automation.util.RuleBuilder;
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.rules.ChangedEventTrigger;
@@ -316,7 +319,27 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
 
     @Override
     public @NonNull Collection<Rule> getParsedObjects(String modelName) {
-        return ruleProvider.getAllFromModel(modelName);
+        List<Rule> result = new ArrayList<>();
+        RuleBuilder builder;
+        List<Action> actions = new ArrayList<>();
+        ActionBuilder aBuilder;
+        LinkedHashMap<String, @Nullable Object> props; // TODO: (Nad) How to handle rule UID if not specified?
+        for (Rule rule : ruleProvider.getAllFromModel(modelName)) {
+            builder = RuleBuilder.create(rule);
+            actions.clear();
+            for (Action action : rule.getActions()) {
+                aBuilder = ActionBuilder.create(action);
+                props = new LinkedHashMap<>(action.getConfiguration().getProperties());
+                if (props.get("script") instanceof String script) {
+                    props.put("script", CONTEXT_COMMENT_PATTERN.matcher(script).replaceFirst(""));
+                }
+                aBuilder.withConfiguration(new Configuration(props));
+                actions.add(aBuilder.build());
+            }
+            builder.withActions(actions);
+            result.add(builder.build());
+        }
+        return result;
     }
 
     @Override

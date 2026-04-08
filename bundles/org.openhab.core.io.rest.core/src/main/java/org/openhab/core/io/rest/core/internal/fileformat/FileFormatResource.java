@@ -674,7 +674,7 @@ public class FileFormatResource implements RESTResource {
                 if (ruleModelName == null) {
                     return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
                 }
-                rules = ruleParser.getParsedObjects(ruleModelName);
+                rules = ruleParser.getParsedObjects(ruleModelName.replace(".rules", "-1")); // TODO: (Nad) Temp hack
                 if (rules.isEmpty()) {
                     ruleParser.finishParsingFormat(ruleModelName);
                     return Response.status(Response.Status.BAD_REQUEST).entity("No rule loaded from input").build();
