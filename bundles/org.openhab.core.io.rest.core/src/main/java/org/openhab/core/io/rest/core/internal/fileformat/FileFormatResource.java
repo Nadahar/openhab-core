@@ -207,7 +207,36 @@ public class FileFormatResource implements RESTResource {
                       param: my param value
             """;
 
-    private static final String YAML_ITEMS_AND_THINGS_EXAMPLE = """
+    private static final String DSL_RULE_EXAMPLE = """
+            rule "My Rule"
+            when
+                Time is noon
+            then
+                logInfo("Test", "MyRule is running")
+            end
+            """;
+
+    private static final String YAML_RULE_EXAMPLE = """
+            version: 1
+            rules:
+              MyRule:
+                label: My Rule
+                description: My rule description
+                actions:
+                  - id: "2"
+                    config:
+                      type: DSL
+                      script: |
+                        logInfo("Test", "MyRule is running")
+                    type: Script
+                triggers:
+                  - id: "1"
+                    config:
+                      time: 12:00
+                    type: TimeOfDay
+            """;
+
+    private static final String YAML_COMBINED_EXAMPLE = """
             version: 1
             things:
               binding:typeBridge:idBridge:
@@ -252,6 +281,19 @@ public class FileFormatResource implements RESTResource {
                     value: my value
                     config:
                       param: my param value
+            rules:
+              MyRule:
+                label: Label
+                actions:
+                  - config:
+                      type: DSL
+                      script: |
+                        logInfo("Test", "MyRule is running")
+                    type: Script
+                triggers:
+                  - config:
+                      itemName: MyItem
+                    type: ItemReceivedCommand
             """;
 
     private static final String GEN_ID_PATTERN = "gen_file_format_%d";
@@ -453,12 +495,12 @@ public class FileFormatResource implements RESTResource {
     @RolesAllowed({ Role.ADMIN })
     @Path("/rules")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces({ "application/vnd.openhab.dsl.rule", "application/yaml" }) //TODO: (Nad) DSL?
+    @Produces({ "application/vnd.openhab.dsl.rule", "application/yaml" })
     @Operation(operationId = "createFileFormatForRules", summary = "Create file format for a list of rules in the registry.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
                     @ApiResponse(responseCode = "200", description = "OK", content = {
-                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
-                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_EXAMPLE)) }), //TODO: (Nad) Examples
+                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_RULE_EXAMPLE)),
+                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_RULE_EXAMPLE)) }),
                     @ApiResponse(responseCode = "404", description = "One or more rules not found in the registry."),
                     @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
     public Response createFileFormatForRules(@Context HttpHeaders httpHeaders,
@@ -508,8 +550,8 @@ public class FileFormatResource implements RESTResource {
                     @ApiResponse(responseCode = "200", description = "OK", content = {
                             @Content(mediaType = "text/vnd.openhab.dsl.thing", schema = @Schema(example = DSL_THINGS_EXAMPLE)),
                             @Content(mediaType = "text/vnd.openhab.dsl.item", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
-                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)), // TODO: (NAd) DSL RULES EXAMPLE
-                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_AND_THINGS_EXAMPLE)) }),
+                            @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_RULE_EXAMPLE)),
+                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_COMBINED_EXAMPLE)) }),
                     @ApiResponse(responseCode = "400", description = "Invalid JSON data."),
                     @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
     public Response create(final @Context HttpHeaders httpHeaders,
@@ -607,8 +649,8 @@ public class FileFormatResource implements RESTResource {
             @RequestBody(description = "file format syntax", required = true, content = {
                     @Content(mediaType = "text/vnd.openhab.dsl.thing", schema = @Schema(example = DSL_THINGS_EXAMPLE)),
                     @Content(mediaType = "text/vnd.openhab.dsl.item", schema = @Schema(example = DSL_ITEMS_EXAMPLE)),
-                    @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_ITEMS_EXAMPLE)), // TODO: (Nad) Rule example
-                    @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_ITEMS_AND_THINGS_EXAMPLE)) }) String input) {
+                    @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_RULE_EXAMPLE)),
+                    @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_COMBINED_EXAMPLE)) }) String input) {
         String contentTypeHeader = httpHeaders.getHeaderString(HttpHeaders.CONTENT_TYPE);
         logger.debug("parse: contentType = {}", contentTypeHeader);
 
