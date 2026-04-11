@@ -14,7 +14,10 @@ package org.openhab.core.automation.converter;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.converter.ObjectSerializer;
 
@@ -25,6 +28,24 @@ import org.openhab.core.converter.ObjectSerializer;
  */
 @NonNullByDefault
 public interface RuleSerializer extends ObjectSerializer<Rule> {
+
+    /**
+     * Checks if the specified rules are serializable with this {@link RuleSerializer}. Returned results are in the same
+     * order as the specified rules, so avoid using an unordered collection if mapping a failure to a rule is desirable.
+     *
+     * @param rules the {@link List} of {@link Rule}s to check.
+     * @return The resulting {@link List} of {@link SerializabilityResult}s.
+     */
+    List<SerializabilityResult> checkSerializability(Collection<Rule> rules);
+
+    /**
+     * Specify the {@link List} of {@link Rule}s to be serialized and associate them with an identifier.
+     *
+     * @param id the identifier of the {@link Rule} format generation.
+     * @param rules the {@link List} of {@link Rule}s to serialize.
+     * @param the option that determines how to serialize the {@link Rule}s.
+     */
+    List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option);
 
     /**
      * A container that holds the result of a serializability check.
@@ -44,20 +65,44 @@ public interface RuleSerializer extends ObjectSerializer<Rule> {
     }
 
     /**
-     * Checks if the specified rules are serializable with this {@link RuleSerializer}. Returned results are in the same
-     * order as the specified rules, so avoid using an unordered collection if mapping a failure to a rule is desirable.
-     *
-     * @param rules the {@link List} of {@link Rule}s to check.
-     * @return The resulting {@link List} of {@link SerializabilityResult}s.
+     * An enum representing the different rule serialization options
      */
-    List<SerializabilityResult> checkSerializability(Collection<Rule> rules);
+    public enum RuleSerializationOption {
 
-    /**
-     * Specify the {@link List} of {@link Rule}s to be serialized and associate them with an identifier.
-     *
-     * @param id the identifier of the {@link Rule} format generation.
-     * @param rules the {@link List} of {@link Rule}s to serialize.
-     * @param hideDefaultParameters {@code true} to hide the configuration parameters having a default value.
-     */
-    List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, boolean hideDefaultParameters); //TODO: (Nad) Is hide relevant?
+        /** Empty collections and normally irrelevant fields are hidden */
+        NORMAL("Normal"),
+
+        /** Everything is serialized, including empty collections */
+        INCLUDE_ALL("Include all"),
+
+        /** Only the fields required in a rule stub to be used with a template is serialized */
+        STUB_ONLY("Stub only"),
+
+        /** Template information is stripped, otherwise like {@link #NORMAL} */
+        STRIP_TEMPLATE("Strip template");
+
+        private final String friendlyName;
+
+        private RuleSerializationOption(String friendlyName) {
+            this.friendlyName = friendlyName;
+        }
+
+        @Override
+        public String toString() {
+            return friendlyName;
+        }
+
+        public static @Nullable RuleSerializationOption fromString(@Nullable String id) {
+            if (id == null || id.isBlank()) {
+                return null;
+            }
+            String upId = id.toUpperCase(Locale.ROOT).trim();
+            for (RuleSerializationOption option : values()) {
+                if (upId.equals(option.name()) || upId.equalsIgnoreCase(option.friendlyName) || upId.equalsIgnoreCase(option.friendlyName.replace(" ", "")) || upId.equalsIgnoreCase(option.friendlyName.replace(" ", "-"))) {
+                    return option;
+                }
+            }
+            return null;
+        }
+    }
 }

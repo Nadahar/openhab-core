@@ -213,7 +213,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public List<SerializabilityResult> setRulesToBeSerialized(String modelName, List<Rule> rules, boolean hideDefaultParameters) {
+    public List<SerializabilityResult> setRulesToBeSerialized(String modelName, List<Rule> rules, RuleSerializationOption option) { // TODO: (Nad) Handle option
         if (rules.isEmpty()) {
             return List.of();
         }

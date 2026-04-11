@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.core.automation.Module;
-import org.openhab.core.model.yaml.internal.rules.YamlRuleDTO.SerializationOption;
+import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 
@@ -43,10 +43,10 @@ public class YamlModuleDTO {
     }
 
     public YamlModuleDTO(@NonNull Module module) {
-        this(module, SerializationOption.NORMAL);
+        this(module, RuleSerializationOption.NORMAL);
     }
 
-    public YamlModuleDTO(@NonNull Module module, SerializationOption option) {
+    public YamlModuleDTO(@NonNull Module module, RuleSerializationOption option) {
         this.id = module.getId();
         this.label = module.getLabel();
         this.description = module.getDescription();
@@ -62,7 +62,7 @@ public class YamlModuleDTO {
                 this.config.put("script", CONTEXT_COMMENT_PATTERN.matcher(scriptContent).replaceFirst(""));
             }
         }
-        if (option != SerializationOption.INCLUDE_ALL && this.config.isEmpty()) {
+        if (option != RuleSerializationOption.INCLUDE_ALL && this.config.isEmpty()) {
             this.config = null;
         }
     }

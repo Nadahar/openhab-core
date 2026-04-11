@@ -17,7 +17,7 @@ import java.util.Objects;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.openhab.core.automation.Condition;
-import org.openhab.core.model.yaml.internal.rules.YamlRuleDTO.SerializationOption;
+import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
 
 /**
  * The {@link YamlConditionDTO} is a data transfer object used to serialize a condition in a YAML configuration file.
@@ -32,13 +32,13 @@ public class YamlConditionDTO extends YamlModuleDTO {
     }
 
     public YamlConditionDTO(@NonNull Condition condition) {
-        this(condition, SerializationOption.NORMAL);
+        this(condition, RuleSerializationOption.NORMAL);
     }
 
-    public YamlConditionDTO(@NonNull Condition condition, SerializationOption option) {
+    public YamlConditionDTO(@NonNull Condition condition, RuleSerializationOption option) {
         super(condition);
         this.inputs = condition.getInputs();
-        if (option != SerializationOption.INCLUDE_ALL && this.inputs.isEmpty()) {
+        if (option != RuleSerializationOption.INCLUDE_ALL && this.inputs.isEmpty()) {
             this.inputs = null;
         }
     }

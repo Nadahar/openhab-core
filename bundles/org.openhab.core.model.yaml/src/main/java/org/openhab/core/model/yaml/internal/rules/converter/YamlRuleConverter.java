@@ -83,7 +83,7 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, boolean hideDefaultParameters) {
+    public List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option) {
         List<SerializabilityResult> result = checkSerializability(rules);
         Map<Integer, Rule> supportedRules = new LinkedHashMap<>();
         for (int i = 0; i < result.size(); i++) {
@@ -98,7 +98,7 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
             if (handledRules.contains(rule)) {
                 continue;
             }
-            elements.add(new YamlRuleDTO(rule)); // TODO: (Nad) Can this fail?
+            elements.add(new YamlRuleDTO(rule, option)); // TODO: (Nad) Can this fail?
         }
         modelRepository.addElementsToBeGenerated(id, elements);
         return result;

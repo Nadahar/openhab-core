@@ -51,6 +51,7 @@ import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
+import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
 import org.openhab.core.automation.converter.RuleSerializer.SerializabilityResult;
 import org.openhab.core.automation.dto.RuleDTO;
 import org.openhab.core.automation.dto.RuleDTOMapper;
@@ -504,7 +505,7 @@ public class FileFormatResource implements RESTResource {
                     @ApiResponse(responseCode = "404", description = "One or more rules not found in the registry."),
                     @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
     public Response createFileFormatForRules(@Context HttpHeaders httpHeaders,
-            @DefaultValue("true") @QueryParam("hideDefaultParameters") @Parameter(description = "hide the configuration parameters having the default value") boolean hideDefaultParameters, //TODO: (Nad) Keep?
+            @DefaultValue("Normal") @QueryParam("serializationOption") @Parameter(required = true, description = "Decides what to include in serialized rules") RuleSerializationOption option,
             @Parameter(description = "Array of rule UIDs. If empty or omitted, return all rules.") @Nullable List<String> ruleUIDs) {
         String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
         logger.debug("createFileFormatForRules: mediaType = {}, ruleUIDs = {}", acceptHeader, ruleUIDs);
@@ -534,7 +535,7 @@ public class FileFormatResource implements RESTResource {
         }
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         String genId = newIdForSerialization();
-        List<SerializabilityResult> result = serializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+        List<SerializabilityResult> result = serializer.setRulesToBeSerialized(genId, rules, option);
         logger.error("Check result: {}", result); // TODO: (Nad) Temp test
         serializer.generateFormat(genId, outputStream);
         return Response.ok(new String(outputStream.toByteArray(), StandardCharsets.UTF_8)).build();
@@ -558,6 +559,7 @@ public class FileFormatResource implements RESTResource {
             @DefaultValue("false") @QueryParam("hideDefaultParameters") @Parameter(description = "hide the configuration parameters having the default value") boolean hideDefaultParameters,
             @DefaultValue("false") @QueryParam("hideDefaultChannels") @Parameter(description = "hide the non extensible channels having a default configuration") boolean hideDefaultChannels,
             @DefaultValue("false") @QueryParam("hideChannelLinksAndMetadata") @Parameter(description = "hide the channel links and metadata for items") boolean hideChannelLinksAndMetadata,
+            @DefaultValue("Normal") @QueryParam("ruleSerializationOption") @Parameter(required = true, description = "Decides what to include in serialized rules") RuleSerializationOption ruleOption,
             @RequestBody(description = "JSON data", required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FileFormatDTO.class))) FileFormatDTO data) {
         String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
         logger.debug("create: mediaType = {}", acceptHeader);
@@ -606,7 +608,7 @@ public class FileFormatResource implements RESTResource {
                 } else if (rules.isEmpty()) {
                     return Response.status(Response.Status.BAD_REQUEST).entity("No rule loaded from input").build();
                 }
-                ruleSerializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+                ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
                 ruleSerializer.generateFormat(genId, outputStream);
                 break;
             case "application/yaml":
@@ -618,7 +620,7 @@ public class FileFormatResource implements RESTResource {
                             hideChannelLinksAndMetadata ? List.of() : metadata, stateFormatters, hideDefaultParameters);
                 }
                 if (ruleSerializer != null) {
-                    ruleSerializer.setRulesToBeSerialized(genId, rules, hideDefaultParameters);
+                    ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
                 }
                 if (thingSerializer != null) {
                     thingSerializer.generateFormat(genId, outputStream);

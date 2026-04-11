@@ -76,7 +76,7 @@ public class YamlRuleTemplateDTO
      *
      * @param template the {@link RuleTemplate}.
      */
-    public YamlRuleTemplateDTO(@NonNull RuleTemplate template) {
+    public YamlRuleTemplateDTO(@NonNull RuleTemplate template) { // TODO: (NAd) Handle RuleSerializationOption
         this.uid = template.getUID();
         this.label = template.getLabel();
         this.tags = template.getTags();
