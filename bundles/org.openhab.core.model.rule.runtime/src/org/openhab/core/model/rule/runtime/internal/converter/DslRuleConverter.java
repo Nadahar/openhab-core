@@ -101,7 +101,7 @@ import org.slf4j.LoggerFactory;
 public class DslRuleConverter implements RuleSerializer, RuleParser {
 
     private static final String SCRIPT_PLACEHOLDER_PREFIX = "SCRIPT_PLACEHOLDER_";
-    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("(?<=then\\R)^\\s*val\\splaceholder=\"SCRIPT_PLACEHOLDER_(?<uid>[^\"]+)\"\\s*$\\R", Pattern.MULTILINE);
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("(?<=then\\R)^\\s*val\\splaceholder=\"SCRIPT_PLACEHOLDER_(?<uid>[^\"]+)\"\\s*$\\R*", Pattern.MULTILINE);
     private static final Pattern CONTEXT_COMMENT_PATTERN = Pattern.compile("^// context:.*$\\R", Pattern.MULTILINE);
     private static final Pattern INDENTATION_PATTERN = Pattern.compile("^(?=.)", Pattern.MULTILINE);
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("-?\\d+(\\.\\d+)?");
@@ -292,6 +292,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     if (element != null) {
                         scriptContent = CONTEXT_COMMENT_PATTERN.matcher(element.scriptContent).replaceFirst("");
                         scriptContent = INDENTATION_PATTERN.matcher(scriptContent).replaceAll("\t");
+                        if (!scriptContent.endsWith("\n")) {
+                            scriptContent += '\n';
+                        }
                         generated = m.replaceFirst(scriptContent);
                     }
                 }
