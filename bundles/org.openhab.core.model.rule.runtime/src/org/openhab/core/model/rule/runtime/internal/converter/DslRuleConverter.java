@@ -41,6 +41,7 @@ import org.eclipse.xtext.xbase.XStringLiteral;
 import org.eclipse.xtext.xbase.XVariableDeclaration;
 import org.eclipse.xtext.xbase.XbaseFactory;
 import org.openhab.core.automation.Action;
+import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
@@ -48,13 +49,19 @@ import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
 import org.openhab.core.automation.internal.module.handler.ChannelEventTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.DateTimeTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.DayOfWeekConditionHandler;
+import org.openhab.core.automation.internal.module.handler.EphemerisConditionHandler;
 import org.openhab.core.automation.internal.module.handler.GenericCronTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.GroupCommandTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.GroupStateTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.IntervalConditionHandler;
 import org.openhab.core.automation.internal.module.handler.ItemCommandTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.ItemStateConditionHandler;
 import org.openhab.core.automation.internal.module.handler.ItemStateTriggerHandler;
 import org.openhab.core.automation.internal.module.handler.SystemTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.ThingStatusConditionHandler;
 import org.openhab.core.automation.internal.module.handler.ThingStatusTriggerHandler;
+import org.openhab.core.automation.internal.module.handler.TimeOfDayConditionHandler;
 import org.openhab.core.automation.internal.module.handler.TimeOfDayTriggerHandler;
 import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
 import org.openhab.core.automation.util.ActionBuilder;
@@ -65,21 +72,29 @@ import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.rules.ChangedEventTrigger;
 import org.openhab.core.model.rule.rules.CommandEventTrigger;
 import org.openhab.core.model.rule.rules.DateTimeTrigger;
+import org.openhab.core.model.rule.rules.DayOfWeekCondition;
 import org.openhab.core.model.rule.rules.EventEmittedTrigger;
 import org.openhab.core.model.rule.rules.EventTrigger;
 import org.openhab.core.model.rule.rules.GroupMemberChangedEventTrigger;
 import org.openhab.core.model.rule.rules.GroupMemberCommandEventTrigger;
 import org.openhab.core.model.rule.rules.GroupMemberUpdateEventTrigger;
+import org.openhab.core.model.rule.rules.HolidayCondition;
+import org.openhab.core.model.rule.rules.InDaysetCondition;
+import org.openhab.core.model.rule.rules.IntervalCondition;
+import org.openhab.core.model.rule.rules.ItemStateCondition;
 import org.openhab.core.model.rule.rules.RuleModel;
 import org.openhab.core.model.rule.rules.RulesFactory;
 import org.openhab.core.model.rule.rules.SystemStartlevelTrigger;
 import org.openhab.core.model.rule.rules.ThingStateChangedEventTrigger;
 import org.openhab.core.model.rule.rules.ThingStateUpdateEventTrigger;
+import org.openhab.core.model.rule.rules.ThingStatusCondition;
+import org.openhab.core.model.rule.rules.TimeOfDayCondition;
 import org.openhab.core.model.rule.rules.TimerTrigger;
 import org.openhab.core.model.rule.rules.UpdateEventTrigger;
 import org.openhab.core.model.rule.rules.ValidCommand;
 import org.openhab.core.model.rule.rules.ValidState;
 import org.openhab.core.model.rule.rules.ValidTrigger;
+import org.openhab.core.model.rule.rules.WeekdayCondition;
 import org.openhab.core.model.rule.runtime.internal.DSLRuleProvider;
 import org.openhab.core.model.script.scoping.StateAndCommandProvider;
 import org.openhab.core.types.Command;
@@ -178,14 +193,25 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 }
             }
 
-            if (!rule.getConditions().isEmpty()) {
-                errors.add("has conditions");
+            for (Condition condition : rule.getConditions()) {
+                if (!condition.getInputs().isEmpty()) {
+                    errors.add("condition '" + condition.getId() + "' has mapped inputs");
+                    continue;
+                }
+                try {
+                    buildModelCondition(condition);
+                } catch (SerializationException e) {
+                    errors.add("condition '" + condition.getId() + "': " + e.getMessage());
+                }
             }
+
             if (rule.getActions().size() != 1) {
                 errors.add("has " + rule.getActions().size() + " actions; one is required");
             } else {
                 Action action = rule.getActions().getFirst();
-                if (action.getConfiguration().get("type") instanceof String type) {
+                if (!action.getInputs().isEmpty()) {
+                    errors.add("action '" + action.getId() + "' has mapped inputs");
+                } else if (action.getConfiguration().get("type") instanceof String type) {
                     if (DSLRuleProvider.MIMETYPE_OPENHAB_DSL_RULE.equals(type)) {
                         if (action.getConfiguration().get("script") instanceof String script) {
                             if (script.isBlank()) {
@@ -357,6 +383,10 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         EList<String> tags = model.getTags();
         for (String tag : rule.getTags()) {
             tags.add(tag);
+        }
+
+        for (Condition condition : rule.getConditions()) {
+            model.getConditions().add(buildModelCondition(condition));
         }
 
         for (Trigger trigger : rule.getTriggers()) {
@@ -565,6 +595,169 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 throw new SerializationException("Invalid trigger: " + trigger);
             default:
                 throw new SerializationException("Unsupported trigger: " + trigger);
+        }
+    }
+
+    private org.openhab.core.model.rule.rules.Condition buildModelCondition(Condition condition) throws SerializationException {
+        String type = condition.getTypeUID();
+        Object value;
+        RulesFactory factory = RulesFactory.eINSTANCE;
+
+        switch (type) {
+            case TimeOfDayConditionHandler.MODULE_TYPE_ID:
+                TimeOfDayCondition todCond = factory.createTimeOfDayCondition();
+                value = condition.getConfiguration().get(TimeOfDayConditionHandler.CFG_START_TIME);
+                if (value instanceof String start) {
+                    todCond.setStart(start);
+                }
+                value = condition.getConfiguration().get(TimeOfDayConditionHandler.CFG_END_TIME);
+                if (value instanceof String end) {
+                    todCond.setEnd(end);
+                }
+                return todCond;
+            case DayOfWeekConditionHandler.MODULE_TYPE_ID:
+                DayOfWeekCondition dowCond = factory.createDayOfWeekCondition();
+                value = condition.getConfiguration().get(DayOfWeekConditionHandler.CFG_DAYS);
+                if (value == null) {
+                    value = List.of();
+                }
+                if (value instanceof List<?> weekDays) {
+                    EList<String> eWeekDays = dowCond.getWeekDays();
+                    for (Object dayObject : weekDays) {
+                        if (dayObject instanceof String day) {
+                            switch (day) {
+                                case "MON":
+                                    eWeekDays.add("Monday");
+                                    break;
+                                case "TUE":
+                                    eWeekDays.add("Tuesday");
+                                    break;
+                                case "WED":
+                                    eWeekDays.add("Wednesday");
+                                    break;
+                                case "THU":
+                                    eWeekDays.add("Thursday");
+                                    break;
+                                case "FRI":
+                                    eWeekDays.add("Friday");
+                                    break;
+                                case "SAT":
+                                    eWeekDays.add("Saturday");
+                                    break;
+                                case "SUN":
+                                    eWeekDays.add("Sunday");
+                                    break;
+                                default:
+                                    throw new SerializationException("Invalid condition: " + condition);
+                            }
+                        } else {
+                            throw new SerializationException("Invalid condition: " + condition);
+                        }
+                    }
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return dowCond;
+            case EphemerisConditionHandler.WEEKDAY_MODULE_TYPE_ID:
+                WeekdayCondition wdCond = factory.createWeekdayCondition();
+                wdCond.setType("weekday");
+                value = condition.getConfiguration().get("offset");
+                if (value instanceof Number offset) {
+                    wdCond.setOffset(Integer.toString(offset.intValue()));
+                } else if (value != null) {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return wdCond;
+            case EphemerisConditionHandler.WEEKEND_MODULE_TYPE_ID:
+                WeekdayCondition weCond = factory.createWeekdayCondition();
+                weCond.setType("weekend");
+                value = condition.getConfiguration().get("offset");
+                if (value instanceof Number offset) {
+                    weCond.setOffset(Integer.toString(offset.intValue()));
+                } else if (value != null) {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return weCond;
+            case EphemerisConditionHandler.HOLIDAY_MODULE_TYPE_ID:
+                HolidayCondition hdCond = factory.createHolidayCondition();
+                hdCond.setNegation(false);
+                value = condition.getConfiguration().get("offset");
+                if (value instanceof Number offset) {
+                    hdCond.setOffset(Integer.toString(offset.intValue()));
+                } else if (value != null) {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return hdCond;
+            case EphemerisConditionHandler.NOT_HOLIDAY_MODULE_TYPE_ID:
+                HolidayCondition nhdCond = factory.createHolidayCondition();
+                nhdCond.setNegation(true);
+                value = condition.getConfiguration().get("offset");
+                if (value instanceof Number offset) {
+                    nhdCond.setOffset(Integer.toString(offset.intValue()));
+                } else if (value != null) {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return nhdCond;
+            case EphemerisConditionHandler.DAYSET_MODULE_TYPE_ID:
+                InDaysetCondition idsCond = factory.createInDaysetCondition();
+                value = condition.getConfiguration().get("dayset");
+                if (value instanceof String dayset) {
+                    idsCond.setDayset(dayset);
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                value = condition.getConfiguration().get("offset");
+                if (value instanceof Number offset) {
+                    idsCond.setOffset(Integer.toString(offset.intValue()));
+                } else if (value != null) {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return idsCond;
+            case IntervalConditionHandler.MODULE_TYPE_ID:
+                IntervalCondition ivCond = factory.createIntervalCondition();
+                value = condition.getConfiguration().get(IntervalConditionHandler.CFG_MIN_INTERVAL);
+                if (value instanceof Number interval) {
+                    ivCond.setInterval(interval.intValue());
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                return ivCond;
+            case ThingStatusConditionHandler.THING_STATUS_CONDITION:
+                ThingStatusCondition tsCond = factory.createThingStatusCondition();
+                value = condition.getConfiguration().get(ThingStatusConditionHandler.CFG_THING_UID);
+                if (value instanceof String thingUid) {
+                    tsCond.setThing(thingUid);
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                value = condition.getConfiguration().get(ThingStatusConditionHandler.CFG_STATUS);
+                if (value instanceof String status) {
+                    tsCond.setStatus(status);
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                value = condition.getConfiguration().get(ThingStatusConditionHandler.CFG_OPERATOR);
+                tsCond.setNegation(value instanceof String op && "!=".equals(op));
+                return tsCond;
+            case ItemStateConditionHandler.ITEM_STATE_CONDITION:
+                ItemStateCondition isCond = factory.createItemStateCondition();
+                value = condition.getConfiguration().get(ItemStateConditionHandler.ITEM_NAME);
+                if (value instanceof String itemName) {
+                    isCond.setItem(itemName);
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                value = condition.getConfiguration().get(ItemStateConditionHandler.STATE);
+                if (value instanceof String state) {
+                    isCond.setState(createValidState(state));
+                } else {
+                    throw new SerializationException("Invalid condition: " + condition);
+                }
+                value = condition.getConfiguration().get(ItemStateConditionHandler.OPERATOR);
+                isCond.setOperator(value instanceof String op ? op : "=");
+                return isCond;
+            default:
+                throw new SerializationException("Unsupported condition: " + condition);
         }
     }
 
