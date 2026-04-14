@@ -22,37 +22,37 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.core.automation.Rule;
-import org.openhab.core.automation.converter.RuleParser;
-import org.openhab.core.automation.converter.RuleSerializer;
-import org.openhab.core.automation.module.script.rulesupport.shared.simple.SimpleRule;
+import org.openhab.core.automation.converter.RuleTemplateParser;
+import org.openhab.core.automation.converter.RuleTemplateSerializer;
+import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
+import org.openhab.core.automation.template.RuleTemplate;
 import org.openhab.core.converter.SerializabilityResult;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.yaml.YamlElement;
 import org.openhab.core.model.yaml.YamlModelRepository;
-import org.openhab.core.model.yaml.internal.rules.YamlRuleDTO;
-import org.openhab.core.model.yaml.internal.rules.YamlRuleProvider;
+import org.openhab.core.model.yaml.internal.rules.YamlRuleTemplateDTO;
+import org.openhab.core.model.yaml.internal.rules.YamlRuleTemplateProvider;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * {@link YamlRuleConverter} is the YAML converter for {@link Rule} objects.
+ * {@link YamlRuleTemplateConverter} is the YAML converter for {@link RuleTemplate} objects.
  *
  * @author Ravi Nadahar - Initial contribution
  */
 @NonNullByDefault
-@Component(immediate = true, service = { RuleSerializer.class, RuleParser.class })
-public class YamlRuleConverter implements RuleSerializer, RuleParser {
+@Component(immediate = true, service = { RuleTemplateSerializer.class, RuleTemplateParser.class })
+public class YamlRuleTemplateConverter implements RuleTemplateSerializer, RuleTemplateParser {
 
     private final YamlModelRepository modelRepository;
-    private final YamlRuleProvider ruleProvider;
+    private final YamlRuleTemplateProvider templateProvider;
 
     @Activate
-    public YamlRuleConverter(@Reference YamlModelRepository modelRepository,
-            @Reference YamlRuleProvider ruleProvider) {
+    public YamlRuleTemplateConverter(@Reference YamlModelRepository modelRepository,
+            @Reference YamlRuleTemplateProvider templateProvider) {
         this.modelRepository = modelRepository;
-        this.ruleProvider = ruleProvider;
+        this.templateProvider = templateProvider;
     }
 
     @Override
@@ -61,27 +61,19 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public List<SerializabilityResult<String>> checkSerializability(Collection<Rule> rules) {
-        List<SerializabilityResult<String>> result = new ArrayList<>(rules.size());
-        for (Rule rule : rules) {
-            if (rule instanceof SimpleRule) {
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
-                continue;
-            }
-            if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
-                continue;
-            }
-            result.add(new SerializabilityResult<>(rule.getUID(), true, ""));
+    public List<SerializabilityResult<String>> checkSerializability(Collection<RuleTemplate> templates) {
+        List<SerializabilityResult<String>> result = new ArrayList<>(templates.size());
+        for (RuleTemplate template : templates) {
+            // There are no known circumstances under which a rule template can't be serialized to YAML
+            result.add(new SerializabilityResult<>(template.getUID(), true, ""));
         }
-
         return result;
     }
 
     @Override
-    public void setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option) throws SerializationException {
+    public void setTemplatesToBeSerialized(String id, List<RuleTemplate> templates, RuleSerializationOption option) throws SerializationException {
         List<String> errors = null;
-        List<SerializabilityResult<String>> checks = checkSerializability(rules);
+        List<SerializabilityResult<String>> checks = checkSerializability(templates);
         for (SerializabilityResult<String> check : checks) {
             if (!check.ok()) {
                 if (errors == null) {
@@ -91,27 +83,27 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
             }
         }
         if (errors != null) {
-            throw new SerializationException("Rule serialization attempt failed with:\n  " + String.join("\n  ", errors));
+            throw new SerializationException("Rule template serialization attempt failed with:\n  " + String.join("\n  ", errors));
         }
 
-        Set<Rule> handledRules = new HashSet<>();
-        List<YamlElement> elements = new ArrayList<>(rules.size());
-        for (Rule rule : rules) {
-            if (handledRules.contains(rule)) {
+        Set<RuleTemplate> handledTemplates = new HashSet<>();
+        List<YamlElement> elements = new ArrayList<>(templates.size());
+        for (RuleTemplate template : templates) {
+            if (handledTemplates.contains(template)) {
                 continue;
             }
             try {
-                elements.add(new YamlRuleDTO(rule, option));
+                elements.add(new YamlRuleTemplateDTO(template, option));
             } catch (RuntimeException e) {
                 if (errors == null) {
                     errors = new ArrayList<>();
                 }
-                errors.add("Rule '" + rule.getUID() + "': " + e.getMessage());
+                errors.add("Rule template '" + template.getUID() + "': " + e.getMessage());
 
             }
         }
         if (errors != null) {
-            throw new SerializationException("Rule serialization attempt failed with:\n  " + String.join("\n  ", errors));
+            throw new SerializationException("Rule template serialization attempt failed with:\n  " + String.join("\n  ", errors));
         }
 
         modelRepository.addElementsToBeGenerated(id, elements);
@@ -134,8 +126,8 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public Collection<Rule> getParsedObjects(String modelName) {
-        return ruleProvider.getAllFromModel(modelName);
+    public Collection<RuleTemplate> getParsedObjects(String modelName) {
+        return templateProvider.getAllFromModel(modelName);
     }
 
     @Override

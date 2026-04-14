@@ -95,10 +95,10 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         this.template = option == RuleSerializationOption.STRIP_TEMPLATE ? null : rule.getTemplateUID();
         this.templateState = option == RuleSerializationOption.INCLUDE_ALL ? rule.getTemplateState() : null;
         this.label = rule.getName();
-        Set<String> tags = rule.getTags();
+        Set<@NonNull String> tags = rule.getTags();
         this.tags = option != RuleSerializationOption.INCLUDE_ALL && tags.isEmpty() ? null : tags;
         this.description = rule.getDescription();
-        this.visibility = option == RuleSerializationOption.INCLUDE_ALL ? rule.getVisibility() : null;
+        this.visibility = option == RuleSerializationOption.INCLUDE_ALL || rule.getVisibility() != Visibility.VISIBLE ? rule.getVisibility() : null;
         if (option != RuleSerializationOption.STRIP_TEMPLATE) {
             this.config = new LinkedHashMap<>(rule.getConfiguration().getProperties());
             if (option != RuleSerializationOption.INCLUDE_ALL) {

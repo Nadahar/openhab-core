@@ -24,7 +24,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,6 +66,7 @@ import org.openhab.core.automation.module.script.rulesupport.shared.simple.Simpl
 import org.openhab.core.automation.util.ActionBuilder;
 import org.openhab.core.automation.util.RuleBuilder;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.converter.SerializabilityResult;
 import org.openhab.core.io.dto.SerializationException;
 import org.openhab.core.model.core.ModelRepository;
 import org.openhab.core.model.rule.rules.ChangedEventTrigger;
@@ -164,16 +164,16 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public List<SerializabilityResult> checkSerializability(Collection<Rule> rules) {
-        List<SerializabilityResult> result = new ArrayList<>(rules.size());
+    public List<SerializabilityResult<String>> checkSerializability(Collection<Rule> rules) {
+        List<SerializabilityResult<String>> result = new ArrayList<>(rules.size());
         List<String> errors = new ArrayList<>();
         for (Rule rule : rules) {
             if (rule instanceof SimpleRule) {
-                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
                 continue;
             }
             if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
-                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
                 continue;
             }
             errors.clear();
@@ -206,7 +206,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             }
 
             if (rule.getActions().size() != 1) {
-                errors.add("has " + rule.getActions().size() + " actions; one is required");
+                errors.add("has " + rule.getActions().size() + " actions but exactly 1 is required");
             } else {
                 Action action = rule.getActions().getFirst();
                 if (!action.getInputs().isEmpty()) {
@@ -229,9 +229,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             }
 
             if (errors.isEmpty()) {
-                result.add(new SerializabilityResult(rule.getUID(), true, ""));
+                result.add(new SerializabilityResult<>(rule.getUID(), true, ""));
             } else {
-                result.add(new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
             }
         }
 
@@ -239,16 +239,25 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public List<SerializabilityResult> setRulesToBeSerialized(String modelName, List<Rule> rules, RuleSerializationOption option) { // TODO: (Nad) Handle option
+    public void setRulesToBeSerialized(String modelName, List<Rule> rules, RuleSerializationOption option) throws SerializationException {
         if (rules.isEmpty()) {
-            return List.of();
+            return;
         }
-        List<SerializabilityResult> result = checkSerializability(rules);
-        Map<Integer, Rule> supportedRules = new LinkedHashMap<>();
-        for (int i = 0; i < result.size(); i++) {
-            if (result.get(i).ok()) {
-                supportedRules.put(Integer.valueOf(i), rules.get(i));
+        if (option != RuleSerializationOption.NORMAL) {
+            throw new SerializationException("DSL rules don't support serialization option '" + option + '\'');
+        }
+        List<String> errors = null;
+        List<SerializabilityResult<String>> checks = checkSerializability(rules);
+        for (SerializabilityResult<String> check : checks) {
+            if (!check.ok()) {
+                if (errors == null) {
+                    errors = new ArrayList<>();
+                }
+                errors.add(check.failureReason());
             }
+        }
+        if (errors != null) {
+            throw new SerializationException("Rule serialization attempt failed with:\n  " + String.join("\n  ", errors));
         }
 
         RuleModel model = RulesFactory.eINSTANCE.createRuleModel();
@@ -257,8 +266,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         model.getVariables();
 
         Set<Rule> handledRules = new HashSet<>();
-        for (Entry<Integer, Rule> entry : supportedRules.entrySet()) {
-            Rule rule = entry.getValue();
+        for (Rule rule : rules) {
             if (handledRules.contains(rule)) {
                 continue;
             }
@@ -278,14 +286,11 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     return r;
                 });
             } catch (SerializationException e) {
-                model.getRules().remove(modelRule);
-                result.set(entry.getKey().intValue(),
-                new SerializabilityResult(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + e.getMessage()));
                 logger.warn("Failed to serialize rule '{}': {}", rule.getUID(), e.getMessage());
+                throw new SerializationException("Rule '" + rule.getUID() + "': " + e.getMessage(), e);
             }
         }
         elementsToGenerate.put(modelName, model);
-        return result;
     }
 
     @Override

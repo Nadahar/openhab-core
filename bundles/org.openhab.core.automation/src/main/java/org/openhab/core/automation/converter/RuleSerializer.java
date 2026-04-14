@@ -20,6 +20,8 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.converter.ObjectSerializer;
+import org.openhab.core.converter.SerializabilityResult;
+import org.openhab.core.io.dto.SerializationException;
 
 /**
  * {@link RuleSerializer} is the interface to implement by any file generator for {@link Rule} object.
@@ -31,12 +33,12 @@ public interface RuleSerializer extends ObjectSerializer<Rule> {
 
     /**
      * Checks if the specified rules are serializable with this {@link RuleSerializer}. Returned results are in the same
-     * order as the specified rules, so avoid using an unordered collection if mapping a failure to a rule is desirable.
+     * order as the specified rules.
      *
      * @param rules the {@link List} of {@link Rule}s to check.
      * @return The resulting {@link List} of {@link SerializabilityResult}s.
      */
-    List<SerializabilityResult> checkSerializability(Collection<Rule> rules);
+    List<SerializabilityResult<String>> checkSerializability(Collection<Rule> rules);
 
     /**
      * Specify the {@link List} of {@link Rule}s to be serialized and associate them with an identifier.
@@ -44,25 +46,9 @@ public interface RuleSerializer extends ObjectSerializer<Rule> {
      * @param id the identifier of the {@link Rule} format generation.
      * @param rules the {@link List} of {@link Rule}s to serialize.
      * @param the option that determines how to serialize the {@link Rule}s.
+     * @throws SerializationException If one or more of the rules can't be serialized.
      */
-    List<SerializabilityResult> setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option);
-
-    /**
-     * A container that holds the result of a serializability check.
-     */
-    public record SerializabilityResult(String ruleUID, boolean ok, String failureReason) {
-
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("SerializabilityResult [ruleUID=").append(ruleUID).append(", ok=").append(ok);
-            if (!ok) {
-                sb.append(", failureReason=").append(failureReason);
-            }
-            sb.append("]");
-            return sb.toString();
-        }
-    }
+    void setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option) throws SerializationException;
 
     /**
      * An enum representing the different rule serialization options

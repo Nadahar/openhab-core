@@ -43,6 +43,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.StatusType;
+import javax.ws.rs.core.Response.Status.Family;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -52,7 +54,6 @@ import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
 import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
-import org.openhab.core.automation.converter.RuleSerializer.SerializabilityResult;
 import org.openhab.core.automation.dto.RuleDTO;
 import org.openhab.core.automation.dto.RuleDTOMapper;
 import org.openhab.core.config.core.ConfigDescription;
@@ -62,6 +63,8 @@ import org.openhab.core.config.core.ConfigUtil;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.inbox.Inbox;
+import org.openhab.core.io.dto.SerializationException;
+import org.openhab.core.io.rest.JSONResponse;
 import org.openhab.core.io.rest.RESTConstants;
 import org.openhab.core.io.rest.RESTResource;
 import org.openhab.core.io.rest.core.fileformat.ExtendedFileFormatDTO;
@@ -299,6 +302,24 @@ public class FileFormatResource implements RESTResource {
 
     private static final String GEN_ID_PATTERN = "gen_file_format_%d";
 
+    private static final Response.StatusType UNPROCESSABLE_ENTITY = new StatusType() {
+
+        @Override
+        public int getStatusCode() {
+            return 422;
+        }
+
+        @Override
+        public String getReasonPhrase() {
+            return "Unprocessable Entity";
+        }
+
+        @Override
+        public Family getFamily() {
+            return Family.CLIENT_ERROR;
+        }
+    };
+
     private final Logger logger = LoggerFactory.getLogger(FileFormatResource.class);
 
     private final ItemBuilderFactory itemBuilderFactory;
@@ -496,23 +517,23 @@ public class FileFormatResource implements RESTResource {
     @RolesAllowed({ Role.ADMIN })
     @Path("/rules")
     @Consumes(MediaType.APPLICATION_JSON)
-    @Produces({ "application/vnd.openhab.dsl.rule", "application/yaml" })
+    @Produces({ "application/vnd.openhab.dsl.rule", "application/yaml", MediaType.APPLICATION_JSON })
     @Operation(operationId = "createFileFormatForRules", summary = "Create file format for a list of rules in the registry.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
                     @ApiResponse(responseCode = "200", description = "OK", content = {
                             @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_RULE_EXAMPLE)),
                             @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_RULE_EXAMPLE)) }),
                     @ApiResponse(responseCode = "404", description = "One or more rules not found in the registry."),
-                    @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
+                    @ApiResponse(responseCode = "415", description = "Unsupported media type."),
+                    @ApiResponse(responseCode = "422", description = "Unable to serialize rule.") })
     public Response createFileFormatForRules(@Context HttpHeaders httpHeaders,
-            @DefaultValue("Normal") @QueryParam("serializationOption") @Parameter(required = true, description = "Decides what to include in serialized rules") RuleSerializationOption option,
+            @DefaultValue("Normal") @QueryParam("serializationOption") @Parameter(description = "Decides what to include in serialized rules") RuleSerializationOption option,
             @Parameter(description = "Array of rule UIDs. If empty or omitted, return all rules.") @Nullable List<String> ruleUIDs) {
         String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
         logger.debug("createFileFormatForRules: mediaType = {}, ruleUIDs = {}", acceptHeader, ruleUIDs);
         RuleSerializer serializer = getRuleSerializer(acceptHeader);
         if (serializer == null) {
-            return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
-                    .entity("Unsupported media type '" + acceptHeader + "'!").build();
+            return JSONResponse.createErrorResponse(Response.Status.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type '" + acceptHeader + "'");
         }
         List<Rule> rules;
         if (ruleUIDs == null || ruleUIDs.isEmpty()) {
@@ -527,16 +548,18 @@ public class FileFormatResource implements RESTResource {
             for (String ruleUID : ruleUIDs) {
                 Rule rule = ruleRegistry.get(ruleUID);
                 if (rule == null) {
-                    return Response.status(Response.Status.NOT_FOUND)
-                            .entity("Rule with ID '" + ruleUID + "' not found in the rule registry!").build();
+                    return JSONResponse.createErrorResponse(Response.Status.NOT_FOUND, "Rule with ID '" + ruleUID + "' not found in the rule registry!");
                 }
                 rules.add(rule);
             }
         }
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         String genId = newIdForSerialization();
-        List<SerializabilityResult> result = serializer.setRulesToBeSerialized(genId, rules, option);
-        logger.error("Check result: {}", result); // TODO: (Nad) Temp test
+        try {
+            serializer.setRulesToBeSerialized(genId, rules, option);
+        } catch (SerializationException e) {
+            return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
+        }
         serializer.generateFormat(genId, outputStream);
         return Response.ok(new String(outputStream.toByteArray(), StandardCharsets.UTF_8)).build();
     }
@@ -554,12 +577,13 @@ public class FileFormatResource implements RESTResource {
                             @Content(mediaType = "application/vnd.openhab.dsl.rule", schema = @Schema(example = DSL_RULE_EXAMPLE)),
                             @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_COMBINED_EXAMPLE)) }),
                     @ApiResponse(responseCode = "400", description = "Invalid JSON data."),
-                    @ApiResponse(responseCode = "415", description = "Unsupported media type.") })
+                    @ApiResponse(responseCode = "415", description = "Unsupported media type."),
+                    @ApiResponse(responseCode = "422", description = "Unable to serialize entity.") })
     public Response create(final @Context HttpHeaders httpHeaders,
             @DefaultValue("false") @QueryParam("hideDefaultParameters") @Parameter(description = "hide the configuration parameters having the default value") boolean hideDefaultParameters,
             @DefaultValue("false") @QueryParam("hideDefaultChannels") @Parameter(description = "hide the non extensible channels having a default configuration") boolean hideDefaultChannels,
             @DefaultValue("false") @QueryParam("hideChannelLinksAndMetadata") @Parameter(description = "hide the channel links and metadata for items") boolean hideChannelLinksAndMetadata,
-            @DefaultValue("Normal") @QueryParam("ruleSerializationOption") @Parameter(required = true, description = "Decides what to include in serialized rules") RuleSerializationOption ruleOption,
+            @DefaultValue("Normal") @QueryParam("ruleSerializationOption") @Parameter(description = "Decides what to include in serialized rules") RuleSerializationOption ruleOption,
             @RequestBody(description = "JSON data", required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FileFormatDTO.class))) FileFormatDTO data) {
         String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
         logger.debug("create: mediaType = {}", acceptHeader);
@@ -603,12 +627,15 @@ public class FileFormatResource implements RESTResource {
                 break;
             case "application/vnd.openhab.dsl.rule":
                 if (ruleSerializer == null) {
-                    return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
-                            .entity("Unsupported media type '" + acceptHeader + "'!").build();
+                    return JSONResponse.createErrorResponse(Response.Status.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type '" + acceptHeader + "'");
                 } else if (rules.isEmpty()) {
-                    return Response.status(Response.Status.BAD_REQUEST).entity("No rule loaded from input").build();
+                    return JSONResponse.createErrorResponse(Response.Status.BAD_REQUEST, "No rule loaded from input");
                 }
-                ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
+                try {
+                    ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
+                } catch (SerializationException e) {
+                    return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
+                }
                 ruleSerializer.generateFormat(genId, outputStream);
                 break;
             case "application/yaml":
@@ -620,7 +647,11 @@ public class FileFormatResource implements RESTResource {
                             hideChannelLinksAndMetadata ? List.of() : metadata, stateFormatters, hideDefaultParameters);
                 }
                 if (ruleSerializer != null) {
-                    ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
+                    try {
+                        ruleSerializer.setRulesToBeSerialized(genId, rules, ruleOption);
+                    } catch (SerializationException e) {
+                        return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
+                    }
                 }
                 if (thingSerializer != null) {
                     thingSerializer.generateFormat(genId, outputStream);
