@@ -116,7 +116,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
                 Map<String, YamlConfigDescriptionParameterDTO> configDescriptionDtos = new LinkedHashMap<>(
                         configDescriptions.size());
                 for (ConfigDescriptionParameter parameter : configDescriptions) {
-                    configDescriptionDtos.put(parameter.getName(), new YamlConfigDescriptionParameterDTO(parameter));
+                    configDescriptionDtos.put(parameter.getName(), new YamlConfigDescriptionParameterDTO(parameter, true));
                 }
                 this.configDescriptions = configDescriptionDtos;
             }

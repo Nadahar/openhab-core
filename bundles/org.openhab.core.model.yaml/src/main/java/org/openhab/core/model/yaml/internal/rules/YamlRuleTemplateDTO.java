@@ -29,7 +29,7 @@ import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Condition;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
-import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
+import org.openhab.core.automation.converter.RuleTemplateSerializer.RuleTemplateSerializationOption;
 import org.openhab.core.automation.template.RuleTemplate;
 import org.openhab.core.common.AbstractUID;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
@@ -76,26 +76,23 @@ public class YamlRuleTemplateDTO
      * Creates a new instance based on the specified {@link RuleTemplate}.
      *
      * @param template the {@link RuleTemplate}.
-     * @param option the {@link RuleSerializationOption} that decides how the to serialize the {@link RuleTemplate}.
+     * @param option the {@link RuleTemplateSerializationOption} that decides how the to serialize the {@link RuleTemplate}.
      * @throws IllegalArgumentException If the specified {@code option} isn't supported.
      */
-    public YamlRuleTemplateDTO(@NonNull RuleTemplate template, RuleSerializationOption option) throws IllegalArgumentException {
-        if (option == RuleSerializationOption.STRIP_TEMPLATE || option == RuleSerializationOption.STUB_ONLY) {
-            throw new IllegalArgumentException("YAML rule templates don't support serialization option '" + option + '\'');
-        }
+    public YamlRuleTemplateDTO(@NonNull RuleTemplate template, RuleTemplateSerializationOption option) throws IllegalArgumentException {
         this.uid = template.getUID();
         this.label = template.getLabel();
         Set<@NonNull String> tags = template.getTags();
-        this.tags = option != RuleSerializationOption.INCLUDE_ALL && tags.isEmpty() ? null : tags;
+        this.tags = option != RuleTemplateSerializationOption.INCLUDE_ALL && tags.isEmpty() ? null : tags;
         this.description = template.getDescription();
-        this.visibility = option == RuleSerializationOption.INCLUDE_ALL || template.getVisibility() != Visibility.VISIBLE ? template.getVisibility() : null;
+        this.visibility = option == RuleTemplateSerializationOption.INCLUDE_ALL || template.getVisibility() != Visibility.VISIBLE ? template.getVisibility() : null;
 
         List<@NonNull ConfigDescriptionParameter> configDescriptions = template.getConfigurationDescriptions();
         if (!configDescriptions.isEmpty()) {
             Map<String, YamlConfigDescriptionParameterDTO> configDescriptionDtos = new LinkedHashMap<>(
                     configDescriptions.size());
             for (ConfigDescriptionParameter parameter : configDescriptions) {
-                configDescriptionDtos.put(parameter.getName(), new YamlConfigDescriptionParameterDTO(parameter));
+                configDescriptionDtos.put(parameter.getName(), new YamlConfigDescriptionParameterDTO(parameter, option == RuleTemplateSerializationOption.INCLUDE_ALL));
             }
             this.configDescriptions = configDescriptionDtos;
         }
@@ -103,7 +100,7 @@ public class YamlRuleTemplateDTO
         if (!actions.isEmpty()) {
             List<YamlActionDTO> actionDtos = new ArrayList<>(actions.size());
             for (Action action : actions) {
-                actionDtos.add(new YamlActionDTO(action, option));
+                actionDtos.add(new YamlActionDTO(action, option.toRuleSerializationOption()));
             }
             this.actions = actionDtos;
         }
@@ -111,7 +108,7 @@ public class YamlRuleTemplateDTO
         if (!conditions.isEmpty()) {
             List<YamlConditionDTO> conditionsDtos = new ArrayList<>(conditions.size());
             for (Condition condition : conditions) {
-                conditionsDtos.add(new YamlConditionDTO(condition, option));
+                conditionsDtos.add(new YamlConditionDTO(condition, option.toRuleSerializationOption()));
             }
             this.conditions = conditionsDtos;
         }
@@ -119,7 +116,7 @@ public class YamlRuleTemplateDTO
         if (!triggers.isEmpty()) {
             List<YamlModuleDTO> triggerDtos = new ArrayList<>(triggers.size());
             for (Trigger trigger : triggers) {
-                triggerDtos.add(new YamlModuleDTO(trigger, option));
+                triggerDtos.add(new YamlModuleDTO(trigger, option.toRuleSerializationOption()));
             }
             this.triggers = triggerDtos;
         }

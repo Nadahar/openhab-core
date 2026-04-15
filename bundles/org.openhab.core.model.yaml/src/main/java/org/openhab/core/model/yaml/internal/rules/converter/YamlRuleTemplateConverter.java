@@ -71,7 +71,7 @@ public class YamlRuleTemplateConverter implements RuleTemplateSerializer, RuleTe
     }
 
     @Override
-    public void setTemplatesToBeSerialized(String id, List<RuleTemplate> templates, RuleSerializationOption option) throws SerializationException {
+    public void setTemplatesToBeSerialized(String id, List<RuleTemplate> templates, RuleTemplateSerializationOption option) throws SerializationException {
         List<String> errors = null;
         List<SerializabilityResult<String>> checks = checkSerializability(templates);
         for (SerializabilityResult<String> check : checks) {

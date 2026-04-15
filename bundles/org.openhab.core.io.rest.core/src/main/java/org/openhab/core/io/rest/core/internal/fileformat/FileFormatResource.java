@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,8 +53,15 @@ import org.openhab.core.automation.RuleRegistry;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
 import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
+import org.openhab.core.automation.converter.RuleTemplateParser;
+import org.openhab.core.automation.converter.RuleTemplateSerializer;
+import org.openhab.core.automation.converter.RuleTemplateSerializer.RuleTemplateSerializationOption;
 import org.openhab.core.automation.dto.RuleDTO;
 import org.openhab.core.automation.dto.RuleDTOMapper;
+import org.openhab.core.automation.dto.RuleTemplateDTO;
+import org.openhab.core.automation.dto.RuleTemplateDTOMapper;
+import org.openhab.core.automation.template.RuleTemplate;
+import org.openhab.core.automation.template.TemplateRegistry;
 import org.openhab.core.config.core.ConfigDescription;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.config.core.ConfigDescriptionRegistry;
@@ -240,6 +246,40 @@ public class FileFormatResource implements RESTResource {
                     type: TimeOfDay
             """;
 
+    private static final String YAML_RULE_TEMPLATE_EXAMPLE = """
+            version: 1
+            ruleTemplates:
+              my-template:
+                label: My Template
+                description: Logs when an Item state changes to ON
+                configDescriptions:
+                  sourceItem:
+                    context: item
+                    description: The source Item whose state to monitor
+                    label: Source Item
+                    required: false
+                    type: TEXT
+                    readOnly: false
+                    multiple: false
+                    advanced: false
+                    verify: false
+                    limitToOptions: true
+                actions:
+                  - id: "2"
+                    config:
+                      type: DSL
+                      script: |
+                        logInfo("Test", "{{sourceItem}} turned on")
+                    type: Script
+                triggers:
+                  - id: "1"
+                    config:
+                      itemName: "{{sourceItem}}"
+                      state: "ON"
+                      previousState: "OFF"
+                    type: ItemChanged
+            """;
+
     private static final String YAML_COMBINED_EXAMPLE = """
             version: 1
             things:
@@ -298,6 +338,36 @@ public class FileFormatResource implements RESTResource {
                   - config:
                       itemName: MyItem
                     type: ItemReceivedCommand
+            ruleTemplates:
+              my-template:
+                label: My Template
+                description: Logs when an Item state changes to ON
+                configDescriptions:
+                  sourceItem:
+                    context: item
+                    description: The source Item whose state to monitor
+                    label: Source Item
+                    required: false
+                    type: TEXT
+                    readOnly: false
+                    multiple: false
+                    advanced: false
+                    verify: false
+                    limitToOptions: true
+                actions:
+                  - id: "2"
+                    config:
+                      type: DSL
+                      script: |
+                        logInfo("Test", "{{sourceItem}} turned on")
+                    type: Script
+                triggers:
+                  - id: "1"
+                    config:
+                      itemName: "{{sourceItem}}"
+                      state: "ON"
+                      previousState: "OFF"
+                    type: ItemChanged
             """;
 
     private static final String GEN_ID_PATTERN = "gen_file_format_%d";
@@ -332,12 +402,15 @@ public class FileFormatResource implements RESTResource {
     private final ChannelTypeRegistry channelTypeRegistry;
     private final ConfigDescriptionRegistry configDescRegistry;
     private final RuleRegistry ruleRegistry;
+    private final TemplateRegistry<RuleTemplate> templateRegistry;
     private final Map<String, ItemSerializer> itemSerializers = new ConcurrentHashMap<>();
     private final Map<String, ItemParser> itemParsers = new ConcurrentHashMap<>();
     private final Map<String, ThingSerializer> thingSerializers = new ConcurrentHashMap<>();
     private final Map<String, ThingParser> thingParsers = new ConcurrentHashMap<>();
     private final Map<String, RuleSerializer> ruleSerializers = new ConcurrentHashMap<>();
     private final Map<String, RuleParser> ruleParsers = new ConcurrentHashMap<>();
+    private final Map<String, RuleTemplateSerializer> templateSerializers = new ConcurrentHashMap<>();
+    private final Map<String, RuleTemplateParser> templateParsers = new ConcurrentHashMap<>();
 
     private final AtomicInteger counter = new AtomicInteger();
 
@@ -352,7 +425,8 @@ public class FileFormatResource implements RESTResource {
             final @Reference ThingTypeRegistry thingTypeRegistry, //
             final @Reference ChannelTypeRegistry channelTypeRegistry, //
             final @Reference ConfigDescriptionRegistry configDescRegistry, //
-            @Reference RuleRegistry ruleRegistry) {
+            @Reference RuleRegistry ruleRegistry, //
+            @Reference TemplateRegistry<RuleTemplate> templateRegistry) {
         this.itemBuilderFactory = itemBuilderFactory;
         this.itemRegistry = itemRegistry;
         this.metadataRegistry = metadataRegistry;
@@ -363,6 +437,7 @@ public class FileFormatResource implements RESTResource {
         this.channelTypeRegistry = channelTypeRegistry;
         this.configDescRegistry = configDescRegistry;
         this.ruleRegistry = ruleRegistry;
+        this.templateRegistry = templateRegistry;
     }
 
     @Deactivate
@@ -421,6 +496,24 @@ public class FileFormatResource implements RESTResource {
 
     protected void removeRuleParser(RuleParser ruleParser) {
         ruleParsers.remove(ruleParser.getParserFormat());
+    }
+
+    @Reference(policy = ReferencePolicy.DYNAMIC, cardinality = ReferenceCardinality.MULTIPLE)
+    protected void addRuleTemplateSerializer(RuleTemplateSerializer templateSerializer) {
+        templateSerializers.put(templateSerializer.getGeneratedFormat(), templateSerializer);
+    }
+
+    protected void removeRuleTemplateSerializer(RuleTemplateSerializer templateSerializer) {
+        templateSerializers.remove(templateSerializer.getGeneratedFormat());
+    }
+
+    @Reference(policy = ReferencePolicy.DYNAMIC, cardinality = ReferenceCardinality.MULTIPLE)
+    protected void addRuleTemplateParser(RuleTemplateParser templateParser) {
+        templateParsers.put(templateParser.getParserFormat(), templateParser);
+    }
+
+    protected void removeRuleTemplateParser(RuleTemplateParser templateParser) {
+        templateParsers.remove(templateParser.getParserFormat());
     }
 
     @POST
@@ -566,6 +659,56 @@ public class FileFormatResource implements RESTResource {
 
     @POST
     @RolesAllowed({ Role.ADMIN })
+    @Path("/ruletemplates")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces({ "application/yaml", MediaType.APPLICATION_JSON })
+    @Operation(operationId = "createFileFormatForRuleTemplates", summary = "Create file format for a list of rule templates in the registry.", security = {
+            @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
+                    @ApiResponse(responseCode = "200", description = "OK", content = {
+                            @Content(mediaType = "application/yaml", schema = @Schema(example = YAML_RULE_TEMPLATE_EXAMPLE)) }),
+                    @ApiResponse(responseCode = "404", description = "One or more rule templates not found in the registry."),
+                    @ApiResponse(responseCode = "415", description = "Unsupported media type."),
+                    @ApiResponse(responseCode = "422", description = "Unable to serialize rule template.") })
+    public Response createFileFormatForRuleTemplates(@Context HttpHeaders httpHeaders,
+            @DefaultValue("Normal") @QueryParam("serializationOption") @Parameter(description = "Decides what to include in serialized rule templates") RuleTemplateSerializationOption option,
+            @Parameter(description = "Array of rule template UIDs. If empty or omitted, return all rule templates.") @Nullable List<String> templateUIDs) {
+        String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
+        logger.debug("createFileFormatForRules: mediaType = {}, ruleUIDs = {}", acceptHeader, templateUIDs);
+        RuleTemplateSerializer serializer = getRuleTemplateSerializer(acceptHeader);
+        if (serializer == null) {
+            return JSONResponse.createErrorResponse(Response.Status.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type '" + acceptHeader + "'");
+        }
+        List<RuleTemplate> templates;
+        if (templateUIDs == null || templateUIDs.isEmpty()) {
+            Collection<RuleTemplate> all = templateRegistry.getAll();
+            if (all instanceof List<RuleTemplate> allList) {
+                templates = allList;
+            } else {
+                templates = new ArrayList<>(all);
+            }
+        } else {
+            templates = new ArrayList<>();
+            for (String templateUID : templateUIDs) {
+                RuleTemplate template = templateRegistry.get(templateUID);
+                if (template == null) {
+                    return JSONResponse.createErrorResponse(Response.Status.NOT_FOUND, "Rule template with ID '" + templateUID + "' not found in the registry!");
+                }
+                templates.add(template);
+            }
+        }
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        String genId = newIdForSerialization();
+        try {
+            serializer.setTemplatesToBeSerialized(genId, templates, option);
+        } catch (SerializationException e) {
+            return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
+        }
+        serializer.generateFormat(genId, outputStream);
+        return Response.ok(new String(outputStream.toByteArray(), StandardCharsets.UTF_8)).build();
+    }
+
+    @POST
+    @RolesAllowed({ Role.ADMIN })
     @Path("/create")
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/vnd.openhab.dsl.rule", "application/yaml" })
@@ -583,7 +726,7 @@ public class FileFormatResource implements RESTResource {
             @DefaultValue("false") @QueryParam("hideDefaultParameters") @Parameter(description = "hide the configuration parameters having the default value") boolean hideDefaultParameters,
             @DefaultValue("false") @QueryParam("hideDefaultChannels") @Parameter(description = "hide the non extensible channels having a default configuration") boolean hideDefaultChannels,
             @DefaultValue("false") @QueryParam("hideChannelLinksAndMetadata") @Parameter(description = "hide the channel links and metadata for items") boolean hideChannelLinksAndMetadata,
-            @DefaultValue("Normal") @QueryParam("ruleSerializationOption") @Parameter(description = "Decides what to include in serialized rules") RuleSerializationOption ruleOption,
+            @DefaultValue("Normal") @QueryParam("ruleSerializationOption") @Parameter(description = "Decides what to include in serialized rules and rule templates") RuleSerializationOption ruleOption,
             @RequestBody(description = "JSON data", required = true, content = @Content(mediaType = MediaType.APPLICATION_JSON, schema = @Schema(implementation = FileFormatDTO.class))) FileFormatDTO data) {
         String acceptHeader = httpHeaders.getHeaderString(HttpHeaders.ACCEPT);
         logger.debug("create: mediaType = {}", acceptHeader);
@@ -593,14 +736,16 @@ public class FileFormatResource implements RESTResource {
         List<Metadata> metadata = new ArrayList<>();
         Map<String, String> stateFormatters = new HashMap<>();
         List<Rule> rules = new ArrayList<>();
+        List<RuleTemplate> templates = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        if (!convertFromFileFormatDTO(data, things, items, metadata, stateFormatters, rules, errors)) {
+        if (!convertFromFileFormatDTO(data, things, items, metadata, stateFormatters, rules, templates, errors)) {
             return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
         }
 
         ThingSerializer thingSerializer = getThingSerializer(acceptHeader);
         ItemSerializer itemSerializer = getItemSerializer(acceptHeader);
-        RuleSerializer ruleSerializer = getRuleSerializer(acceptHeader); // TODO: (Nad) Rule templates as well?
+        RuleSerializer ruleSerializer = getRuleSerializer(acceptHeader);
+        RuleTemplateSerializer templateSerializer = getRuleTemplateSerializer(acceptHeader);
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         String genId = newIdForSerialization();
         switch (acceptHeader) {
@@ -653,6 +798,13 @@ public class FileFormatResource implements RESTResource {
                         return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
                     }
                 }
+                if (templateSerializer != null) {
+                    try {
+                        templateSerializer.setTemplatesToBeSerialized(genId, templates, ruleOption == RuleSerializationOption.INCLUDE_ALL ? RuleTemplateSerializationOption.INCLUDE_ALL : RuleTemplateSerializationOption.NORMAL);
+                    } catch (SerializationException e) {
+                        return JSONResponse.createErrorResponse(UNPROCESSABLE_ENTITY, e.getMessage());
+                    }
+                }
                 if (thingSerializer != null) {
                     thingSerializer.generateFormat(genId, outputStream);
                 } else if (itemSerializer != null) {
@@ -671,7 +823,7 @@ public class FileFormatResource implements RESTResource {
     @POST
     @RolesAllowed({ Role.ADMIN })
     @Path("/parse")
-    @Consumes({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/vnd.openhab.dsl.rule", "application/yaml" }) // TODO: (Nad) Template as well..?
+    @Consumes({ "text/vnd.openhab.dsl.thing", "text/vnd.openhab.dsl.item", "application/vnd.openhab.dsl.rule", "application/yaml" })
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "parse", summary = "Parse file format.", security = {
             @SecurityRequirement(name = "oauth2", scopes = { "admin" }) }, responses = {
@@ -694,27 +846,31 @@ public class FileFormatResource implements RESTResource {
         Collection<ItemChannelLink> channelLinks = List.of();
         Map<String, String> stateFormatters = Map.of();
         Collection<Rule> rules = List.of();
+        Collection<RuleTemplate> templates = List.of();
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         ThingParser thingParser = getThingParser(contentTypeHeader);
         ItemParser itemParser = getItemParser(contentTypeHeader);
         RuleParser ruleParser = getRuleParser(contentTypeHeader);
+        RuleTemplateParser templateParser = getRuleTemplateParser(contentTypeHeader);
         String modelName = null;
-        String modelName2 = null;
+        String thingModelName = null;
+        String itemModelName = null;
         String ruleModelName = null;
+        String templateModelName = null;
         switch (contentTypeHeader) {
             case "text/vnd.openhab.dsl.thing":
                 if (thingParser == null) {
                     return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
                             .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
                 }
-                modelName = thingParser.startParsingFormat(input, errors, warnings);
-                if (modelName == null) {
+                thingModelName = thingParser.startParsingFormat(input, errors, warnings);
+                if (thingModelName == null) {
                     return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
                 }
-                things = thingParser.getParsedObjects(modelName);
+                things = thingParser.getParsedObjects(thingModelName);
                 if (things.isEmpty()) {
-                    thingParser.finishParsingFormat(modelName);
+                    thingParser.finishParsingFormat(thingModelName);
                     return Response.status(Response.Status.BAD_REQUEST).entity("No thing loaded from input").build();
                 }
                 break;
@@ -723,24 +879,24 @@ public class FileFormatResource implements RESTResource {
                     return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
                             .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
                 }
-                modelName2 = itemParser.startParsingFormat(input, errors, warnings);
-                if (modelName2 == null) {
+                itemModelName = itemParser.startParsingFormat(input, errors, warnings);
+                if (itemModelName == null) {
                     return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
                 }
-                items = itemParser.getParsedObjects(modelName2);
+                items = itemParser.getParsedObjects(itemModelName);
                 if (items.isEmpty()) {
-                    itemParser.finishParsingFormat(modelName2);
+                    itemParser.finishParsingFormat(itemModelName);
                     return Response.status(Response.Status.BAD_REQUEST).entity("No item loaded from input").build();
                 }
-                metadata = itemParser.getParsedMetadata(modelName2);
-                stateFormatters = itemParser.getParsedStateFormatters(modelName2);
+                metadata = itemParser.getParsedMetadata(itemModelName);
+                stateFormatters = itemParser.getParsedStateFormatters(itemModelName);
                 // We need to go through the thing parser to retrieve the items channel links
                 // But there is no need to parse again the input
                 if (thingParser != null) {
-                    channelLinks = thingParser.getParsedChannelLinks(modelName2);
+                    channelLinks = thingParser.getParsedChannelLinks(itemModelName);
                 }
                 break;
-            case "application/vnd.openhab.dsl.rule": // TODO: (Nad) Rule template
+            case "application/vnd.openhab.dsl.rule":
                 if (ruleParser == null) {
                     return Response.status(Response.Status.UNSUPPORTED_MEDIA_TYPE)
                             .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
@@ -757,26 +913,57 @@ public class FileFormatResource implements RESTResource {
                 break;
             case "application/yaml":
                 if (thingParser != null) {
-                    modelName = thingParser.startParsingFormat(input, errors, warnings);
-                    if (modelName == null) {
+                    thingModelName = thingParser.startParsingFormat(input, errors, warnings);
+                    if (thingModelName == null) {
                         return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors)).build();
                     }
-                    things = thingParser.getParsedObjects(modelName);
-                    channelLinks = thingParser.getParsedChannelLinks(modelName);
+                    modelName = thingModelName;
+                    things = thingParser.getParsedObjects(thingModelName);
+                    channelLinks = thingParser.getParsedChannelLinks(thingModelName);
                 }
                 if (itemParser != null) {
-                    // Avoid parsing the input a second time
+                    // Avoid parsing the input again
                     if (modelName == null) {
-                        modelName2 = itemParser.startParsingFormat(input, errors, warnings);
-                        if (modelName2 == null) {
+                        itemModelName = itemParser.startParsingFormat(input, errors, warnings);
+                        if (itemModelName == null) {
                             return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors))
                                     .build();
                         }
+                        modelName = itemModelName;
+                    } else {
+                        itemModelName = modelName;
                     }
-                    String modelNameToUse = modelName != null ? modelName : Objects.requireNonNull(modelName2);
-                    items = itemParser.getParsedObjects(modelNameToUse);
-                    metadata = itemParser.getParsedMetadata(modelNameToUse);
-                    stateFormatters = itemParser.getParsedStateFormatters(modelNameToUse);
+                    items = itemParser.getParsedObjects(itemModelName);
+                    metadata = itemParser.getParsedMetadata(itemModelName);
+                    stateFormatters = itemParser.getParsedStateFormatters(itemModelName);
+                }
+                if (ruleParser != null) {
+                    // Avoid parsing the input again
+                    if (modelName == null) {
+                        ruleModelName = ruleParser.startParsingFormat(input, errors, warnings);
+                        if (ruleModelName == null) {
+                            return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors))
+                                    .build();
+                        }
+                        modelName = ruleModelName;
+                    } else {
+                        ruleModelName = modelName;
+                    }
+                    rules = ruleParser.getParsedObjects(ruleModelName);
+                }
+                if (templateParser != null) {
+                    // Avoid parsing the input again
+                    if (modelName == null) {
+                        templateModelName = templateParser.startParsingFormat(input, errors, warnings);
+                        if (templateModelName == null) {
+                            return Response.status(Response.Status.BAD_REQUEST).entity(String.join("\n", errors))
+                                    .build();
+                        }
+                        modelName = templateModelName;
+                    } else {
+                        templateModelName = modelName;
+                    }
+                    templates = templateParser.getParsedObjects(templateModelName);
                 }
                 break;
             default:
@@ -784,15 +971,18 @@ public class FileFormatResource implements RESTResource {
                         .entity("Unsupported content type '" + contentTypeHeader + "'!").build();
         }
         ExtendedFileFormatDTO result = convertToFileFormatDTO(things, items, metadata, stateFormatters, channelLinks,
-                rules, warnings);
-        if (modelName != null && thingParser != null) {
-            thingParser.finishParsingFormat(modelName);
+                rules, templates, warnings);
+        if (thingModelName != null && thingParser != null) {
+            thingParser.finishParsingFormat(thingModelName);
         }
-        if (modelName2 != null && itemParser != null) {
-            itemParser.finishParsingFormat(modelName2);
+        if (itemModelName != null && itemParser != null) {
+            itemParser.finishParsingFormat(itemModelName);
         }
         if (ruleModelName != null && ruleParser != null) {
             ruleParser.finishParsingFormat(ruleModelName);
+        }
+        if (templateModelName != null && templateParser != null) {
+            templateParser.finishParsingFormat(templateModelName);
         }
         return Response.ok(result).build();
     }
@@ -969,6 +1159,13 @@ public class FileFormatResource implements RESTResource {
         }
     }
 
+    private @Nullable RuleTemplateSerializer getRuleTemplateSerializer(String mediaType) {
+        switch (mediaType) {
+            case "application/yaml": return templateSerializers.get("YAML");
+            default: return null;
+        }
+    }
+
     private @Nullable ItemParser getItemParser(String contentType) {
         return switch (contentType) {
             case "text/vnd.openhab.dsl.item" -> itemParsers.get("DSL");
@@ -990,6 +1187,13 @@ public class FileFormatResource implements RESTResource {
         switch (contentType) {
             case "application/yaml": return ruleParsers.get("YAML");
             case "application/vnd.openhab.dsl.rule": return ruleParsers.get("DSL");
+            default: return null;
+        }
+    }
+
+    private @Nullable RuleTemplateParser getRuleTemplateParser(String contentType) {
+        switch (contentType) {
+            case "application/yaml": return templateParsers.get("YAML");
             default: return null;
         }
     }
@@ -1016,7 +1220,7 @@ public class FileFormatResource implements RESTResource {
     }
 
     private boolean convertFromFileFormatDTO(FileFormatDTO data, List<Thing> things, List<Item> items,
-            List<Metadata> metadata, Map<String, String> stateFormatters, List<Rule> rules, List<String> errors) {
+            List<Metadata> metadata, Map<String, String> stateFormatters, List<Rule> rules, List<RuleTemplate> templates, List<String> errors) {
         boolean ok = true;
         if (data.things != null) {
             for (ThingDTO thingData : data.things) {
@@ -1104,12 +1308,17 @@ public class FileFormatResource implements RESTResource {
                 rules.add(RuleDTOMapper.map(ruleData));
             }
         }
+        if (data.ruleTemplates != null) {
+            for (RuleTemplateDTO templateData : data.ruleTemplates) {
+                templates.add(RuleTemplateDTOMapper.map(templateData));
+            }
+        }
         return ok;
     }
 
     private ExtendedFileFormatDTO convertToFileFormatDTO(Collection<Thing> things, Collection<Item> items,
             Collection<Metadata> metadata, Map<String, String> stateFormatters,
-            Collection<ItemChannelLink> channelLinks, Collection<Rule> rules, List<String> warnings) {
+            Collection<ItemChannelLink> channelLinks, Collection<Rule> rules, Collection<RuleTemplate> templates, List<String> warnings) {
         ExtendedFileFormatDTO dto = new ExtendedFileFormatDTO();
         dto.warnings = warnings.isEmpty() ? null : warnings;
         if (!things.isEmpty()) {
@@ -1160,6 +1369,12 @@ public class FileFormatResource implements RESTResource {
             dto.rules = new ArrayList<>();
             for (Rule rule : rules) {
                 dto.rules.add(RuleDTOMapper.map(rule));
+            }
+        }
+        if (!templates.isEmpty()) {
+            dto.ruleTemplates = new ArrayList<>();
+            for (RuleTemplate template : templates) {
+                dto.ruleTemplates.add(RuleTemplateDTOMapper.map(template));
             }
         }
         return dto;

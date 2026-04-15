@@ -14,7 +14,10 @@ package org.openhab.core.automation.converter;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
 import org.openhab.core.automation.template.RuleTemplate;
@@ -44,8 +47,53 @@ public interface RuleTemplateSerializer extends ObjectSerializer<RuleTemplate> {
      *
      * @param id the identifier of the {@link RuleTemplate} format generation.
      * @param templates the {@link List} of {@link RuleTemplate}s to serialize.
-     * @param the option that determines how to serialize the {@link Rule}s.
+     * @param the option that determines how to serialize the {@link RuleTemplate}s.
      * @throws SerializationException If one or more of the rule templates can't be serialized.
      */
-    void setTemplatesToBeSerialized(String id, List<RuleTemplate> templates, RuleSerializationOption option) throws SerializationException;
+    void setTemplatesToBeSerialized(String id, List<RuleTemplate> templates, RuleTemplateSerializationOption option) throws SerializationException;
+
+    /**
+     * An enum representing the different rule template serialization options.
+     */
+    public enum RuleTemplateSerializationOption {
+
+        /** Empty collections and normally irrelevant fields are hidden */
+        NORMAL("Normal"),
+
+        /** Everything is serialized, including empty collections */
+        INCLUDE_ALL("Include all");
+
+        private final String friendlyName;
+
+        private RuleTemplateSerializationOption(String friendlyName) {
+            this.friendlyName = friendlyName;
+        }
+
+        public RuleSerializationOption toRuleSerializationOption() {
+            switch (this) {
+                case INCLUDE_ALL: return RuleSerializationOption.INCLUDE_ALL;
+                case NORMAL: return RuleSerializationOption.NORMAL;
+                default:
+                    throw new UnsupportedOperationException("Missing toRuleSerializationOption() implementation for " + name());
+            }
+        }
+
+        @Override
+        public String toString() {
+            return friendlyName;
+        }
+
+        public static @Nullable RuleTemplateSerializationOption fromString(@Nullable String id) {
+            if (id == null || id.isBlank()) {
+                return null;
+            }
+            String upId = id.toUpperCase(Locale.ROOT).trim();
+            for (RuleTemplateSerializationOption option : values()) {
+                if (upId.equals(option.name()) || upId.equalsIgnoreCase(option.friendlyName) || upId.equalsIgnoreCase(option.friendlyName.replace(" ", "")) || upId.equalsIgnoreCase(option.friendlyName.replace(" ", "-"))) {
+                    return option;
+                }
+            }
+            return null;
+        }
+    }
 }

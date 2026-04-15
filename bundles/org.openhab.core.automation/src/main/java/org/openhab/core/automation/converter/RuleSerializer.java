@@ -51,7 +51,7 @@ public interface RuleSerializer extends ObjectSerializer<Rule> {
     void setRulesToBeSerialized(String id, List<Rule> rules, RuleSerializationOption option) throws SerializationException;
 
     /**
-     * An enum representing the different rule serialization options
+     * An enum representing the different rule serialization options.
      */
     public enum RuleSerializationOption {
 
