@@ -87,7 +87,18 @@ public class RuleBuilder {
      * @return The new {@link RuleBuilder}.
      */
     public static RuleBuilder create(Rule r) {
-        return create(r.getUID()).withActions(r.getActions()).withConditions(r.getConditions())
+        return create(r.getUID(), r);
+    }
+
+    /**
+     * Build a new {@link Rule} with a new UID, based on an existing rule.
+     *
+     * @param ruleUid the UID to use.
+     * @param r the {@link Rule} to base the builder on.
+     * @return The new {@link RuleBuilder}.
+     */
+    public static RuleBuilder create(String ruleUid, Rule r) {
+        return create(ruleUid).withActions(r.getActions()).withConditions(r.getConditions())
                 .withTriggers(r.getTriggers()).withConfiguration(r.getConfiguration())
                 .withConfigurationDescriptions(r.getConfigurationDescriptions()).withDescription(r.getDescription())
                 .withName(r.getName()).withTags(r.getTags()).withTemplateUID(r.getTemplateUID())

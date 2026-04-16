@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -120,6 +121,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     private static final Pattern CONTEXT_COMMENT_PATTERN = Pattern.compile("^// context:.*$\\R", Pattern.MULTILINE);
     private static final Pattern INDENTATION_PATTERN = Pattern.compile("^(?=.)", Pattern.MULTILINE);
     private static final Pattern NUMERIC_PATTERN = Pattern.compile("-?\\d+(\\.\\d+)?");
+    private static final Pattern INDEX_PATTERN = Pattern.compile("-(?<idx>\\d+)$");
     private final Set<String> enumStates;
     private final Set<String> enumCommands;
 
@@ -357,9 +359,17 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         RuleBuilder builder;
         List<Action> actions = new ArrayList<>();
         ActionBuilder aBuilder;
-        LinkedHashMap<String, @Nullable Object> props; // TODO: (Nad) How to handle rule UID if not specified?
+        LinkedHashMap<String, @Nullable Object> props;
+        Set<String> usedUids = new HashSet<>();
+        String strippedModeName = modelName.replace(".rules", "");
+        String uid;
         for (Rule rule : ruleProvider.getAllFromModel(modelName)) {
-            builder = RuleBuilder.create(rule);
+            if ((uid = rule.getUID()).startsWith(strippedModeName) || usedUids.contains(uid)) {
+                builder = RuleBuilder.create(generateUid(rule, usedUids), rule);
+            } else {
+                usedUids.add(uid);
+                builder = RuleBuilder.create(uid, rule);
+            }
             actions.clear();
             for (Action action : rule.getActions()) {
                 aBuilder = ActionBuilder.create(action);
@@ -376,6 +386,29 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         return result;
     }
 
+    private String generateUid(Rule rule, Set<String> usedUids) {
+
+        String result = rule.getName();
+        if (result == null || result.isBlank()) {
+            result = "generated-1";
+        } else {
+            result = result.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", "-");
+        }
+
+        Matcher matcher;
+        while (usedUids.contains(result)) {
+            matcher = INDEX_PATTERN.matcher(result);
+            if (matcher.find()) {
+                result = matcher.replaceFirst("-" + Integer.parseInt(matcher.group("idx")) + 1);
+            } else {
+                result += "-2";
+            }
+        }
+
+        usedUids.add(result);
+        return result;
+    }
+
     @Override
     public void finishParsingFormat(String modelName) {
         modelRepository.removeModel(modelName);
@@ -384,6 +417,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
 
     private org.openhab.core.model.rule.rules.Rule buildModelRule(Rule rule, org.openhab.core.model.rule.rules.Rule model,
             String placeholderLiteral, Set<Rule> handledRules) throws SerializationException {
+        model.setUid(rule.getUID());
         model.setName(rule.getName());
         EList<String> tags = model.getTags();
         for (String tag : rule.getTags()) {
