@@ -120,7 +120,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
                 this.configDescriptions = configDescriptionDtos;
             }
         }
-        if (option != RuleSerializationOption.STUB_ONLY) { // TODO: (Nad) Ignore template state on deserialization?
+        if (option != RuleSerializationOption.STUB_ONLY) {
             List<@NonNull Action> actions = rule.getActions();
             if (!actions.isEmpty()) {
                 List<YamlActionDTO> actionDtos = new ArrayList<>(actions.size());
@@ -166,8 +166,10 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         try {
             partial = mapper.treeToValue(node, YamlPartialRuleDTO.class);
             result.uid = partial.uid;
-            result.template = partial.template;
-            result.templateState = TemplateState.typeOf(partial.templateState);
+            String templateUID = partial.template;
+            result.template = templateUID;
+            result.templateState = templateUID == null || templateUID.isBlank() ? TemplateState.NO_TEMPLATE
+                    : TemplateState.PENDING;
             result.label = partial.label;
             result.tags = partial.tags;
             result.description = partial.description;
