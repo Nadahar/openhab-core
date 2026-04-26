@@ -57,7 +57,7 @@ public class YamlModuleDTO {
             if (!type.equals(typeAlias)) {
                 this.config.put("type", typeAlias);
             }
-            if ("application/vnd.openhab.dsl.rule".equals(type) && this.config.get("script") instanceof String scriptContent) {
+            if (option != RuleSerializationOption.INCLUDE_ALL && "application/vnd.openhab.dsl.rule".equals(type) && this.config.get("script") instanceof String scriptContent) {
                 // Remove the "context comment" inserted into file-based DSL rules
                 this.config.put("script", CONTEXT_COMMENT_PATTERN.matcher(scriptContent).replaceFirst(""));
             }

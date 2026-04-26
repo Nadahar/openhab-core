@@ -125,7 +125,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
             if (!actions.isEmpty()) {
                 List<YamlActionDTO> actionDtos = new ArrayList<>(actions.size());
                 for (Action action : actions) {
-                    actionDtos.add(new YamlActionDTO(action, option)); // TODO: (Nad) Strip // context from DSL
+                    actionDtos.add(new YamlActionDTO(action, option));
                 }
                 this.actions = actionDtos;
             }
