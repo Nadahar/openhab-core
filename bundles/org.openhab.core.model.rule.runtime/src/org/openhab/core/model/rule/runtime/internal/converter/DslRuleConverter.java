@@ -719,6 +719,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 return weCond;
             case EphemerisConditionHandler.HOLIDAY_MODULE_TYPE_ID:
                 HolidayCondition hdCond = factory.createHolidayCondition();
+                hdCond.setHoliday("holiday");
                 hdCond.setNegation(false);
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
@@ -729,6 +730,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 return hdCond;
             case EphemerisConditionHandler.NOT_HOLIDAY_MODULE_TYPE_ID:
                 HolidayCondition nhdCond = factory.createHolidayCondition();
+                nhdCond.setHoliday("holiday");
                 nhdCond.setNegation(true);
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
