@@ -169,6 +169,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     public List<SerializabilityResult<String>> checkSerializability(Collection<Rule> rules) {
         List<SerializabilityResult<String>> result = new ArrayList<>(rules.size());
         List<String> errors = new ArrayList<>();
+        String s;
         for (Rule rule : rules) {
             if (rule instanceof SimpleRule) {
                 result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
@@ -181,6 +182,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             errors.clear();
             if (rule.getVisibility() != Visibility.VISIBLE) {
                 errors.add("is invisible");
+            }
+            if ((s = rule.getDescription()) != null && !s.isBlank()) {
+                errors.add("has a description");
             }
             List<Trigger> triggers = rule.getTriggers();
             if (triggers.isEmpty()) {
@@ -215,11 +219,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     errors.add("action '" + action.getId() + "' has mapped inputs");
                 } else if (action.getConfiguration().get("type") instanceof String type) {
                     if (DSLRuleProvider.MIMETYPE_OPENHAB_DSL_RULE.equals(type)) {
-                        if (action.getConfiguration().get("script") instanceof String script) {
-                            if (script.isBlank()) {
-                                errors.add("has an empty scripted DSL action");
-                            }
-                        } else {
+                        if (!(action.getConfiguration().get("script") instanceof String)) {
                             errors.add("has no action script");
                         }
                     } else {
@@ -641,6 +641,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         String type = condition.getTypeUID();
         Object value;
         RulesFactory factory = RulesFactory.eINSTANCE;
+        int i;
 
         switch (type) {
             case TimeOfDayConditionHandler.MODULE_TYPE_ID:
@@ -702,7 +703,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 wdCond.setType("weekday");
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
-                    wdCond.setOffset(Integer.toString(offset.intValue()));
+                    if ((i = offset.intValue()) != 0) {
+                        wdCond.setOffset(Integer.toString(i));
+                    }
                 } else if (value != null) {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
@@ -712,7 +715,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 weCond.setType("weekend");
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
-                    weCond.setOffset(Integer.toString(offset.intValue()));
+                    if ((i = offset.intValue()) != 0) {
+                        weCond.setOffset(Integer.toString(i));
+                    }
                 } else if (value != null) {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
@@ -723,7 +728,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 hdCond.setNegation(false);
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
-                    hdCond.setOffset(Integer.toString(offset.intValue()));
+                    if ((i = offset.intValue()) != 0) {
+                        hdCond.setOffset(Integer.toString(i));
+                    }
                 } else if (value != null) {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
@@ -734,7 +741,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 nhdCond.setNegation(true);
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
-                    nhdCond.setOffset(Integer.toString(offset.intValue()));
+                    if ((i = offset.intValue()) != 0) {
+                        nhdCond.setOffset(Integer.toString(i));
+                    }
                 } else if (value != null) {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
@@ -749,7 +758,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 }
                 value = condition.getConfiguration().get("offset");
                 if (value instanceof Number offset) {
-                    idsCond.setOffset(Integer.toString(offset.intValue()));
+                    if ((i = offset.intValue()) != 0) {
+                        idsCond.setOffset(Integer.toString(i));
+                    }
                 } else if (value != null) {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
@@ -795,7 +806,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     throw new SerializationException("Invalid condition: " + condition);
                 }
                 value = condition.getConfiguration().get(ItemStateConditionHandler.OPERATOR);
-                isCond.setOperator(value instanceof String op ? op : "=");
+                isCond.setOperator(value instanceof String op && !op.isBlank() ? op : "=");
                 return isCond;
             default:
                 throw new SerializationException("Unsupported condition: " + condition);

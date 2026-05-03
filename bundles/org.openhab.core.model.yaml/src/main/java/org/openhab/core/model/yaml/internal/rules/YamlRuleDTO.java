@@ -438,6 +438,7 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         @JsonAlias({ "templateUid", "templateUID" })
         public String template;
         public String templateState;
+        @JsonAlias({ "name" })
         public String label;
         public Set<@NonNull String> tags;
         public String description;
