@@ -364,7 +364,12 @@ public class DSLRuleProvider
         if (sharedContext) {
             ruleCfg.put("sharedContext", Boolean.TRUE);
         }
-        ruleCfg.put("source", sharedContext ? ruleNode.getParent().getText() : ruleNode.getText().replaceFirst("^\\R+", ""));
+        String source = sharedContext ? ruleNode.getParent().getText() : ruleNode.getText().replaceFirst("^\\R+", "");
+        source = source.replaceAll("\\R", "\n");
+        if (!source.endsWith("\n")) {
+            source += '\n';
+        }
+        ruleCfg.put("source", source);
         ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
         return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers).withActions(actions).withConditions(conditions).withConfiguration(ruleCfg).build();
     }
