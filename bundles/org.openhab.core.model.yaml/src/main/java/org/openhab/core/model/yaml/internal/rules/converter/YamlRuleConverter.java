@@ -22,6 +22,7 @@ import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
@@ -63,16 +64,25 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
     @Override
     public List<SerializabilityResult<String>> checkSerializability(Collection<Rule> rules) {
         List<SerializabilityResult<String>> result = new ArrayList<>(rules.size());
+        boolean failed;
         for (Rule rule : rules) {
+            failed = false;
             if (rule instanceof SimpleRule) {
                 result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
                 continue;
             }
-            if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
-                continue;
+
+            for (Action action : rule.getActions()) {
+                if (action.getConfiguration().get("type") instanceof String type && "application/vnd.openhab.dsl.rule".equals(type) && action.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) {
+                    result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': action '" + action.getId() + "' has shared context"));
+                    failed = true;
+                    break;
+                }
             }
-            result.add(new SerializabilityResult<>(rule.getUID(), true, ""));
+
+            if (!failed) {
+                result.add(new SerializabilityResult<>(rule.getUID(), true, ""));
+            }
         }
 
         return result;

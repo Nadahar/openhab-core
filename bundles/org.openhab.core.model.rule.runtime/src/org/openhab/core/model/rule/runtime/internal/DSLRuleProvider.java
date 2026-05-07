@@ -355,21 +355,21 @@ public class DSLRuleProvider
         Configuration cfg = new Configuration();
         cfg.put(AbstractScriptModuleHandler.CONFIG_SCRIPT, context + removeIndentation(script));
         cfg.put(AbstractScriptModuleHandler.CONFIG_SCRIPT_TYPE, MIMETYPE_OPENHAB_DSL_RULE);
+        INode ruleNode = NodeModelUtils.findActualNodeFor(rule);
+        boolean sharedContext = hasSharedContext(ruleNode);
+        if (sharedContext) {
+            cfg.put("sharedContext", Boolean.TRUE);
+        }
         List<Action> actions = List.of(ActionBuilder.create().withId("script").withTypeUID(ScriptActionHandler.TYPE_ID)
                 .withConfiguration(cfg).build());
 
-        INode ruleNode = NodeModelUtils.findActualNodeFor(rule);
-        boolean sharedContext = hasSharedContext(ruleNode);
         Configuration ruleCfg = new Configuration();
-        if (sharedContext) {
-            ruleCfg.put("sharedContext", Boolean.TRUE);
-        }
         String source = sharedContext ? ruleNode.getParent().getText() : ruleNode.getText().replaceFirst("^\\R+", "");
         source = source.replaceAll("\\R", "\n");
         if (!source.endsWith("\n")) {
             source += '\n';
         }
-        ruleCfg.put("source", source);
+        ruleCfg.put("source", source); // TODO: (Nad) Key names etc.
         ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
         return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers).withActions(actions).withConditions(conditions).withConfiguration(ruleCfg).build();
     }

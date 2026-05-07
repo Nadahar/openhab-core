@@ -33,7 +33,6 @@ import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
 import org.openhab.core.automation.converter.RuleSerializer.RuleSerializationOption;
 import org.openhab.core.automation.util.RuleUtil;
-import org.openhab.core.common.AbstractUID;
 import org.openhab.core.config.core.ConfigDescriptionParameter;
 import org.openhab.core.io.dto.ModularDTO;
 import org.openhab.core.io.dto.SerializationException;
@@ -103,7 +102,6 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
             if (option != RuleSerializationOption.INCLUDE_ALL) {
                 this.config.remove("source"); // TODO: (Nad) Name, constant
                 this.config.remove("sourceType"); // TODO: (Nad) Name, constant
-                this.config.remove("sharedContext"); // TODO: (Nad) Name, constant
                 if (this.config.isEmpty()) {
                     this.config = null;
                 }

@@ -175,10 +175,6 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                 result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
                 continue;
             }
-            if (rule.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) { //TODO: (Nad) Key name
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a DSL rule with shared context"));
-                continue;
-            }
             errors.clear();
             if (rule.getVisibility() != Visibility.VISIBLE) {
                 errors.add("is invisible");
@@ -221,6 +217,9 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                     if (DSLRuleProvider.MIMETYPE_OPENHAB_DSL_RULE.equals(type)) {
                         if (!(action.getConfiguration().get("script") instanceof String)) {
                             errors.add("has no action script");
+                        }
+                        if (action.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) {
+                            errors.add("action '" + action.getId() + "' has shared context");
                         }
                     } else {
                         errors.add("doesn't have a scripted DSL action");

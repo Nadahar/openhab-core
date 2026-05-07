@@ -57,9 +57,12 @@ public class YamlModuleDTO {
             if (!type.equals(typeAlias)) {
                 this.config.put("type", typeAlias);
             }
-            if (option != RuleSerializationOption.INCLUDE_ALL && "application/vnd.openhab.dsl.rule".equals(type) && this.config.get("script") instanceof String scriptContent) {
-                // Remove the "context comment" inserted into file-based DSL rules
-                this.config.put("script", CONTEXT_COMMENT_PATTERN.matcher(scriptContent).replaceFirst(""));
+            if (option != RuleSerializationOption.INCLUDE_ALL && "application/vnd.openhab.dsl.rule".equals(type)) {
+                if (this.config.get("script") instanceof String scriptContent) {
+                    // Remove the "context comment" inserted into file-based DSL rules
+                    this.config.put("script", CONTEXT_COMMENT_PATTERN.matcher(scriptContent).replaceFirst(""));
+                }
+                this.config.remove("sharedContext");
             }
         }
         if (option != RuleSerializationOption.INCLUDE_ALL && this.config.isEmpty()) {
