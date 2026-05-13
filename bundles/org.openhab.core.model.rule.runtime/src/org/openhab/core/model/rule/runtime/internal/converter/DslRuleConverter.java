@@ -172,7 +172,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
         String s;
         for (Rule rule : rules) {
             if (rule instanceof SimpleRule) {
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action."));
                 continue;
             }
             errors.clear();
@@ -232,7 +232,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
             if (errors.isEmpty()) {
                 result.add(new SerializabilityResult<>(rule.getUID(), true, ""));
             } else {
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors)));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': " + String.join(", ", errors) + '.'));
             }
         }
 

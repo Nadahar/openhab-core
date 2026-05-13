@@ -68,13 +68,13 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
         for (Rule rule : rules) {
             failed = false;
             if (rule instanceof SimpleRule) {
-                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action"));
+                result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "' is a SimpleRule with an inaccessible action."));
                 continue;
             }
 
             for (Action action : rule.getActions()) {
                 if (action.getConfiguration().get("type") instanceof String type && "application/vnd.openhab.dsl.rule".equals(type) && action.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) {
-                    result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': action '" + action.getId() + "' has shared context"));
+                    result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': action '" + action.getId() + "' has shared context."));
                     failed = true;
                     break;
                 }
