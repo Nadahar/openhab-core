@@ -34,6 +34,7 @@ import org.eclipse.xtext.xbase.XExpression;
 import org.eclipse.xtext.xbase.interpreter.IEvaluationContext;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Condition;
+import org.openhab.core.automation.Module;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleProvider;
 import org.openhab.core.automation.Trigger;
@@ -358,7 +359,7 @@ public class DSLRuleProvider
         INode ruleNode = NodeModelUtils.findActualNodeFor(rule);
         boolean sharedContext = hasSharedContext(ruleNode);
         if (sharedContext) {
-            cfg.put("sharedContext", Boolean.TRUE);
+            cfg.put(Module.SHARED_CONTEXT, Boolean.TRUE);
         }
         List<Action> actions = List.of(ActionBuilder.create().withId("script").withTypeUID(ScriptActionHandler.TYPE_ID)
                 .withConfiguration(cfg).build());
@@ -369,8 +370,8 @@ public class DSLRuleProvider
         if (!source.endsWith("\n")) {
             source += '\n';
         }
-        ruleCfg.put("source", source); // TODO: (Nad) Key names etc.
-        ruleCfg.put("sourceType", MIMETYPE_OPENHAB_DSL_RULE);
+        ruleCfg.put(Rule.SOURCE, source);
+        ruleCfg.put(Rule.SOURCE_TYPE, MIMETYPE_OPENHAB_DSL_RULE);
         return RuleBuilder.create(uid).withTags(rule.getTags()).withName(name).withTriggers(triggers).withActions(actions).withConditions(conditions).withConfiguration(ruleCfg).build();
     }
 

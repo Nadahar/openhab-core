@@ -62,7 +62,7 @@ public class YamlModuleDTO {
                     // Remove the "context comment" inserted into file-based DSL rules
                     this.config.put("script", CONTEXT_COMMENT_PATTERN.matcher(scriptContent).replaceFirst(""));
                 }
-                this.config.remove("sharedContext");
+                this.config.remove(Module.SHARED_CONTEXT);
             }
         }
         if (option != RuleSerializationOption.INCLUDE_ALL && this.config.isEmpty()) {

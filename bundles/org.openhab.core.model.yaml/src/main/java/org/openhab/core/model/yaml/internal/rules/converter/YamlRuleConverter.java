@@ -23,6 +23,7 @@ import java.util.Set;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Action;
+import org.openhab.core.automation.Module;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.converter.RuleParser;
 import org.openhab.core.automation.converter.RuleSerializer;
@@ -73,7 +74,7 @@ public class YamlRuleConverter implements RuleSerializer, RuleParser {
             }
 
             for (Action action : rule.getActions()) {
-                if (action.getConfiguration().get("type") instanceof String type && "application/vnd.openhab.dsl.rule".equals(type) && action.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) {
+                if (action.getConfiguration().get("type") instanceof String type && "application/vnd.openhab.dsl.rule".equals(type) && action.getConfiguration().get(Module.SHARED_CONTEXT) instanceof Boolean shared && shared.booleanValue()) {
                     result.add(new SerializabilityResult<>(rule.getUID(), false, "Rule '" + rule.getUID() + "': action '" + action.getId() + "' has shared context."));
                     failed = true;
                     break;

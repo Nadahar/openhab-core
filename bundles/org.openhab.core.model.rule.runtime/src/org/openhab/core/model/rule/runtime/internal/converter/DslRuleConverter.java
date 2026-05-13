@@ -42,6 +42,7 @@ import org.eclipse.xtext.xbase.XVariableDeclaration;
 import org.eclipse.xtext.xbase.XbaseFactory;
 import org.openhab.core.automation.Action;
 import org.openhab.core.automation.Condition;
+import org.openhab.core.automation.Module;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.Trigger;
 import org.openhab.core.automation.Visibility;
@@ -161,7 +162,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
     }
 
     @Override
-    public String getGeneratedFormat() { //TODO: (Nad) UI: Erase source on rule duplication, and //context for DSL
+    public String getGeneratedFormat() {
         return "DSL";
     }
 
@@ -218,7 +219,7 @@ public class DslRuleConverter implements RuleSerializer, RuleParser {
                         if (!(action.getConfiguration().get("script") instanceof String)) {
                             errors.add("has no action script");
                         }
-                        if (action.getConfiguration().get("sharedContext") instanceof Boolean shared && shared.booleanValue()) {
+                        if (action.getConfiguration().get(Module.SHARED_CONTEXT) instanceof Boolean shared && shared.booleanValue()) {
                             errors.add("action '" + action.getId() + "' has shared context");
                         }
                     } else {

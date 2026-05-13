@@ -100,8 +100,8 @@ public class YamlRuleDTO implements ModularDTO<YamlRuleDTO, ObjectMapper, JsonNo
         if (option != RuleSerializationOption.STRIP_TEMPLATE) {
             this.config = new LinkedHashMap<>(rule.getConfiguration().getProperties());
             if (option != RuleSerializationOption.INCLUDE_ALL) {
-                this.config.remove("source"); // TODO: (Nad) Name, constant
-                this.config.remove("sourceType"); // TODO: (Nad) Name, constant
+                this.config.remove(Rule.SOURCE);
+                this.config.remove(Rule.SOURCE_TYPE);
                 if (this.config.isEmpty()) {
                     this.config = null;
                 }
