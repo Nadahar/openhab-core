@@ -28,6 +28,10 @@ import org.openhab.core.model.script.engine.action.ActionService;
 import org.openhab.core.scheduler.Scheduler;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.binding.ThingActions;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.FrameworkUtil;
+import org.osgi.framework.ServiceReference;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
@@ -42,6 +46,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Davy Vanherbergen - Initial contribution
  * @author Kai Kreuzer - renamed and removed interface
+ * @author Ravi Nadahar - added additional registries for retrieval
  */
 @Component(immediate = true, service = ScriptServiceUtil.class)
 public class ScriptServiceUtil {
@@ -102,6 +107,9 @@ public class ScriptServiceUtil {
         return instance;
     }
 
+    /**
+     * @return The {@link ItemRegistry}.
+     */
     public static ItemRegistry getItemRegistry() {
         return getInstance().itemRegistry;
     }
@@ -110,6 +118,9 @@ public class ScriptServiceUtil {
         return itemRegistry;
     }
 
+    /**
+     * @return The {@link ThingRegistry} instance.
+     */
     public static ThingRegistry getThingRegistry() {
         return getInstance().thingRegistry;
     }
@@ -118,10 +129,16 @@ public class ScriptServiceUtil {
         return thingRegistry;
     }
 
+    /**
+     * @return The {@link EventPublisher} instance.
+     */
     public static EventPublisher getEventPublisher() {
         return getInstance().eventPublisher;
     }
 
+    /**
+     * @return The {@link ModelRepository} instance.
+     */
     public static ModelRepository getModelRepository() {
         return getInstance().modelRepository;
     }
@@ -130,6 +147,9 @@ public class ScriptServiceUtil {
         return modelRepository;
     }
 
+    /**
+     * @return The {@link MetadataRegistry} instance.
+     */
     public static MetadataRegistry getMetadataRegistry() {
         return getInstance().metadataRegistry;
     }
@@ -138,6 +158,9 @@ public class ScriptServiceUtil {
         return metadataRegistry;
     }
 
+    /**
+     * @return The {@link RuleRegistry} instance.
+     */
     public static RuleRegistry getRuleRegistry() {
         return getInstance().ruleRegistry;
     }
@@ -146,6 +169,9 @@ public class ScriptServiceUtil {
         return ruleRegistry;
     }
 
+    /**
+     * @return The {@link RuleManager} / rule engine instance or {@code null} if it doesn't exist.
+     */
     public @Nullable static RuleManager getRuleManager() {
         return getInstance().ruleManager;
     }
@@ -154,6 +180,9 @@ public class ScriptServiceUtil {
         return ruleManager;
     }
 
+    /**
+     * @return The {@link Scheduler} instance.
+     */
     public static Scheduler getScheduler() {
         return getInstance().scheduler;
     }
@@ -166,12 +195,18 @@ public class ScriptServiceUtil {
         return getInstance().scriptEngine.get();
     }
 
+    /**
+     * @return A {@link List} of currently registered {@link ActionService} instances.
+     */
     public static List<ActionService> getActionServices() {
-        return getInstance().actionServices;
+        return List.copyOf(getInstance().actionServices);
     }
 
+    /**
+     * @return A {@link List} of currently registered {@link ThingActions} instances.
+     */
     public static List<ThingActions> getThingActions() {
-        return getInstance().thingActions;
+        return List.copyOf(getInstance().thingActions);
     }
 
     public List<ActionService> getActionServiceInstances() {
@@ -208,5 +243,39 @@ public class ScriptServiceUtil {
     public void unsetScriptEngine(ScriptEngine scriptEngine) {
         // uninjected as a callback from the script engine, not via DS as it is a circular dependency...
         this.scriptEngine.compareAndSet(scriptEngine, null);
+    }
+
+    /**
+     * Retrieve an OSGi instance of the specified {@link Class}, if it exists. The reference to the instance is
+     * <i>unreserved</i>, which means that the instance might stop being valid at any time, for example if the service
+     * or the containing bundle is stopped.
+     * <p>
+     * Returning an unreserved service isn't kosher in the world of OSGi, but the only alternative is that the scripts
+     * that retrieve the instance are responsible for unregistering the reservation after use. That isn't a reasonable
+     * thing to expect from user scripts. The chance that a service is stopped while OH is running is quite small, so
+     * on balance, returning an unreserved service instance seems like the best way to do it. It isn't much different
+     * from returning an instance to a registry that is reserved by {@link ScriptServiceUtil} - if the
+     * {@link ScriptServiceUtil} itself is stopped, the instance might become invalid while the script is using it.
+     *
+     * @param <T> the class type.
+     * @param clazz the class of the instance to get.
+     * @return The instance or {@code null} if the instance wasn't found.
+     */
+    public static @Nullable <T> T getInstance(Class<T> clazz) {
+        Bundle bundle = FrameworkUtil.getBundle(clazz);
+        if (bundle != null) {
+            BundleContext bc = bundle.getBundleContext();
+            if (bc != null) {
+                ServiceReference<T> ref = bc.getServiceReference(clazz);
+                if (ref != null) {
+                    T result = bc.getService(ref);
+                    if (result != null) {
+                        bc.ungetService(ref);
+                    }
+                    return result;
+                }
+            }
+        }
+        return null;
     }
 }

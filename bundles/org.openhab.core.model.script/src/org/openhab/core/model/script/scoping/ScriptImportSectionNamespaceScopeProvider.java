@@ -39,6 +39,10 @@ public class ScriptImportSectionNamespaceScopeProvider extends XImportSectionNam
     public static final QualifiedName TIME_PACKAGE = QualifiedName.create("java", "time");
     public static final QualifiedName CHRONOUNIT_CLASS = QualifiedName.create("java", "time", "temporal", "ChronoUnit");
     public static final QualifiedName QUANTITY_PACKAGE = QualifiedName.create("javax", "measure", "quantity");
+    public static final QualifiedName ITEMS_CLASS = QualifiedName.create("org", "openhab", "core", "model", "script",
+            "Items");
+    public static final QualifiedName RULES_CLASS = QualifiedName.create("org", "openhab", "core", "model", "script",
+            "Rules");
 
     @Override
     protected List<ImportNormalizer> getImplicitImports(boolean ignoreCase) {
@@ -53,6 +57,8 @@ public class ScriptImportSectionNamespaceScopeProvider extends XImportSectionNam
         implicitImports.add(doCreateImportNormalizer(TIME_PACKAGE, true, false));
         implicitImports.add(doCreateImportNormalizer(CHRONOUNIT_CLASS, false, false));
         implicitImports.add(doCreateImportNormalizer(QUANTITY_PACKAGE, true, false));
+        implicitImports.add(doCreateImportNormalizer(ITEMS_CLASS, false, false));
+        implicitImports.add(doCreateImportNormalizer(RULES_CLASS, false, false));
         return implicitImports;
     }
 }

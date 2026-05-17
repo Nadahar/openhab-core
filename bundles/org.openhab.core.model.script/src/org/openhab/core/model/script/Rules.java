@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.model.script.actions;
+package org.openhab.core.model.script;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -19,7 +19,6 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleManager;
-import org.openhab.core.model.script.ScriptServiceUtil;
 import org.openhab.core.model.script.engine.action.ActionDoc;
 
 /**

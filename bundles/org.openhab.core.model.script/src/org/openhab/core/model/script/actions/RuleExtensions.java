@@ -34,9 +34,8 @@ public class RuleExtensions {
     /**
      * Run the rule with the specified UID.
      *
-     * @param ruleUID the UID of the rule to run.
+     * @param rule the {@link Rule} to run.
      * @return A copy of the rule context, including possible return values.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static Map<String, Object> run(Rule rule) {
@@ -66,10 +65,9 @@ public class RuleExtensions {
     /**
      * Run the rule with the specified UID with the specified context.
      *
-     * @param ruleUID the UID of the rule to run.
+     * @param rule the {@link Rule} to run.
      * @param context the {@link Map} of {@link String} and {@link Object} pairs that constitutes the context.
      * @return A copy of the rule context, including possible return values.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static Map<String, Object> run(Rule rule, Map<String, Object> context) {
@@ -88,12 +86,11 @@ public class RuleExtensions {
      * Run the rule with the specified UID with the specified context, while optionally taking conditions into
      * account.
      *
-     * @param ruleUID the UID of the rule to run.
+     * @param rule the {@link Rule} to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
      * @param context the pairs of {@link String}s and {@link Object}s that constitutes the context. Must be in pairs,
      *            the first is the key, the second is the value.
      * @return A copy of the rule context, including possible return values.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static Map<String, Object> run(Rule rule, boolean considerConditions, Object... context) {
@@ -112,11 +109,10 @@ public class RuleExtensions {
      * Run the rule with the specified UID with the specified context, while optionally taking conditions into
      * account.
      *
-     * @param ruleUID the UID of the rule to run.
+     * @param rule the {@link Rule} to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
      * @param context the {@link Map} of {@link String} and {@link Object} pairs that constitutes the context.
      * @return A copy of the rule context, including possible return values.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static Map<String, Object> run(Rule rule, boolean considerConditions,
@@ -135,9 +131,8 @@ public class RuleExtensions {
     /**
      * Check whether the specified rule is enabled.
      *
-     * @param ruleUID the UID of the rule to check.
+     * @param rule the {@link Rule} to check.
      * @return {@code true} if the rule is enabled, {@code false} otherwise.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static boolean isEnabled(Rule rule) {
@@ -156,9 +151,8 @@ public class RuleExtensions {
     /**
      * Set whether the specified rule is enabled.
      *
-     * @param ruleUID the UID of the rule to enable or disable.
+     * @param rule the {@link Rule} to enable or disable.
      * @param enabled {@code true} to enable the rule, {@code false} to disable the rule.
-     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
     public static void setEnabled(Rule rule, boolean enabled) {

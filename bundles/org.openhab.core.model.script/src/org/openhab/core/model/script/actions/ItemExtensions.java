@@ -20,6 +20,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.items.Item;
 import org.openhab.core.items.Metadata;
+import org.openhab.core.model.script.Items;
 
 /**
  * {@link ItemExtensions} provides DSL access to things like OSGi instances, system registries and the ability to run
@@ -92,7 +93,7 @@ public class ItemExtensions {
         if (item == null) {
             throw new IllegalArgumentException("item cannot be null");
         }
-        return Items.updateMetadata(item.getName(), namespace, value);
+        return Items.updateMetadata(item.getName(), namespace, value, configuration);
     }
 
     private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {
