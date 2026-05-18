@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.model.script;
+package org.openhab.core.model.script.helper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -23,6 +23,7 @@ import org.openhab.core.items.Item;
 import org.openhab.core.items.Metadata;
 import org.openhab.core.items.MetadataKey;
 import org.openhab.core.items.MetadataProvider;
+import org.openhab.core.model.script.ScriptServiceUtil;
 
 /**
  * {@link Items} provides DSL access to things like OSGi instances, system registries and the ability to run other

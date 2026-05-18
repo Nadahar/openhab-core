@@ -33,15 +33,15 @@ import org.openhab.core.model.script.actions.BusEvent;
 import org.openhab.core.model.script.actions.CoreUtil;
 import org.openhab.core.model.script.actions.Exec;
 import org.openhab.core.model.script.actions.HTTP;
-import org.openhab.core.model.script.actions.ItemExtensions;
 import org.openhab.core.model.script.actions.Log;
 import org.openhab.core.model.script.actions.Ping;
-import org.openhab.core.model.script.actions.RuleExtensions;
 import org.openhab.core.model.script.actions.ScriptExecution;
 import org.openhab.core.model.script.actions.Transformation;
 import org.openhab.core.model.script.engine.IActionServiceProvider;
 import org.openhab.core.model.script.engine.IThingActionsProvider;
 import org.openhab.core.model.script.engine.action.ActionService;
+import org.openhab.core.model.script.helper.ItemExtensions;
+import org.openhab.core.model.script.helper.RuleExtensions;
 import org.openhab.core.model.script.lib.NumberExtensions;
 import org.openhab.core.thing.binding.ThingActions;
 

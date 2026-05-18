@@ -10,19 +10,13 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.model.script.actions;
+package org.openhab.core.model.script.helper;
 
 import java.time.ZonedDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
-import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.items.Item;
-import org.openhab.core.items.Metadata;
 import org.openhab.core.library.types.DecimalType;
-import org.openhab.core.model.script.Items;
 import org.openhab.core.persistence.HistoricItem;
 import org.openhab.core.persistence.ModifiablePersistenceService;
 import org.openhab.core.persistence.PersistenceService;
@@ -33,77 +27,23 @@ import org.openhab.core.types.State;
 import org.openhab.core.types.TimeSeries;
 
 /**
- * {@link ItemExtensions} provides DSL access to things like OSGi instances, system registries and the ability to run
+ * {@link ItemPersistence} provides DSL access to things like OSGi instances, system registries and the ability to run
  * other
  * rules.
  *
  * @author Ravi Nadahar - Initial contribution
  */
 @NonNullByDefault
-public class ItemExtensions {
+public class ItemPersistence { // TODO: (Nad) JavaDocs
+
+    private final Item item;
 
     @NonNullByDefault({})
-    public static void addMetadata(Item item, String namespace, String value) {
+    public ItemPersistence(Item item) {
         if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
+            throw new IllegalArgumentException("Item cannot be null");
         }
-        Items.addMetadata(item.getName(), namespace, value, (String) null);
-    }
-
-    @NonNullByDefault({})
-    public static void addMetadata(Item item, String namespace, String value, Object... configuration) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        Items.addMetadata(item.getName(), namespace, value, parseObjectArray(configuration));
-    }
-
-    @NonNullByDefault({})
-    public static void addMetadata(Item item, String namespace, String value,
-            @Nullable Map<@NonNull String, @NonNull Object> configuration) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        Items.addMetadata(item.getName(), namespace, value, configuration);
-    }
-
-    @NonNullByDefault({})
-    public static @Nullable Metadata getMetadata(Item item, String namespace) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        return Items.getMetadata(item.getName(), namespace);
-    }
-
-    @NonNullByDefault({})
-    public static @Nullable Metadata removeMetadata(Item item, String namespace) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        return Items.removeMetadata(item.getName(), namespace);
-    }
-
-    @NonNullByDefault({})
-    public static @Nullable Metadata updateMetadata(Item item, String namespace, String value) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        return Items.updateMetadata(item.getName(), namespace, value);
-    }
-
-    @NonNullByDefault({})
-    public static @Nullable Metadata updateMetadata(Item item, String namespace, String value,
-            Object... configuration) {
-        return Items.updateMetadata(item.getName(), namespace, value, parseObjectArray(configuration));
-    }
-
-    @NonNullByDefault({})
-    public static @Nullable Metadata updateMetadata(Item item, String namespace, String value,
-            @Nullable Map<@NonNull String, @NonNull Object> configuration) {
-        if (item == null) {
-            throw new IllegalArgumentException("item cannot be null");
-        }
-        return Items.updateMetadata(item.getName(), namespace, value, configuration);
+        this.item = item;
     }
 
     /**
@@ -118,7 +58,7 @@ public class ItemExtensions {
      *         states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}.
      */
-    public static @Nullable State averageBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State averageBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.averageBetween(item, begin, end);
     }
 
@@ -134,7 +74,7 @@ public class ItemExtensions {
      *         states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}.
      */
-    public static @Nullable State averageBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State averageBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type) {
         return PersistenceExtensions.averageBetween(item, begin, end, type);
     }
@@ -152,7 +92,7 @@ public class ItemExtensions {
      *         states could be found or if the persistence service given by <code>serviceId</code> does not
      *         refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable State averageBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State averageBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.averageBetween(item, begin, end, serviceId);
     }
@@ -170,7 +110,7 @@ public class ItemExtensions {
      *         states could be found or if the persistence service given by <code>serviceId</code> does not
      *         refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable State averageBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State averageBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type, @Nullable String serviceId) {
         return PersistenceExtensions.averageBetween(item, begin, end, type, serviceId);
     }
@@ -186,7 +126,7 @@ public class ItemExtensions {
      *         previous states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State averageSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State averageSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.averageSince(item, timestamp);
     }
 
@@ -201,7 +141,7 @@ public class ItemExtensions {
      *         previous states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State averageSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State averageSince(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.averageSince(item, timestamp, type);
     }
 
@@ -219,7 +159,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State averageSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State averageSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.averageSince(item, timestamp, serviceId);
     }
 
@@ -236,7 +176,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State averageSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State averageSince(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.averageSince(item, timestamp, type, serviceId);
     }
@@ -252,7 +192,7 @@ public class ItemExtensions {
      *         future states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State averageUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State averageUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.averageUntil(item, timestamp);
     }
 
@@ -267,7 +207,7 @@ public class ItemExtensions {
      *         future states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State averageUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State averageUntil(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.averageUntil(item, timestamp, type);
     }
 
@@ -284,7 +224,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State averageUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State averageUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.averageUntil(item, timestamp, serviceId);
     }
 
@@ -301,7 +241,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State averageUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State averageUntil(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.averageUntil(item, timestamp, type, serviceId);
     }
@@ -317,7 +257,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> for the given points in time
      */
-    public static @Nullable State deltaBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State deltaBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.deltaBetween(item, begin, end);
     }
 
@@ -333,7 +273,7 @@ public class ItemExtensions {
      *         available {@link QueryablePersistenceService}, or if there is no persisted state for the given
      *         <code>item</code> at the given points in time
      */
-    public static @Nullable State deltaBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State deltaBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.deltaBetween(item, begin, end, serviceId);
     }
@@ -349,7 +289,7 @@ public class ItemExtensions {
      *         there is no persisted state for the given <code>item</code> at the given <code>timestamp</code> available
      *         in the default persistence service
      */
-    public static @Nullable State deltaSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State deltaSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.deltaSince(item, timestamp);
     }
 
@@ -365,7 +305,7 @@ public class ItemExtensions {
      *         <code>item</code> at the given <code>timestamp</code> using the persistence service named
      *         <code>serviceId</code>
      */
-    public static @Nullable State deltaSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State deltaSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.deltaSince(item, timestamp, serviceId);
     }
 
@@ -380,7 +320,7 @@ public class ItemExtensions {
      *         there is no persisted state for the given <code>item</code> at the given <code>timestamp</code> available
      *         in the default persistence service
      */
-    public static @Nullable State deltaUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State deltaUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.deltaUntil(item, timestamp);
     }
 
@@ -396,7 +336,7 @@ public class ItemExtensions {
      *         <code>item</code> at the given <code>timestamp</code> using the persistence service named
      *         <code>serviceId</code>
      */
-    public static @Nullable State deltaUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State deltaUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.deltaUntil(item, timestamp, serviceId);
     }
 
@@ -416,7 +356,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State deviationBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State deviationBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.deviationBetween(item, begin, end);
     }
 
@@ -436,7 +376,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State deviationBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State deviationBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type) {
         return PersistenceExtensions.deviationBetween(item, begin, end, type);
     }
@@ -459,7 +399,7 @@ public class ItemExtensions {
      *         a {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State deviationBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State deviationBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.deviationBetween(item, begin, end, serviceId);
     }
@@ -482,7 +422,7 @@ public class ItemExtensions {
      *         a {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State deviationBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State deviationBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type, @Nullable String serviceId) {
         return PersistenceExtensions.deviationBetween(item, begin, end, type, serviceId);
     }
@@ -502,7 +442,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State deviationSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.deviationSince(item, timestamp);
     }
 
@@ -521,7 +461,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State deviationSince(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.deviationSince(item, timestamp, type);
     }
 
@@ -541,7 +481,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State deviationSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.deviationSince(item, timestamp, serviceId);
     }
 
@@ -561,7 +501,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State deviationSince(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.deviationSince(item, timestamp, type, serviceId);
     }
@@ -581,7 +521,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State deviationUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.deviationUntil(item, timestamp);
     }
 
@@ -600,7 +540,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State deviationUntil(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.deviationUntil(item, timestamp, type);
     }
 
@@ -620,7 +560,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State deviationUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.deviationUntil(item, timestamp, serviceId);
     }
 
@@ -640,7 +580,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State deviationUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State deviationUntil(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.deviationUntil(item, timestamp, type, serviceId);
     }
@@ -656,7 +596,7 @@ public class ItemExtensions {
      *         states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}.
      */
-    public static @Nullable State medianBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State medianBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.medianBetween(item, begin, end);
     }
 
@@ -672,7 +612,7 @@ public class ItemExtensions {
      *         states could be found or if the persistence service given by <code>serviceId</code> does not
      *         refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable State medianBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State medianBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.medianBetween(item, begin, end, serviceId);
     }
@@ -687,7 +627,7 @@ public class ItemExtensions {
      *         previous states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State medianSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State medianSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.medianSince(item, timestamp);
     }
 
@@ -703,7 +643,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State medianSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State medianSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.medianSince(item, timestamp, serviceId);
     }
 
@@ -717,7 +657,7 @@ public class ItemExtensions {
      *         future states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State medianUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State medianUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.medianUntil(item, timestamp);
     }
 
@@ -733,7 +673,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State medianUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State medianUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.medianUntil(item, timestamp, serviceId);
     }
 
@@ -752,7 +692,7 @@ public class ItemExtensions {
      *         states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}.
      */
-    public static @Nullable State riemannSumBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State riemannSumBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.riemannSumBetween(item, begin, end);
     }
 
@@ -771,7 +711,7 @@ public class ItemExtensions {
      *         states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}.
      */
-    public static @Nullable State riemannSumBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State riemannSumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type) {
         return PersistenceExtensions.riemannSumBetween(item, begin, end, type);
     }
@@ -792,7 +732,7 @@ public class ItemExtensions {
      *         states could be found or if the persistence service given by <code>serviceId</code> does not
      *         refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable State riemannSumBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State riemannSumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumBetween(item, begin, end, serviceId);
     }
@@ -813,7 +753,7 @@ public class ItemExtensions {
      *         states could be found or if the persistence service given by <code>serviceId</code> does not
      *         refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable State riemannSumBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State riemannSumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type, @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumBetween(item, begin, end, type, serviceId);
     }
@@ -832,7 +772,7 @@ public class ItemExtensions {
      *         previous states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State riemannSumSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State riemannSumSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.riemannSumSince(item, timestamp);
     }
 
@@ -850,7 +790,7 @@ public class ItemExtensions {
      *         previous states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State riemannSumSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State riemannSumSince(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.riemannSumSince(item, timestamp, type);
     }
 
@@ -870,7 +810,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State riemannSumSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State riemannSumSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumSince(item, timestamp, serviceId);
     }
 
@@ -890,7 +830,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State riemannSumSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State riemannSumSince(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumSince(item, timestamp, type, serviceId);
     }
@@ -909,7 +849,7 @@ public class ItemExtensions {
      *         future states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State riemannSumUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State riemannSumUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.riemannSumUntil(item, timestamp);
     }
 
@@ -927,7 +867,7 @@ public class ItemExtensions {
      *         future states could be found or if the default persistence service does not refer to an available
      *         {@link QueryablePersistenceService}. The current state is included in the calculation.
      */
-    public static @Nullable State riemannSumUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State riemannSumUntil(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.riemannSumUntil(item, timestamp, type);
     }
 
@@ -947,7 +887,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State riemannSumUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State riemannSumUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumUntil(item, timestamp, serviceId);
     }
 
@@ -967,7 +907,7 @@ public class ItemExtensions {
      *         refer to an available {@link QueryablePersistenceService}. The current state is included in the
      *         calculation.
      */
-    public static @Nullable State riemannSumUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State riemannSumUntil(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.riemannSumUntil(item, timestamp, type, serviceId);
     }
@@ -986,7 +926,7 @@ public class ItemExtensions {
      *         <code>end</code> or if the default persistence service does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State sumBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.sumBetween(item, begin, end);
     }
 
@@ -1004,7 +944,7 @@ public class ItemExtensions {
      * @return the sum of the state values between the given points in time, or null if <code>begin</code> is after
      *         <code>end</code> or <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State sumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.sumBetween(item, begin, end, serviceId);
     }
@@ -1020,7 +960,7 @@ public class ItemExtensions {
      * @return the sum of the state values since <code>timestamp</code>, or null if <code>timestamp</code> is in the
      *         future or the default persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State sumSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.sumSince(item, timestamp);
     }
 
@@ -1036,7 +976,7 @@ public class ItemExtensions {
      * @return the sum of the state values since <code>timestamp</code>, or null if <code>timestamp</code> is in the
      *         future or <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State sumSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.sumSince(item, timestamp, serviceId);
     }
 
@@ -1051,7 +991,7 @@ public class ItemExtensions {
      * @return the sum of the state values until <code>timestamp</code>, or null if <code>timestamp</code> is in the
      *         past or the default persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State sumUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.sumUntil(item, timestamp);
     }
 
@@ -1067,7 +1007,7 @@ public class ItemExtensions {
      * @return the sum of the state values until <code>timestamp</code>, or null if <code>timestamp</code> is in the
      *         past or <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public @Nullable static State sumUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State sumUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.sumUntil(item, timestamp, serviceId);
     }
 
@@ -1084,7 +1024,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State varianceBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable State varianceBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.varianceBetween(item, begin, end);
     }
 
@@ -1101,7 +1041,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State varianceBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State varianceBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type) {
         return PersistenceExtensions.varianceBetween(item, begin, end, type);
     }
@@ -1121,7 +1061,7 @@ public class ItemExtensions {
      *         a {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State varianceBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State varianceBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.varianceBetween(item, begin, end, serviceId);
     }
@@ -1141,7 +1081,7 @@ public class ItemExtensions {
      *         a {@link QueryablePersistenceService}, or if there is no persisted state for the
      *         given <code>item</code> between <code>begin</code> and <code>end</code>
      */
-    public static @Nullable State varianceBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable State varianceBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable RiemannType type, @Nullable String serviceId) {
         return PersistenceExtensions.varianceBetween(item, begin, end, type, serviceId);
     }
@@ -1157,7 +1097,7 @@ public class ItemExtensions {
      *         there is no default persistence service available, or it is not a {@link QueryablePersistenceService}, or
      *         if there is no persisted state for the given <code>item</code> at the given <code>timestamp</code>
      */
-    public static @Nullable State varianceSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable State varianceSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.varianceSince(item, timestamp);
     }
 
@@ -1172,7 +1112,7 @@ public class ItemExtensions {
      *         there is no default persistence service available, or it is not a {@link QueryablePersistenceService}, or
      *         if there is no persisted state for the given <code>item</code> at the given <code>timestamp</code>
      */
-    public static @Nullable State varianceSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State varianceSince(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.varianceSince(item, timestamp, type);
     }
 
@@ -1189,7 +1129,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State varianceSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State varianceSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.varianceSince(item, timestamp, serviceId);
     }
 
@@ -1206,7 +1146,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State varianceSince(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State varianceSince(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.varianceSince(item, timestamp, type, serviceId);
     }
@@ -1222,7 +1162,7 @@ public class ItemExtensions {
      *         there is no default persistence service available, or it is not a {@link QueryablePersistenceService}, or
      *         if there is no persisted state for the given <code>item</code> at the given <code>timestamp</code>
      */
-    public static @Nullable State varianceUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable State varianceUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.varianceUntil(item, timestamp);
     }
 
@@ -1237,7 +1177,7 @@ public class ItemExtensions {
      *         there is no default persistence service available, or it is not a {@link QueryablePersistenceService}, or
      *         if there is no persisted state for the given <code>item</code> at the given <code>timestamp</code>
      */
-    public static @Nullable State varianceUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type) {
+    public @Nullable State varianceUntil(ZonedDateTime timestamp, @Nullable RiemannType type) {
         return PersistenceExtensions.varianceUntil(item, timestamp, type);
     }
 
@@ -1254,7 +1194,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State varianceUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable State varianceUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.varianceUntil(item, timestamp, serviceId);
     }
 
@@ -1271,7 +1211,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}, or if there is no persisted state for the given <code>item</code> at
      *         the given <code>timestamp</code>
      */
-    public static @Nullable State varianceUntil(Item item, ZonedDateTime timestamp, @Nullable RiemannType type,
+    public @Nullable State varianceUntil(ZonedDateTime timestamp, @Nullable RiemannType type,
             @Nullable String serviceId) {
         return PersistenceExtensions.varianceUntil(item, timestamp, type, serviceId);
     }
@@ -1289,7 +1229,7 @@ public class ItemExtensions {
      *         at the given interval, or if there is a state but it is zero (which would cause a
      *         divide-by-zero error)
      */
-    public static @Nullable DecimalType evolutionRateBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable DecimalType evolutionRateBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.evolutionRateBetween(item, begin, end);
     }
 
@@ -1308,7 +1248,7 @@ public class ItemExtensions {
      *         given by <code>serviceId</code>, or if there is a state but it is zero (which would cause a
      *         divide-by-zero error)
      */
-    public static @Nullable DecimalType evolutionRateBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable DecimalType evolutionRateBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.evolutionRateBetween(item, begin, end, serviceId);
     }
@@ -1325,7 +1265,7 @@ public class ItemExtensions {
      *         the given <code>timestamp</code>, or if there is a state but it is zero (which would cause a
      *         divide-by-zero error)
      */
-    public static @Nullable DecimalType evolutionRateSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable DecimalType evolutionRateSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.evolutionRateSince(item, timestamp);
     }
 
@@ -1343,7 +1283,7 @@ public class ItemExtensions {
      *         <code>serviceId</code>, or if there is a state but it is zero (which would cause a divide-by-zero
      *         error)
      */
-    public static @Nullable DecimalType evolutionRateSince(Item item, ZonedDateTime timestamp,
+    public @Nullable DecimalType evolutionRateSince(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.evolutionRateSince(item, timestamp, serviceId);
     }
@@ -1360,7 +1300,7 @@ public class ItemExtensions {
      *         the given <code>timestamp</code>, or if there is a state but it is zero (which would cause a
      *         divide-by-zero error)
      */
-    public static @Nullable DecimalType evolutionRateUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable DecimalType evolutionRateUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.evolutionRateUntil(item, timestamp);
     }
 
@@ -1378,7 +1318,7 @@ public class ItemExtensions {
      *         <code>serviceId</code>, or if there is a state but it is zero (which would cause a divide-by-zero
      *         error)
      */
-    public static @Nullable DecimalType evolutionRateUntil(Item item, ZonedDateTime timestamp,
+    public @Nullable DecimalType evolutionRateUntil(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.evolutionRateUntil(item, timestamp, serviceId);
     }
@@ -1388,7 +1328,7 @@ public class ItemExtensions {
      *
      * @param item the item to store
      */
-    public static void persist(Item item) {
+    public void persist() {
         PersistenceExtensions.persist(item);
     }
 
@@ -1399,7 +1339,7 @@ public class ItemExtensions {
      * @param item the item to store
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void persist(Item item, @Nullable String serviceId) {
+    public void persist(@Nullable String serviceId) {
         PersistenceExtensions.persist(item, serviceId);
     }
 
@@ -1411,7 +1351,7 @@ public class ItemExtensions {
      * @param timestamp the date for the item state to be stored
      * @param state the state to be stored
      */
-    public static void persist(Item item, ZonedDateTime timestamp, State state) {
+    public void persist(ZonedDateTime timestamp, State state) {
         PersistenceExtensions.persist(item, timestamp, state);
     }
 
@@ -1424,7 +1364,7 @@ public class ItemExtensions {
      * @param state the state to be stored
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void persist(Item item, ZonedDateTime timestamp, State state, @Nullable String serviceId) {
+    public void persist(ZonedDateTime timestamp, State state, @Nullable String serviceId) {
         PersistenceExtensions.persist(item, timestamp, state, serviceId);
     }
 
@@ -1436,7 +1376,7 @@ public class ItemExtensions {
      * @param timestamp the date for the item state to be stored
      * @param stateString the state to be stored
      */
-    public static void persist(Item item, ZonedDateTime timestamp, String stateString) {
+    public void persist(ZonedDateTime timestamp, String stateString) {
         PersistenceExtensions.persist(item, timestamp, stateString);
     }
 
@@ -1449,7 +1389,7 @@ public class ItemExtensions {
      * @param stateString the state to be stored
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void persist(Item item, ZonedDateTime timestamp, String stateString, @Nullable String serviceId) {
+    public void persist(ZonedDateTime timestamp, String stateString, @Nullable String serviceId) {
         PersistenceExtensions.persist(item, timestamp, stateString, serviceId);
     }
 
@@ -1459,7 +1399,7 @@ public class ItemExtensions {
      * @param item the item to store
      * @param timeSeries the timeSeries of states to be stored
      */
-    public static void persist(Item item, TimeSeries timeSeries) {
+    public void persist(TimeSeries timeSeries) {
         PersistenceExtensions.persist(item, timeSeries);
     }
 
@@ -1471,7 +1411,7 @@ public class ItemExtensions {
      * @param timeSeries the timeSeries of states to be stored
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void persist(Item item, TimeSeries timeSeries, @Nullable String serviceId) {
+    public void persist(TimeSeries timeSeries, @Nullable String serviceId) {
         PersistenceExtensions.persist(item, timeSeries, serviceId);
     }
 
@@ -1485,7 +1425,7 @@ public class ItemExtensions {
      *         the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem persistedState(Item item, ZonedDateTime timestamp) {
+    public @Nullable HistoricItem persistedState(ZonedDateTime timestamp) {
         return PersistenceExtensions.persistedState(item, timestamp);
     }
 
@@ -1500,7 +1440,7 @@ public class ItemExtensions {
      *         or if the provided <code>serviceId</code> does not refer to an available
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem persistedState(Item item, ZonedDateTime timestamp,
+    public @Nullable HistoricItem persistedState(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.persistedState(item, timestamp, serviceId);
     }
@@ -1514,7 +1454,7 @@ public class ItemExtensions {
      *         historic persisted updates, the state has changed since the last update or the default persistence
      *         service is not available or not a {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime lastUpdate(Item item) {
+    public @Nullable ZonedDateTime lastUpdate() {
         return PersistenceExtensions.lastUpdate(item);
     }
 
@@ -1528,7 +1468,7 @@ public class ItemExtensions {
      *         historic persisted updates, the state has changed since the last update or if persistence service given
      *         by <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime lastUpdate(Item item, @Nullable String serviceId) {
+    public @Nullable ZonedDateTime lastUpdate(@Nullable String serviceId) {
         return PersistenceExtensions.lastUpdate(item, serviceId);
     }
 
@@ -1540,7 +1480,7 @@ public class ItemExtensions {
      *         future persisted updates or the default persistence service is not available or not a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime nextUpdate(Item item) {
+    public @Nullable ZonedDateTime nextUpdate() {
         return PersistenceExtensions.nextUpdate(item);
     }
 
@@ -1553,7 +1493,7 @@ public class ItemExtensions {
      *         future persisted updates or if persistence service given by <code>serviceId</code> does not refer to an
      *         available {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime nextUpdate(Item item, @Nullable String serviceId) {
+    public @Nullable ZonedDateTime nextUpdate(@Nullable String serviceId) {
         return PersistenceExtensions.nextUpdate(item, serviceId);
     }
 
@@ -1566,7 +1506,7 @@ public class ItemExtensions {
      *         historic persisted changes, the state has changed since the last update or the default persistence
      *         service is not available or not a {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime lastChange(Item item) {
+    public @Nullable ZonedDateTime lastChange() {
         return PersistenceExtensions.lastChange(item);
     }
 
@@ -1580,7 +1520,7 @@ public class ItemExtensions {
      *         historic persisted changes, the state has changed since the last update or if persistence service given
      *         by <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime lastChange(Item item, @Nullable String serviceId) {
+    public @Nullable ZonedDateTime lastChange(@Nullable String serviceId) {
         return PersistenceExtensions.lastChange(item, serviceId);
     }
 
@@ -1592,7 +1532,7 @@ public class ItemExtensions {
      *         future persisted changes or the default persistence service is not available or not a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime nextChange(Item item) {
+    public @Nullable ZonedDateTime nextChange() {
         return PersistenceExtensions.nextChange(item);
     }
 
@@ -1605,7 +1545,7 @@ public class ItemExtensions {
      *         future persisted changes or if persistence service given by <code>serviceId</code> does not refer to an
      *         available {@link QueryablePersistenceService}
      */
-    public static @Nullable ZonedDateTime nextChange(Item item, @Nullable String serviceId) {
+    public @Nullable ZonedDateTime nextChange(@Nullable String serviceId) {
         return PersistenceExtensions.nextChange(item, serviceId);
     }
 
@@ -1617,7 +1557,7 @@ public class ItemExtensions {
      * @return the previous state or <code>null</code> if no previous state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem previousState(Item item) {
+    public @Nullable HistoricItem previousState() {
         return PersistenceExtensions.previousState(item);
     }
 
@@ -1630,7 +1570,7 @@ public class ItemExtensions {
      * @return the previous state or <code>null</code> if no previous state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem previousState(Item item, boolean skipEqual) {
+    public @Nullable HistoricItem previousState(boolean skipEqual) {
         return PersistenceExtensions.previousState(item, skipEqual);
     }
 
@@ -1644,7 +1584,7 @@ public class ItemExtensions {
      * @return the previous state or <code>null</code> if no previous state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem previousState(Item item, @Nullable String serviceId) {
+    public @Nullable HistoricItem previousState(@Nullable String serviceId) {
         return PersistenceExtensions.previousState(item, serviceId);
     }
 
@@ -1660,7 +1600,7 @@ public class ItemExtensions {
      * @return the previous state or <code>null</code> if no previous state could be found, or if the given
      *         <code>serviceId</code> is not available or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem previousState(Item item, boolean skipEqual, @Nullable String serviceId) {
+    public @Nullable HistoricItem previousState(boolean skipEqual, @Nullable String serviceId) {
         return PersistenceExtensions.previousState(item, skipEqual, serviceId);
     }
 
@@ -1671,7 +1611,7 @@ public class ItemExtensions {
      * @return the next state or <code>null</code> if no next state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem nextState(Item item) {
+    public @Nullable HistoricItem nextState() {
         return PersistenceExtensions.nextState(item);
     }
 
@@ -1683,7 +1623,7 @@ public class ItemExtensions {
      * @return the next state or <code>null</code> if no next state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem nextState(Item item, boolean skipEqual) {
+    public @Nullable HistoricItem nextState(boolean skipEqual) {
         return PersistenceExtensions.nextState(item, skipEqual);
     }
 
@@ -1696,7 +1636,7 @@ public class ItemExtensions {
      * @return the next state or <code>null</code> if no next state could be found, or if the default
      *         persistence service is not configured or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem nextState(Item item, @Nullable String serviceId) {
+    public @Nullable HistoricItem nextState(@Nullable String serviceId) {
         return PersistenceExtensions.nextState(item, serviceId);
     }
 
@@ -1711,7 +1651,7 @@ public class ItemExtensions {
      * @return the next state or <code>null</code> if no next state could be found, or if the given
      *         <code>serviceId</code> is not available or does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem nextState(Item item, boolean skipEqual, @Nullable String serviceId) {
+    public @Nullable HistoricItem nextState(boolean skipEqual, @Nullable String serviceId) {
         return PersistenceExtensions.nextState(item, skipEqual, serviceId);
     }
 
@@ -1725,7 +1665,7 @@ public class ItemExtensions {
      *         persistence does not refer to a {@link QueryablePersistenceService}, or <code>null</code> if the default
      *         persistence service is not available
      */
-    public static @Nullable Boolean changedBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable Boolean changedBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.changedBetween(item, begin, end);
     }
 
@@ -1741,7 +1681,7 @@ public class ItemExtensions {
      *         in the given interval, <code>null</code> if <code>begin</code> is after <code>end</code>, if the given
      *         <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean changedBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable Boolean changedBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.changedBetween(item, begin, end, serviceId);
     }
@@ -1756,7 +1696,7 @@ public class ItemExtensions {
      *         if <code>timestamp</code> is in the future, if the default persistence service is not available or does
      *         not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean changedSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable Boolean changedSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.changedSince(item, timestamp);
     }
 
@@ -1771,7 +1711,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>timestamp</code> is in the future, if the provided <code>serviceId</code> does
      *         not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean changedSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable Boolean changedSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.changedSince(item, timestamp, serviceId);
     }
 
@@ -1785,7 +1725,7 @@ public class ItemExtensions {
      *         if <code>timestamp></code> is in the past, if the default persistence service is not available or does
      *         not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean changedUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable Boolean changedUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.changedUntil(item, timestamp);
     }
 
@@ -1800,7 +1740,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>timestamp</code> is in the past, if the provided <code>serviceId</code> does
      *         not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean changedUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable Boolean changedUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.changedUntil(item, timestamp, serviceId);
     }
 
@@ -1816,7 +1756,7 @@ public class ItemExtensions {
      *         persistence does not refer to a {@link QueryablePersistenceService}, or <code>null</code> if the default
      *         persistence service is not available
      */
-    public static @Nullable Boolean updatedBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable Boolean updatedBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.updatedBetween(item, begin, end);
     }
 
@@ -1832,7 +1772,7 @@ public class ItemExtensions {
      *         in the given interval, <code>null</code> if <code>begin</code> is after <code>end</code>, if the given
      *         <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean updatedBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable Boolean updatedBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.updatedBetween(item, begin, end, serviceId);
     }
@@ -1848,7 +1788,7 @@ public class ItemExtensions {
      *         persistence does not refer to a {@link QueryablePersistenceService}, or <code>null</code> if the default
      *         persistence service is not available
      */
-    public static @Nullable Boolean updatedSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable Boolean updatedSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.updatedSince(item, timestamp);
     }
 
@@ -1863,7 +1803,7 @@ public class ItemExtensions {
      *         since <code>timestamp</code>, <code>null</code> if <code>timestamp</code> is in the future, if the given
      *         <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean updatedSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable Boolean updatedSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.updatedSince(item, timestamp, serviceId);
     }
 
@@ -1878,7 +1818,7 @@ public class ItemExtensions {
      *         persistence does not refer to a {@link QueryablePersistenceService}, or <code>null</code> if the default
      *         persistence service is not available
      */
-    public static @Nullable Boolean updatedUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable Boolean updatedUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.updatedUntil(item, timestamp);
     }
 
@@ -1893,7 +1833,7 @@ public class ItemExtensions {
      *         since <code>timestamp</code>, <code>null</code> if <code>timestamp</code> is in the past, if the given
      *         <code>serviceId</code> does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable Boolean updatedUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable Boolean updatedUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.updatedUntil(item, timestamp, serviceId);
     }
 
@@ -1909,7 +1849,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>begin</code> is after <code>end</end> or if the default persistence service
      *         does not refer to an available{@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumBetween(final Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable HistoricItem maximumBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.maximumBetween(item, begin, end);
     }
 
@@ -1926,7 +1866,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>begin</code> is after <code>end</end> or if the given <code>serviceId</code>
      *         does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumBetween(final Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable HistoricItem maximumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.maximumBetween(item, begin, end, serviceId);
     }
@@ -1942,7 +1882,7 @@ public class ItemExtensions {
      *         maximum value, <code>null</code> if <code>timestamp</code> is in the future or if the default
      *         persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable HistoricItem maximumSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.maximumSince(item, timestamp);
     }
 
@@ -1958,7 +1898,7 @@ public class ItemExtensions {
      *         maximum value, <code>null</code> if <code>timestamp</code> is in the future or if the given
      *         <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumSince(final Item item, ZonedDateTime timestamp,
+    public @Nullable HistoricItem maximumSince(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.maximumSince(item, timestamp, serviceId);
     }
@@ -1974,7 +1914,7 @@ public class ItemExtensions {
      *         maximum value, <code>null</code> if <code>timestamp</code> is in the past or if the default
      *         persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable HistoricItem maximumUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.maximumUntil(item, timestamp);
     }
 
@@ -1990,7 +1930,7 @@ public class ItemExtensions {
      *         maximum value, <code>null</code> if <code>timestamp</code> is in the past or if the given
      *         <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem maximumUntil(final Item item, ZonedDateTime timestamp,
+    public @Nullable HistoricItem maximumUntil(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.maximumUntil(item, timestamp, serviceId);
     }
@@ -2007,7 +1947,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>begin</code> is after <code>end</end> or if the default persistence service
      *         does not refer to an available{@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumBetween(final Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable HistoricItem minimumBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.minimumBetween(item, begin, end);
     }
 
@@ -2024,7 +1964,7 @@ public class ItemExtensions {
      *         <code>null</code> if <code>begin</code> is after <code>end</end> or if the given <code>serviceId</code>
      *         does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumBetween(final Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable HistoricItem minimumBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.minimumBetween(item, begin, end, serviceId);
     }
@@ -2040,7 +1980,7 @@ public class ItemExtensions {
      *         minimum value, <code>null</code> if <code>timestamp</code> is in the future or if the default
      *         persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable HistoricItem minimumSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.minimumSince(item, timestamp);
     }
 
@@ -2056,7 +1996,7 @@ public class ItemExtensions {
      *         minimum value, <code>null</code> if <code>timestamp</code> is in the future or if the given
      *         <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumSince(final Item item, ZonedDateTime timestamp,
+    public @Nullable HistoricItem minimumSince(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.minimumSince(item, timestamp, serviceId);
     }
@@ -2072,7 +2012,7 @@ public class ItemExtensions {
      *         minimum value, <code>null</code> if <code>timestamp</code> is in the past or if the default
      *         persistence service does not refer to a {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable HistoricItem minimumUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.minimumUntil(item, timestamp);
     }
 
@@ -2088,7 +2028,7 @@ public class ItemExtensions {
      *         minimum value, <code>null</code> if <code>timestamp</code> is in the past or if the given
      *         <code>serviceId</code> does not refer to an available {@link QueryablePersistenceService}
      */
-    public static @Nullable HistoricItem minimumUntil(final Item item, ZonedDateTime timestamp,
+    public @Nullable HistoricItem minimumUntil(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.minimumUntil(item, timestamp, serviceId);
     }
@@ -2104,7 +2044,7 @@ public class ItemExtensions {
      *         <code>end</code>, if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable Long countBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.countBetween(item, begin, end);
     }
 
@@ -2120,7 +2060,7 @@ public class ItemExtensions {
      *         <code>end</code>, if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable Long countBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.countBetween(item, begin, end, serviceId);
     }
@@ -2135,7 +2075,7 @@ public class ItemExtensions {
      *         future, if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable Long countSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.countSince(item, timestamp);
     }
 
@@ -2150,7 +2090,7 @@ public class ItemExtensions {
      *         future, if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countSince(Item item, ZonedDateTime begin, @Nullable String serviceId) {
+    public @Nullable Long countSince(ZonedDateTime begin, @Nullable String serviceId) {
         return PersistenceExtensions.countSince(item, begin, serviceId);
     }
 
@@ -2164,7 +2104,7 @@ public class ItemExtensions {
      *         past, if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable Long countUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.countUntil(item, timestamp);
     }
 
@@ -2179,7 +2119,7 @@ public class ItemExtensions {
      *         past, if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public @Nullable Long countUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         return PersistenceExtensions.countUntil(item, timestamp, serviceId);
     }
 
@@ -2194,7 +2134,7 @@ public class ItemExtensions {
      *         if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public @Nullable Long countStateChangesBetween(ZonedDateTime begin, ZonedDateTime end) {
         return PersistenceExtensions.countStateChangesBetween(item, begin, end);
     }
 
@@ -2210,7 +2150,7 @@ public class ItemExtensions {
      *         if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public @Nullable Long countStateChangesBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         return PersistenceExtensions.countStateChangesBetween(item, begin, end, serviceId);
     }
@@ -2225,7 +2165,7 @@ public class ItemExtensions {
      *         if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable Long countStateChangesSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.countStateChangesSince(item, timestamp);
     }
 
@@ -2240,7 +2180,7 @@ public class ItemExtensions {
      *         if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesSince(Item item, ZonedDateTime timestamp,
+    public @Nullable Long countStateChangesSince(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.countStateChangesSince(item, timestamp, serviceId);
     }
@@ -2255,7 +2195,7 @@ public class ItemExtensions {
      *         if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable Long countStateChangesUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.countStateChangesUntil(item, timestamp);
     }
 
@@ -2270,7 +2210,7 @@ public class ItemExtensions {
      *         if the persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Long countStateChangesUntil(Item item, ZonedDateTime timestamp,
+    public @Nullable Long countStateChangesUntil(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.countStateChangesUntil(item, timestamp, serviceId);
     }
@@ -2286,7 +2226,7 @@ public class ItemExtensions {
      *         if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesBetween(Item item, ZonedDateTime begin,
+    public @Nullable Iterable<HistoricItem> getAllStatesBetween(ZonedDateTime begin,
             ZonedDateTime end) {
         return PersistenceExtensions.getAllStatesBetween(item, begin, end);
     }
@@ -2303,7 +2243,7 @@ public class ItemExtensions {
      *         if the provided <code>serviceId</code> does not refer to an available
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesBetween(Item item, ZonedDateTime begin,
+    public @Nullable Iterable<HistoricItem> getAllStatesBetween(ZonedDateTime begin,
             ZonedDateTime end, @Nullable String serviceId) {
         return PersistenceExtensions.getAllStatesBetween(item, begin, end, serviceId);
     }
@@ -2319,7 +2259,7 @@ public class ItemExtensions {
      *         {@link QueryablePersistenceService}
      *
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesSince(Item item, ZonedDateTime timestamp) {
+    public @Nullable Iterable<HistoricItem> getAllStatesSince(ZonedDateTime timestamp) {
         return PersistenceExtensions.getAllStatesSince(item, timestamp);
     }
 
@@ -2334,7 +2274,7 @@ public class ItemExtensions {
      *         if the provided <code>serviceId</code> does not refer to an available
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesSince(Item item, ZonedDateTime timestamp,
+    public @Nullable Iterable<HistoricItem> getAllStatesSince(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.getAllStatesSince(item, timestamp, serviceId);
     }
@@ -2349,7 +2289,7 @@ public class ItemExtensions {
      *         if the default persistence service is not available or does not refer to a
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesUntil(Item item, ZonedDateTime timestamp) {
+    public @Nullable Iterable<HistoricItem> getAllStatesUntil(ZonedDateTime timestamp) {
         return PersistenceExtensions.getAllStatesUntil(item, timestamp);
     }
 
@@ -2364,7 +2304,7 @@ public class ItemExtensions {
      *         if the provided <code>serviceId</code> does not refer to an available
      *         {@link QueryablePersistenceService}
      */
-    public static @Nullable Iterable<HistoricItem> getAllStatesUntil(Item item, ZonedDateTime timestamp,
+    public @Nullable Iterable<HistoricItem> getAllStatesUntil(ZonedDateTime timestamp,
             @Nullable String serviceId) {
         return PersistenceExtensions.getAllStatesUntil(item, timestamp, serviceId);
     }
@@ -2378,7 +2318,7 @@ public class ItemExtensions {
      * @param begin the point in time from which to remove the states
      * @param end the point in time to which to remove the states
      */
-    public static void removeAllStatesBetween(Item item, ZonedDateTime begin, ZonedDateTime end) {
+    public void removeAllStatesBetween(ZonedDateTime begin, ZonedDateTime end) {
         PersistenceExtensions.removeAllStatesBetween(item, begin, end);
     }
 
@@ -2392,7 +2332,7 @@ public class ItemExtensions {
      * @param end the point in time to which to remove the states
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void removeAllStatesBetween(Item item, ZonedDateTime begin, ZonedDateTime end,
+    public void removeAllStatesBetween(ZonedDateTime begin, ZonedDateTime end,
             @Nullable String serviceId) {
         PersistenceExtensions.removeAllStatesBetween(item, begin, end, serviceId);
     }
@@ -2405,7 +2345,7 @@ public class ItemExtensions {
      * @param item the item for which to remove the historic item
      * @param timestamp the point in time from which to remove the states
      */
-    public static void removeAllStatesSince(Item item, ZonedDateTime timestamp) {
+    public void removeAllStatesSince(ZonedDateTime timestamp) {
         PersistenceExtensions.removeAllStatesSince(item, timestamp);
     }
 
@@ -2418,7 +2358,7 @@ public class ItemExtensions {
      * @param timestamp the point in time from which to remove the states
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void removeAllStatesSince(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public void removeAllStatesSince(ZonedDateTime timestamp, @Nullable String serviceId) {
         PersistenceExtensions.removeAllStatesSince(item, timestamp, serviceId);
     }
 
@@ -2430,7 +2370,7 @@ public class ItemExtensions {
      * @param item the item for which to remove the future item
      * @param timestamp the point in time to which to remove the states
      */
-    public static void removeAllStatesUntil(Item item, ZonedDateTime timestamp) {
+    public void removeAllStatesUntil(ZonedDateTime timestamp) {
         PersistenceExtensions.removeAllStatesUntil(item, timestamp);
     }
 
@@ -2443,37 +2383,7 @@ public class ItemExtensions {
      * @param timestamp the point in time to which to remove the states
      * @param serviceId the name of the {@link PersistenceService} to use
      */
-    public static void removeAllStatesUntil(Item item, ZonedDateTime timestamp, @Nullable String serviceId) {
+    public void removeAllStatesUntil(ZonedDateTime timestamp, @Nullable String serviceId) {
         PersistenceExtensions.removeAllStatesUntil(item, timestamp, serviceId);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {
-        if (objects == null || objects.length == 0) {
-            return Map.of();
-        }
-        if ((objects.length % 2) != 0) {
-            throw new IllegalArgumentException("There must be an even number of objects (" + objects.length + ')');
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (int i = 0; i < objects.length; i += 2) {
-            if (objects[i] instanceof String key) {
-                result.put(key, objects[i + 1]);
-            } else {
-                throw new IllegalArgumentException("Keys must be strings: " + objects[i]);
-            }
-        }
-        return result;
     }
 }

@@ -32,6 +32,12 @@ public class ScriptImportSectionNamespaceScopeProvider extends XImportSectionNam
     public static final QualifiedName CORE_ITEMS_PACKAGE = QualifiedName.create("org", "openhab", "core", "items");
     public static final QualifiedName CORE_PERSISTENCE_PACKAGE = QualifiedName.create("org", "openhab", "core",
             "persistence");
+    public static final QualifiedName CORE_PERSISTENCE_HISTORICITEM_CLASS = QualifiedName.create("org", "openhab",
+            "core", "persistence", "HistoricItem");
+    public static final QualifiedName CORE_PERSISTENCE_PERSISTENCESERVICE_INTERFACE = QualifiedName.create("org", "openhab",
+            "core", "persistence", "PersistenceService");
+    public static final QualifiedName CORE_PERSISTENCE_PERSISTENCEEXTENSIONS_CLASS = QualifiedName.create("org", "openhab",
+            "core", "persistence", "extensions", "PersistenceExtensions");
     public static final QualifiedName CORE_PERSISTENCE_RIEMANNTYPE_CLASS = QualifiedName.create("org", "openhab",
             "core", "persistence", "extensions", "PersistenceExtensions", "RiemannType");
     public static final QualifiedName MODEL_SCRIPT_ACTIONS_PACKAGE = QualifiedName.create("org", "openhab", "core",
@@ -52,6 +58,9 @@ public class ScriptImportSectionNamespaceScopeProvider extends XImportSectionNam
         implicitImports.add(doCreateImportNormalizer(CORE_LIBRARY_ITEMS_PACKAGE, true, false));
         implicitImports.add(doCreateImportNormalizer(CORE_ITEMS_PACKAGE, true, false));
         implicitImports.add(doCreateImportNormalizer(CORE_PERSISTENCE_PACKAGE, true, false));
+        implicitImports.add(doCreateImportNormalizer(CORE_PERSISTENCE_HISTORICITEM_CLASS, false, false));
+        implicitImports.add(doCreateImportNormalizer(CORE_PERSISTENCE_PERSISTENCESERVICE_INTERFACE, false, false));
+        implicitImports.add(doCreateImportNormalizer(CORE_PERSISTENCE_PERSISTENCEEXTENSIONS_CLASS, false, false));
         implicitImports.add(doCreateImportNormalizer(CORE_PERSISTENCE_RIEMANNTYPE_CLASS, false, false));
         implicitImports.add(doCreateImportNormalizer(MODEL_SCRIPT_ACTIONS_PACKAGE, true, false));
         implicitImports.add(doCreateImportNormalizer(TIME_PACKAGE, true, false));

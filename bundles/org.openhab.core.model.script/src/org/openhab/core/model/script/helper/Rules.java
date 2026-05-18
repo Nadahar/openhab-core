@@ -10,7 +10,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.core.model.script.actions;
+package org.openhab.core.model.script.helper;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,42 +20,47 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.model.script.ScriptServiceUtil;
+import org.openhab.core.model.script.engine.action.ActionDoc;
 
 /**
- * {@link RuleExtensions} provides DSL access to things like OSGi instances, system registries and the ability to run
- * other
+ * {@link Rules} provides DSL access to things like OSGi instances, system registries and the ability to run other
  * rules.
  *
  * @author Ravi Nadahar - Initial contribution
  */
 @NonNullByDefault
-public class RuleExtensions {
+public class Rules {
+
+    public static @Nullable Rule getRule(String ruleUID) {
+        return ScriptServiceUtil.getRuleRegistry().get(ruleUID);
+    }
 
     /**
      * Run the rule with the specified UID.
      *
-     * @param rule the {@link Rule} to run.
+     * @param ruleUID the UID of the rule to run.
      * @return A copy of the rule context, including possible return values.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static Map<String, Object> run(Rule rule) {
+    @ActionDoc(text = "run the rule with the specified UID")
+    public static Map<String, Object> runRule(String ruleUID) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         if (ruleManager.getStatus(ruleUID) == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
         }
         return ruleManager.runNow(ruleUID);
     }
 
-    public static Map<String, Object> run(Rule rule, boolean considerConditions) {
+    @ActionDoc(text = "run the rule with the specified UID and condition evaluation setting")
+    public static Map<String, Object> runRule(String ruleUID, boolean considerConditions) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         if (ruleManager.getStatus(ruleUID) == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
         }
@@ -65,17 +70,18 @@ public class RuleExtensions {
     /**
      * Run the rule with the specified UID with the specified context.
      *
-     * @param rule the {@link Rule} to run.
+     * @param ruleUID the UID of the rule to run.
      * @param context the {@link Map} of {@link String} and {@link Object} pairs that constitutes the context.
      * @return A copy of the rule context, including possible return values.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static Map<String, Object> run(Rule rule, Map<String, Object> context) {
+    @ActionDoc(text = "run the rule with the specified UID and context")
+    public static Map<String, Object> runRule(String ruleUID, Map<String, Object> context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         if (ruleManager.getStatus(ruleUID) == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
         }
@@ -86,19 +92,20 @@ public class RuleExtensions {
      * Run the rule with the specified UID with the specified context, while optionally taking conditions into
      * account.
      *
-     * @param rule the {@link Rule} to run.
+     * @param ruleUID the UID of the rule to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
      * @param context the pairs of {@link String}s and {@link Object}s that constitutes the context. Must be in pairs,
      *            the first is the key, the second is the value.
      * @return A copy of the rule context, including possible return values.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static Map<String, Object> run(Rule rule, boolean considerConditions, Object... context) {
+    @ActionDoc(text = "run the rule with the specified UID, condition evaluation setting and context")
+    public static Map<String, Object> runRule(String ruleUID, boolean considerConditions, Object... context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         if (ruleManager.getStatus(ruleUID) == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
         }
@@ -109,19 +116,19 @@ public class RuleExtensions {
      * Run the rule with the specified UID with the specified context, while optionally taking conditions into
      * account.
      *
-     * @param rule the {@link Rule} to run.
+     * @param ruleUID the UID of the rule to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
      * @param context the {@link Map} of {@link String} and {@link Object} pairs that constitutes the context.
      * @return A copy of the rule context, including possible return values.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static Map<String, Object> run(Rule rule, boolean considerConditions,
-            @Nullable Map<String, Object> context) {
+    @ActionDoc(text = "run the rule with the specified UID, condition evaluation setting and context")
+    public static Map<String, Object> runRule(String ruleUID, boolean considerConditions, Map<String, Object> context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         if (ruleManager.getStatus(ruleUID) == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
         }
@@ -131,16 +138,17 @@ public class RuleExtensions {
     /**
      * Check whether the specified rule is enabled.
      *
-     * @param rule the {@link Rule} to check.
+     * @param ruleUID the UID of the rule to check.
      * @return {@code true} if the rule is enabled, {@code false} otherwise.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static boolean isEnabled(Rule rule) {
+    @ActionDoc(text = "check whether the specified rule rule is enabled")
+    public static boolean isRuleEnabled(String ruleUID) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        String ruleUID = rule.getUID();
         Boolean result = ruleManager.isEnabled(ruleUID);
         if (result == null) {
             throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
@@ -151,16 +159,26 @@ public class RuleExtensions {
     /**
      * Set whether the specified rule is enabled.
      *
-     * @param rule the {@link Rule} to enable or disable.
+     * @param ruleUID the UID of the rule to enable or disable.
      * @param enabled {@code true} to enable the rule, {@code false} to disable the rule.
+     * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static void setEnabled(Rule rule, boolean enabled) {
+    @ActionDoc(text = "set whether the specified rule is enabled")
+    public static void setRuleEnabled(String ruleUID, boolean enabled) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
-        ruleManager.setEnabled(rule.getUID(), enabled);
+        ruleManager.setEnabled(ruleUID, enabled);
+    }
+
+    /**
+     * @return The {@link RuleManager} or {@code null}.
+     */
+    @ActionDoc(text = "get the rule manager")
+    public static @Nullable RuleManager getRuleManager() {
+        return ScriptServiceUtil.getRuleManager();
     }
 
     private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {

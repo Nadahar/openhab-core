@@ -28,6 +28,7 @@ import org.openhab.core.model.script.engine.action.ActionService;
 import org.openhab.core.scheduler.Scheduler;
 import org.openhab.core.thing.ThingRegistry;
 import org.openhab.core.thing.binding.ThingActions;
+import org.openhab.core.thing.link.ItemChannelLinkRegistry;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.FrameworkUtil;
@@ -61,6 +62,7 @@ public class ScriptServiceUtil {
     private final ModelRepository modelRepository;
     private final MetadataRegistry metadataRegistry;
     private final RuleRegistry ruleRegistry;
+    private final ItemChannelLinkRegistry itemChannelLinkRegistry;
     private volatile @Nullable RuleManager ruleManager;
     private final Scheduler scheduler;
 
@@ -72,13 +74,14 @@ public class ScriptServiceUtil {
     public ScriptServiceUtil(final @Reference ItemRegistry itemRegistry, final @Reference ThingRegistry thingRegistry,
             final @Reference EventPublisher eventPublisher, final @Reference ModelRepository modelRepository,
             final @Reference MetadataRegistry metadataRegistry, final @Reference RuleRegistry ruleRegistry,
-            final @Reference Scheduler scheduler) {
+            final @Reference ItemChannelLinkRegistry itemChannelLinkRegistry, final @Reference Scheduler scheduler) {
         this.itemRegistry = itemRegistry;
         this.thingRegistry = thingRegistry;
         this.eventPublisher = eventPublisher;
         this.modelRepository = modelRepository;
         this.metadataRegistry = metadataRegistry;
         this.ruleRegistry = ruleRegistry;
+        this.itemChannelLinkRegistry = itemChannelLinkRegistry;
         this.scheduler = scheduler;
 
         if (instance != null) {
@@ -167,6 +170,17 @@ public class ScriptServiceUtil {
 
     public RuleRegistry getRuleRegistryInstance() {
         return ruleRegistry;
+    }
+
+    /**
+     * @return The {@link ItemChannelLinkRegistry} instance.
+     */
+    public static ItemChannelLinkRegistry getItemChannelLinkRegistry() {
+        return getInstance().itemChannelLinkRegistry;
+    }
+
+    public ItemChannelLinkRegistry getItemChannelLinkRegistryInstance() {
+        return itemChannelLinkRegistry;
     }
 
     /**
