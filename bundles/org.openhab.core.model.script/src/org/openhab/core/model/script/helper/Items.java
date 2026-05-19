@@ -53,12 +53,10 @@ public class Items {
      *             not a {@link ManagedProvider}.
      * @throws IllegalStateException If no ManagedProvider is available.
      */
-    @NonNullByDefault({})
     public static void addMetadata(String itemName, String namespace, String value) {
         addMetadata(itemName, namespace, value, (String) null);
     }
 
-    @NonNullByDefault({})
     public static void addMetadata(String itemName, String namespace, String value, Object... configuration) {
         addMetadata(itemName, namespace, value, parseObjectArray(configuration));
     }
@@ -124,12 +122,10 @@ public class Items {
      *             not a {@link ManagedProvider}.
      * @throws IllegalStateException If no ManagedProvider is available.
      */
-    @NonNullByDefault({})
     public static @Nullable Metadata updateMetadata(String itemName, String namespace, String value) {
         return updateMetadata(itemName, namespace, value, (Map<String, Object>) null);
     }
 
-    @NonNullByDefault({})
     public static @Nullable Metadata updateMetadata(String itemName, String namespace, String value,
             Object... configuration) {
         return updateMetadata(itemName, namespace, value, parseObjectArray(configuration));
