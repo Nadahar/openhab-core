@@ -31,10 +31,6 @@ import org.openhab.core.items.Metadata;
 @NonNullByDefault
 public class ItemExtensions {
 
-    public static ItemPersistence persistence(Item item) {
-        return new ItemPersistence(item);
-    }
-
     @NonNullByDefault({})
     public static void addMetadata(Item item, String namespace, String value) {
         if (item == null) {
