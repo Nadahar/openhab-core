@@ -43,7 +43,7 @@ import org.osgi.service.component.annotations.ReferencePolicy;
 public class ThingActionService implements ActionService {
 
     private static final Map<String, ThingActions> THING_ACTIONS_MAP = new HashMap<>();
-    private static @Nullable ThingRegistry thingRegistry;
+    private static @NonNullByDefault({}) ThingRegistry thingRegistry;
 
     @Activate
     public ThingActionService(final @Reference ThingRegistry thingRegistry) {
@@ -81,6 +81,24 @@ public class ThingActionService implements ActionService {
             ThingHandler handler = thing.getHandler();
             if (handler != null) {
                 return THING_ACTIONS_MAP.get(getKey(scope, thingUid));
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gets an actions instance of a certain scope for a given {@link Thing}.
+     *
+     * @param thing the {@link Thing}.
+     * @param scope the action scope.
+     *
+     * @return actions the actions instance or null, if not available.
+     */
+    public static @Nullable ThingActions getActions(@Nullable Thing thing, String scope) {
+        if (thing != null) {
+            ThingHandler handler = thing.getHandler();
+            if (handler != null) {
+                return THING_ACTIONS_MAP.get(getKey(scope, thing.getUID().getAsString()));
             }
         }
         return null;
