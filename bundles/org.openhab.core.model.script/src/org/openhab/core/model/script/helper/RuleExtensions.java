@@ -14,7 +14,6 @@ package org.openhab.core.model.script.helper;
 
 import java.util.Map;
 
-import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
@@ -22,9 +21,7 @@ import org.openhab.core.automation.RuleManager;
 import org.openhab.core.model.script.ScriptServiceUtil;
 
 /**
- * {@link RuleExtensions} provides DSL access to things like OSGi instances, system registries and the ability to run
- * other
- * rules.
+ * {@link ItemExtensions} provides DSL {@link Rule} extensions.
  *
  * @author Ravi Nadahar - Initial contribution
  */
@@ -32,7 +29,7 @@ import org.openhab.core.model.script.ScriptServiceUtil;
 public class RuleExtensions {
 
     /**
-     * Run the rule with the specified UID.
+     * Run the specified rule.
      *
      * @param rule the {@link Rule} to run.
      * @return A copy of the rule context, including possible return values.
@@ -50,6 +47,14 @@ public class RuleExtensions {
         return ruleManager.runNow(ruleUID);
     }
 
+    /**
+     * Run the specified rule while optionally taking conditions into account.
+     *
+     * @param rule the {@link Rule} to run.
+     * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
+     * @return A copy of the rule context, including possible return values.
+     * @throws IllegalStateException If no {@link RuleManager} instance exists.
+     */
     public static Map<String, Object> run(Rule rule, boolean considerConditions) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -63,7 +68,7 @@ public class RuleExtensions {
     }
 
     /**
-     * Run the rule with the specified UID with the specified context.
+     * Run the specified rule with the specified context.
      *
      * @param rule the {@link Rule} to run.
      * @param context the {@link Map} of {@link String} and {@link Object} pairs that constitutes the context.
@@ -83,28 +88,21 @@ public class RuleExtensions {
     }
 
     /**
-     * Run the rule with the specified UID with the specified context, while optionally taking conditions into
-     * account.
+     * Run the specified rule with the specified context, while optionally taking conditions into account.
      *
      * @param rule the {@link Rule} to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.
      * @param context the pairs of {@link String}s and {@link Object}s that constitutes the context. Must be in pairs,
      *            the first is the key, the second is the value.
      * @return A copy of the rule context, including possible return values.
-     * @throws IllegalArgumentException
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @NonNullByDefault({})
-    public static @NonNull Map<@NonNull String, @NonNull Object> run(Rule rule, boolean considerConditions, Object... context) {
-        if (rule == null) {
-            throw new IllegalArgumentException("rule cannot be null");
-        }
+    public static Map<String, Object> run(Rule rule, boolean considerConditions, Object... context) {
         return Rules.runRule(rule.getUID(), considerConditions, context);
     }
 
     /**
-     * Run the rule with the specified UID with the specified context, while optionally taking conditions into
-     * account.
+     * Run the specified rule with the specified context, while optionally taking conditions into account.
      *
      * @param rule the {@link Rule} to run.
      * @param considerConditions {@code true} to not run the rule if its conditions don't qualify.

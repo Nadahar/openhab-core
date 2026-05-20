@@ -29,7 +29,7 @@ import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.link.ItemChannelLink;
 
 /**
- * {@link Channels} provides DSL access to {@link ItemChannelLink} manipulation.
+ * {@link Channels} provides DSL access to channel manipulation.
  *
  * @author Ravi Nadahar - Initial contribution
  */
@@ -366,7 +366,7 @@ public class Channels {
      *
      * @param item the {@link Item} to link.
      * @param channelUid the UID of the channel to link.
-     * @param configProperties the pairs of {@link String}s and {@link Object}s that constitutes the configuration
+     * @param configProperties the pairs of {@link String}s and {@link Object}s that constitutes the configuration.
      * properties for the link. Must be in pairs, the first is the key, the second is the value.
      * @return The newly created {@link ItemChannelLink}.
      * @throws IllegalArgumentException If {@code item} is {@code null}, {@code channelUid} is invalid, the {@link ItemChannelLink} already exists, or if there is an odd number of {@code configProperties}, or if any of the keys aren't {@link String}s.
@@ -418,7 +418,7 @@ public class Channels {
      *
      * @param item the {@link Item} to link.
      * @param channelUid the UID of the channel to link.
-     * @param configProperties the pairs of {@link String}s and {@link Object}s that constitutes the configuration
+     * @param configProperties the pairs of {@link String}s and {@link Object}s that constitutes the configuration.
      * properties for the link. Must be in pairs, the first is the key, the second is the value.
      * @return The old {@link ItemChannelLink} if one existed, or {@code null}.
      * @throws IllegalArgumentException If {@code item} is {@code null}, {@code channelUid} is invalid, or if there is an odd number of {@code configProperties}, or if any of the keys aren't {@link String}s.

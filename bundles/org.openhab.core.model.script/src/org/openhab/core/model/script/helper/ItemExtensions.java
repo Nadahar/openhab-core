@@ -27,9 +27,7 @@ import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.link.ItemChannelLink;
 
 /**
- * {@link ItemExtensions} provides DSL access to things like OSGi instances, system registries and the ability to run
- * other
- * rules.
+ * {@link ItemExtensions} provides DSL {@link Item} extensions.
  *
  * @author Ravi Nadahar - Initial contribution
  */
