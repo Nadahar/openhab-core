@@ -159,6 +159,13 @@ public class Items {
                 .update(new Metadata(new MetadataKey(namespace, itemName), value, configuration));
     }
 
+    /**
+     * Transforms pairs of {@link Object}s into a {@link Map}. The former of each pair (the key) must be a {@link String}.
+     *
+     * @param objects the array of {@link Object}s to transform.
+     * @return The resulting {@link Map}.
+     * @throws IllegalArgumentException If there is an odd number of objects, or if any of the keys aren't {@link String}s.
+     */
     private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {
         if (objects == null || objects.length == 0) {
             return Map.of();

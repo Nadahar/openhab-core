@@ -12,9 +12,9 @@
  */
 package org.openhab.core.model.script.helper;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
@@ -91,18 +91,15 @@ public class RuleExtensions {
      * @param context the pairs of {@link String}s and {@link Object}s that constitutes the context. Must be in pairs,
      *            the first is the key, the second is the value.
      * @return A copy of the rule context, including possible return values.
+     * @throws IllegalArgumentException
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    public static Map<String, Object> run(Rule rule, boolean considerConditions, Object... context) {
-        RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
-        if (ruleManager == null) {
-            throw new IllegalStateException("RuleManager doesn't exist");
+    @NonNullByDefault({})
+    public static @NonNull Map<@NonNull String, @NonNull Object> run(Rule rule, boolean considerConditions, Object... context) {
+        if (rule == null) {
+            throw new IllegalArgumentException("rule cannot be null");
         }
-        String ruleUID = rule.getUID();
-        if (ruleManager.getStatus(ruleUID) == null) {
-            throw new IllegalArgumentException("Rule with UID '" + ruleUID + "' doesn't exist");
-        }
-        return ruleManager.runNow(ruleUID, considerConditions, parseObjectArray(context));
+        return Rules.runRule(rule.getUID(), considerConditions, context);
     }
 
     /**
@@ -161,23 +158,5 @@ public class RuleExtensions {
             throw new IllegalStateException("RuleManager doesn't exist");
         }
         ruleManager.setEnabled(rule.getUID(), enabled);
-    }
-
-    private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {
-        if (objects == null || objects.length == 0) {
-            return Map.of();
-        }
-        if ((objects.length % 2) != 0) {
-            throw new IllegalArgumentException("There must be an even number of objects (" + objects.length + ')');
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        for (int i = 0; i < objects.length; i += 2) {
-            if (objects[i] instanceof String key) {
-                result.put(key, objects[i + 1]);
-            } else {
-                throw new IllegalArgumentException("Keys must be strings: " + objects[i]);
-            }
-        }
-        return result;
     }
 }

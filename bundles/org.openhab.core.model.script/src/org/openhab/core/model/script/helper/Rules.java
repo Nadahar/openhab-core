@@ -20,7 +20,6 @@ import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.automation.Rule;
 import org.openhab.core.automation.RuleManager;
 import org.openhab.core.model.script.ScriptServiceUtil;
-import org.openhab.core.model.script.engine.action.ActionDoc;
 
 /**
  * {@link Rules} provides DSL access to things like OSGi instances, system registries and the ability to run other
@@ -29,7 +28,7 @@ import org.openhab.core.model.script.engine.action.ActionDoc;
  * @author Ravi Nadahar - Initial contribution
  */
 @NonNullByDefault
-public class Rules {
+public class Rules { // TODO: (Nad) JavaDocs
 
     public static @Nullable Rule getRule(String ruleUID) {
         return ScriptServiceUtil.getRuleRegistry().get(ruleUID);
@@ -43,7 +42,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "run the rule with the specified UID")
     public static Map<String, Object> runRule(String ruleUID) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -55,7 +53,6 @@ public class Rules {
         return ruleManager.runNow(ruleUID);
     }
 
-    @ActionDoc(text = "run the rule with the specified UID and condition evaluation setting")
     public static Map<String, Object> runRule(String ruleUID, boolean considerConditions) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -76,7 +73,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "run the rule with the specified UID and context")
     public static Map<String, Object> runRule(String ruleUID, Map<String, Object> context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -100,7 +96,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "run the rule with the specified UID, condition evaluation setting and context")
     public static Map<String, Object> runRule(String ruleUID, boolean considerConditions, Object... context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -123,7 +118,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "run the rule with the specified UID, condition evaluation setting and context")
     public static Map<String, Object> runRule(String ruleUID, boolean considerConditions, Map<String, Object> context) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -143,7 +137,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "check whether the specified rule rule is enabled")
     public static boolean isRuleEnabled(String ruleUID) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -164,7 +157,6 @@ public class Rules {
      * @throws IllegalArgumentException If a rule with the specified UID doesn't exist.
      * @throws IllegalStateException If no {@link RuleManager} instance exists.
      */
-    @ActionDoc(text = "set whether the specified rule is enabled")
     public static void setRuleEnabled(String ruleUID, boolean enabled) {
         RuleManager ruleManager = ScriptServiceUtil.getRuleManager();
         if (ruleManager == null) {
@@ -176,11 +168,17 @@ public class Rules {
     /**
      * @return The {@link RuleManager} or {@code null}.
      */
-    @ActionDoc(text = "get the rule manager")
     public static @Nullable RuleManager getRuleManager() {
         return ScriptServiceUtil.getRuleManager();
     }
 
+    /**
+     * Transforms pairs of {@link Object}s into a {@link Map}. The former of each pair (the key) must be a {@link String}.
+     *
+     * @param objects the array of {@link Object}s to transform.
+     * @return The resulting {@link Map}.
+     * @throws IllegalArgumentException If there is an odd number of objects, or if any of the keys aren't {@link String}s.
+     */
     private static Map<String, Object> parseObjectArray(Object @Nullable [] objects) throws IllegalArgumentException {
         if (objects == null || objects.length == 0) {
             return Map.of();
