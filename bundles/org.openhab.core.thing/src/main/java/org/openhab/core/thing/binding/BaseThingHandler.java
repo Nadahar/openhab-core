@@ -258,7 +258,7 @@ public abstract class BaseThingHandler implements ThingHandler {
      *
      * @return raw configuration of the thing
      */
-    private Configuration getRawConfig() {
+    protected Configuration getRawConfig() {
         return getThing().getConfiguration();
     }
 

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -64,8 +65,8 @@ public class ConfigUtil {
      *
      * <p>
      * This <strong>MUST NOT</strong> be called in production environments as it can break environment variable
-     * resolving.
-     * 
+     * resolving. It's also not thread-safe.
+     *
      * @param provider the env provider to use for resolving environment variables
      */
     protected static void setEnvProvider(EnvProvider provider) {
@@ -147,7 +148,7 @@ public class ConfigUtil {
 
     /**
      * Applies the default values from a give {@link ConfigDescription} to the given configuration {@link Map}.
-     * 
+     *
      * @param configuration the configuration {@link Map} where the default values should be added (must not be null)
      * @param configDescription the {@link ConfigDescription} where the default values are located (may be null, but
      *            method won't have any effect then)
@@ -222,8 +223,8 @@ public class ConfigUtil {
         } else if (value instanceof Collection collection) {
             return normalizeCollection(collection);
         }
-        throw new IllegalArgumentException(
-                "Invalid type '{%s}' of configuration value!".formatted(value.getClass().getCanonicalName()));
+        throw new IllegalArgumentException(String.format(Locale.ROOT, "Invalid type '%s' of configuration value!",
+                value == null ? "null" : value.getClass().getCanonicalName()));
     }
 
     /**
@@ -320,36 +321,48 @@ public class ConfigUtil {
     }
 
     /**
-     * Checks a string value for the variable patterns and resolves referenced variables.
-     *
+     * Substitute variable references with their values for the specified parameter. Only {@link String}s will
+     * actually undergo substitution, but any object type that aren't {@link Collection}s can be "processed" in a
+     * type-safe way.
      * <p>
-     * Note: At the moment, only environment variables are supported.
-     * If no variable is referenced, the string value is returned as-is.
-     * If a referenced variable fails to resolve, a {@link IllegalArgumentException} is thrown.
+     * <b>Note:</b> {@link Collection}s aren't supported by this method, and will be returned unchanged. The reason is
+     * that there's no universal way to create a new collection of type {@code T} to return, which would lead to a
+     * {@code ClassCastException}. To substitute {@link Collection}s, use {@link #resolveVariables(Object)} instead,
+     * which lacks type-safety and always returns an {@link Object}.
+     * <p>
+     * Note: At the moment, only environment variables are supported. If no variable is referenced, the value is
+     * returned as-is. If a referenced variable fails to resolve, a {@link IllegalArgumentException} is thrown.
      *
      * @param value the value to resolve
      * @return the resolved value
      * @throws IllegalArgumentException if a variable fails to resolve
      */
-    private static String resolveVariables(String value) throws IllegalArgumentException {
-        final Matcher matcher = ENV_PATTERN.matcher(value);
+    public static <T> T resolveVariable(T value) throws IllegalArgumentException {
+        if (value instanceof String stringValue) {
+            Matcher matcher = ENV_PATTERN.matcher(stringValue);
+            if (matcher.find()) {
+                @SuppressWarnings("unchecked")
+                T result = (T) matcher.replaceAll(matchResult -> {
+                    final String envVarName = matchResult.group(1);
+                    final @Nullable String envVarValue = envProvider.get(envVarName);
 
-        return matcher.replaceAll(matchResult -> {
-            final String envVarName = matchResult.group(1);
-            final @Nullable String envVarValue = envProvider.get(envVarName);
+                    if (envVarValue == null) {
+                        throw new IllegalArgumentException(
+                                String.format(Locale.ROOT, "Could not resolve environment variable '%s'!", envVarName));
+                    }
 
-            if (envVarValue == null) {
-                throw new IllegalArgumentException(
-                        "Could not resolve environment variable '%s'!".formatted(envVarName));
+                    // Safely escape the replacement string so '$' and '\' are treated as literals
+                    return Matcher.quoteReplacement(envVarValue);
+                });
+                return result;
             }
-
-            // Safely escape the replacement string so '$' and '\' are treated as literals
-            return Matcher.quoteReplacement(envVarValue);
-        });
+        }
+        return value;
     }
 
     /**
-     * Resolves variables in the given value by replacing the variable patterns through the variable values.
+     * Recursively resolve variables in the given value by replacing the variable patterns through the variable
+     * values.
      *
      * <p>
      * The following rules are applied:
@@ -367,11 +380,12 @@ public class ConfigUtil {
      */
     public static Object resolveVariables(Object value) throws IllegalArgumentException {
         if (value instanceof String stringValue) {
-            return resolveVariables(stringValue);
+            return resolveVariable(stringValue);
         } else if (value instanceof Collection<?> collectionValue) {
-            final List<Object> entry = new ArrayList<>(collectionValue.size());
+            List<Object> entry = new ArrayList<>(collectionValue.size());
+            Object resolved;
             for (final Object it : collectionValue) {
-                final Object resolved = resolveVariables(it);
+                resolved = resolveVariables(it);
                 entry.add(resolved);
             }
             return entry;
@@ -380,7 +394,7 @@ public class ConfigUtil {
     }
 
     /**
-     * Resolve variables in the given configuration.
+     * Recursively resolve variables in the given configuration.
      *
      * <p>
      * Note that when substituting variables in non-TEXT values such as BOOLEAN, DECIMAL, etc., the config needs to be
@@ -406,7 +420,7 @@ public class ConfigUtil {
     }
 
     /**
-     * Resolve variables in the given {@link Configuration}.
+     * Recursively resolve variables in the given {@link Configuration}.
      *
      * <p>
      * Note that when substituting variables in non-TEXT values such as BOOLEAN, DECIMAL, etc., the config needs to be

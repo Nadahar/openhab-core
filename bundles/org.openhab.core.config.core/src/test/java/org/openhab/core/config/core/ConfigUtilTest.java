@@ -286,6 +286,22 @@ public class ConfigUtilTest {
     }
 
     @Test
+    public void resolveVariablesResolvesCombinedEnvVariablesInConfiguration() {
+        String hostname = mockEnv.get("HOSTNAME");
+        when(mockEnv.get("PORT")).thenReturn("6363");
+
+        Map<String, @Nullable Object> config = Map.of("p1", "plain", "p2", "${ENV:HOSTNAME}:${ENV:PORT}", "p3", true,
+                "p4", 42, "p5", 3.14159);
+
+        Map<String, @Nullable Object> resolvedConfig = ConfigUtil.resolveVariables(config);
+        assertEquals("plain", resolvedConfig.get("p1"));
+        assertEquals(hostname + ":6363", resolvedConfig.get("p2"));
+        assertEquals(true, resolvedConfig.get("p3"));
+        assertEquals(42, resolvedConfig.get("p4"));
+        assertEquals(3.14159, resolvedConfig.get("p5"));
+    }
+
+    @Test
     public void resolveVariablesAndNormalizeTypesResolvesThenNormalizedConfiguration() {
         String hostname = mockEnv.get("HOSTNAME");
         when(mockEnv.get("BOOLEAN")).thenReturn("true");
