@@ -14,10 +14,20 @@ package org.openhab.core.internal.items;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.core.auth.GroupRegistry;
+import org.openhab.core.auth.ManagedGroup;
+import org.openhab.core.auth.ManagedRole;
+import org.openhab.core.auth.ManagedUser;
+import org.openhab.core.auth.RoleRegistry;
+import org.openhab.core.auth.User;
+import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.common.registry.AbstractRegistry;
 import org.openhab.core.common.registry.Provider;
 import org.openhab.core.common.registry.RegistryChangeListener;
@@ -72,13 +82,21 @@ public class ItemRegistryImpl extends AbstractRegistry<Item, String, ItemProvide
     private final DefaultStateDescriptionFragmentProvider defaultStateDescriptionFragmentProvider;
 
     private @Nullable ItemStateConverter itemStateConverter;
+    private final UserRegistry userRegistry;
+    private final RoleRegistry roleRegistry;
+    private final GroupRegistry groupRegistry;
 
     @Activate
     public ItemRegistryImpl(final @Reference MetadataRegistry metadataRegistry,
-            final @Reference DefaultStateDescriptionFragmentProvider defaultStateDescriptionFragmentProvider) {
+            final @Reference DefaultStateDescriptionFragmentProvider defaultStateDescriptionFragmentProvider,
+            final @Reference UserRegistry userRegistry, final @Reference RoleRegistry roleRegistry,
+            final @Reference GroupRegistry groupRegistry) {
         super(ItemProvider.class);
         this.metadataRegistry = metadataRegistry;
         this.defaultStateDescriptionFragmentProvider = defaultStateDescriptionFragmentProvider;
+        this.userRegistry = userRegistry;
+        this.roleRegistry = roleRegistry;
+        this.groupRegistry = groupRegistry;
     }
 
     @Activate
@@ -122,6 +140,73 @@ public class ItemRegistryImpl extends AbstractRegistry<Item, String, ItemProvide
     @Override
     public Collection<Item> getItems() {
         return getAll();
+    }
+
+    @Override
+    public Collection<Item> getAllItemsWithRoles(String principal) {
+        Set<String> itemNames = getItemNames(principal);
+        if (principal.isEmpty()) {
+            return getAll();
+        }
+
+        User user = userRegistry.get(principal);
+        ManagedUser managedUser = (ManagedUser) user;
+        if (managedUser == null) {
+            logger.warn("The managed user in getAllItemsWithRoles function is null.");
+            return new HashSet<>();
+        }
+        Set<String> roles = managedUser.getRoles();
+        if (roles.contains("administrator")) {
+            return getAll();
+        }
+        Set<Item> items = new HashSet<>();
+
+        for (String itemName : itemNames) {
+            try {
+                items.add(getItem(itemName));
+            } catch (ItemNotFoundException e) {
+                logger.warn("ItemNotFoundException ", e);
+            }
+        }
+
+        return items;
+    }
+
+    /**
+     * Return all the items name that correspond to the roles of the principal
+     *
+     * @param principal that want its itemNames
+     * @return set of itemNames
+     */
+    @Override
+    public Set<String> getItemNames(String principal) {
+        ManagedUser managedUser = (ManagedUser) userRegistry.get(principal);
+        if (managedUser == null) {
+            return new HashSet<>();
+        }
+        Set<String> groups = managedUser.getGroups();
+        Set<String> roles = managedUser.getRoles();
+
+        for (String group : groups) {
+            ManagedGroup managedGroup = (ManagedGroup) groupRegistry.get(group);
+            if (managedGroup != null) {
+                roles.addAll(managedGroup.getRoles());
+            }
+        }
+
+        Set<String> itemNames = new HashSet<>();
+        for (String role : roles) {
+            ManagedRole managedRole = (ManagedRole) roleRegistry.get(role);
+            if (managedRole != null) {
+                itemNames.addAll(managedRole.getItemNames());
+            }
+        }
+        return itemNames;
+    }
+
+    @Override
+    public Set<String> getAllItemNames() {
+        return getAll().stream().map(Item::getName).collect(Collectors.toSet());
     }
 
     @Override

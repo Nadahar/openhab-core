@@ -13,6 +13,7 @@
 package org.openhab.core.items;
 
 import java.util.Collection;
+import java.util.Set;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -59,6 +60,14 @@ public interface ItemRegistry extends Registry<Item, String> {
     Collection<Item> getItems();
 
     /**
+     * This method retrieves all items that belong to the roles of the principal
+     *
+     * @param principal The information about the user
+     * @return a collection for the authorised items
+     */
+    public Collection<Item> getAllItemsWithRoles(String principal);
+
+    /**
      * This method retrieves all items with the given type
      *
      * @param type item type as defined by {@link ItemFactory}s
@@ -72,6 +81,21 @@ public interface ItemRegistry extends Registry<Item, String> {
      * @return a collection of all items matching the search pattern
      */
     Collection<Item> getItems(String pattern);
+
+    /**
+     * Return all the items name that correspond to the roles of the principal
+     *
+     * @param principal that want its itemNames
+     * @return set of itemNames
+     */
+    public Set<String> getItemNames(String principal);
+
+    /**
+     * Get the name of each item
+     *
+     * @return a set that contains the names of all items.
+     */
+    public Set<String> getAllItemNames();
 
     /**
      * Returns list of items which contains all of the given tags.

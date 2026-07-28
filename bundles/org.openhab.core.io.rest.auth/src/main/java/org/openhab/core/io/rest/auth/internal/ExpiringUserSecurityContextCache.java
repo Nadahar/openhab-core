@@ -29,13 +29,13 @@ import org.eclipse.jdt.annotation.Nullable;
  */
 @NonNullByDefault
 public class ExpiringUserSecurityContextCache {
-    static final int MAX_SIZE = 10;
-    static final int CLEANUP_FREQUENCY = 10;
+    public static final int MAX_SIZE = 10;
+    public static final int CLEANUP_FREQUENCY = 10;
 
     private final long keepPeriod;
     private final Map<String, MyEntry> entryMap;
 
-    private int calls = 0;
+    public int calls = 0; // TODO: (Nad) Code smell - check
 
     public ExpiringUserSecurityContextCache(long expirationTime) {
         this.keepPeriod = expirationTime;

@@ -24,6 +24,7 @@ import org.apache.karaf.jaas.boot.principal.UserPrincipal;
 import org.apache.karaf.jaas.modules.BackingEngine;
 import org.openhab.core.auth.ManagedUser;
 import org.openhab.core.auth.Role;
+import org.openhab.core.auth.RoleRegistry;
 import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserRegistry;
 
@@ -35,14 +36,17 @@ import org.openhab.core.auth.UserRegistry;
 public class ManagedUserBackingEngine implements BackingEngine {
 
     private final UserRegistry userRegistry;
+    private final RoleRegistry roleRegistry;
 
-    public ManagedUserBackingEngine(UserRegistry userRegistry) {
+    public ManagedUserBackingEngine(UserRegistry userRegistry, RoleRegistry roleRegistry) {
         this.userRegistry = userRegistry;
+        this.roleRegistry = roleRegistry;
     }
 
     @Override
     public void addUser(String username, String password) {
         userRegistry.register(username, password, new HashSet<>(Set.of(Role.USER)));
+        roleRegistry.addRole(Role.USER);
     }
 
     @Override

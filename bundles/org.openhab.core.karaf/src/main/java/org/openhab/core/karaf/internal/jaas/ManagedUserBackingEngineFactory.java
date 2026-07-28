@@ -16,6 +16,7 @@ import java.util.Map;
 
 import org.apache.karaf.jaas.modules.BackingEngine;
 import org.apache.karaf.jaas.modules.BackingEngineFactory;
+import org.openhab.core.auth.RoleRegistry;
 import org.openhab.core.auth.UserRegistry;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -30,10 +31,12 @@ import org.osgi.service.component.annotations.Reference;
 public class ManagedUserBackingEngineFactory implements BackingEngineFactory {
 
     private final UserRegistry userRegistry;
+    private final RoleRegistry roleRegistry;
 
     @Activate
-    public ManagedUserBackingEngineFactory(@Reference UserRegistry userRegistry) {
+    public ManagedUserBackingEngineFactory(@Reference UserRegistry userRegistry, @Reference RoleRegistry roleRegistry) {
         this.userRegistry = userRegistry;
+        this.roleRegistry = roleRegistry;
     }
 
     @Override
@@ -43,6 +46,6 @@ public class ManagedUserBackingEngineFactory implements BackingEngineFactory {
 
     @Override
     public BackingEngine build(Map<String, ?> options) {
-        return new ManagedUserBackingEngine(userRegistry);
+        return new ManagedUserBackingEngine(userRegistry, roleRegistry);
     }
 }

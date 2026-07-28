@@ -186,7 +186,7 @@ public class AuthFilter implements ContainerRequestFilter {
         }
     }
 
-    private SecurityContext authenticateBearerToken(String token) throws AuthenticationException {
+    public SecurityContext authenticateBearerToken(String token) throws AuthenticationException {
         if (token.startsWith(API_TOKEN_PREFIX)) {
             UserApiTokenCredentials credentials = new UserApiTokenCredentials(token);
             Authentication auth = userRegistry.authenticate(credentials);
@@ -201,7 +201,7 @@ public class AuthFilter implements ContainerRequestFilter {
         }
     }
 
-    private SecurityContext authenticateBasicAuth(String credentialString) throws AuthenticationException {
+    public SecurityContext authenticateBasicAuth(String credentialString) throws AuthenticationException {
         final String cacheKey = getCacheKey(credentialString);
         if (cacheKey != null) {
             final UserSecurityContext cachedValue = authCache.get(cacheKey);

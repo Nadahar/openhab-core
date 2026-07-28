@@ -32,9 +32,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.openhab.core.auth.GroupRegistry;
+import org.openhab.core.auth.RoleRegistry;
 import org.openhab.core.common.registry.RegistryChangeListener;
 import org.openhab.core.events.EventPublisher;
 import org.openhab.core.i18n.UnitProvider;
+import org.openhab.core.internal.auth.UserRegistryImpl;
 import org.openhab.core.internal.items.DefaultStateDescriptionFragmentProvider;
 import org.openhab.core.internal.items.ItemBuilderFactoryImpl;
 import org.openhab.core.internal.items.ItemRegistryImpl;
@@ -103,7 +106,8 @@ public class ItemRegistryImplTest extends JavaTest {
 
         // setup ItemRegistryImpl with necessary dependencies:
         itemRegistry = new ItemRegistryImpl(mock(MetadataRegistry.class),
-                mock(DefaultStateDescriptionFragmentProvider.class)) {
+                mock(DefaultStateDescriptionFragmentProvider.class), mock(UserRegistryImpl.class),
+                mock(RoleRegistry.class), mock(GroupRegistry.class)) {
             {
                 addProvider(itemProvider);
                 setManagedProvider(itemProvider);

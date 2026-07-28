@@ -25,9 +25,11 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.auth.AuthenticatedUser;
 import org.openhab.core.auth.AuthenticationException;
 import org.openhab.core.auth.AuthenticationProvider;
+import org.openhab.core.auth.RoleRegistry;
 import org.openhab.core.auth.User;
 import org.openhab.core.auth.UserRegistry;
 import org.openhab.core.i18n.LocaleProvider;
+import org.openhab.core.items.ItemRegistry;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -53,8 +55,9 @@ public class CreateAPITokenPageServlet extends AbstractAuthPageServlet {
 
     @Activate
     public CreateAPITokenPageServlet(BundleContext bundleContext, @Reference UserRegistry userRegistry,
-            @Reference AuthenticationProvider authProvider, @Reference LocaleProvider localeProvider) {
-        super(bundleContext, userRegistry, authProvider, localeProvider);
+            @Reference AuthenticationProvider authProvider, @Reference LocaleProvider localeProvider,
+            @Reference ItemRegistry itemRegistry, @Reference RoleRegistry roleRegistry) {
+        super(bundleContext, userRegistry, authProvider, localeProvider, itemRegistry, roleRegistry);
     }
 
     @Override

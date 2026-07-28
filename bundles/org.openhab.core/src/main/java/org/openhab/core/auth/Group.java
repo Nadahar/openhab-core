@@ -15,23 +15,8 @@ package org.openhab.core.auth;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.common.registry.Identifiable;
 
-/**
- * Interface defining constants for roles within the framework.
- *
- * @author Kai Kreuzer - Initial contribution
- */
 @NonNullByDefault
-public interface Role extends Identifiable<String> {
+public interface Group extends Identifiable<String> {
 
-    /**
-     * Role of users with administrative rights
-     */
-    String ADMIN = "administrator";
-
-    /**
-     * Role of a regular user without any exceptional permissions or restrictions
-     */
-    String USER = "user";
-
-    String getRole();
+    public String getGroup();
 }

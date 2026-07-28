@@ -95,7 +95,7 @@ public class ProviderItemRegistryDelegate implements ItemRegistry, ProviderRegis
     /**
      * Add an item permanently to the registry.
      * This item will be kept in the registry even if the script is unloaded.
-     * 
+     *
      * @param element the item to be added (must not be null)
      * @return the added item
      */
@@ -136,6 +136,11 @@ public class ProviderItemRegistryDelegate implements ItemRegistry, ProviderRegis
     }
 
     @Override
+    public Collection<Item> getAllItemsWithRoles(String principal) {
+        return itemRegistry.getAllItemsWithRoles(principal);
+    }
+
+    @Override
     public Collection<Item> getItemsOfType(String type) {
         return itemRegistry.getItemsOfType(type);
     }
@@ -143,6 +148,16 @@ public class ProviderItemRegistryDelegate implements ItemRegistry, ProviderRegis
     @Override
     public Collection<Item> getItems(String pattern) {
         return itemRegistry.getItems(pattern);
+    }
+
+    @Override
+    public Set<String> getItemNames(String principal) {
+        return itemRegistry.getItemNames(principal);
+    }
+
+    @Override
+    public Set<String> getAllItemNames() {
+        return itemRegistry.getAllItemNames();
     }
 
     @Override

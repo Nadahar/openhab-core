@@ -948,6 +948,16 @@ public class ItemUIRegistryImpl implements ItemUIRegistry {
     }
 
     @Override
+    public Collection<Item> getAllItemsWithRoles(String principal) {
+        return itemRegistry.getAllItemsWithRoles(principal);
+    }
+
+    @Override
+    public Set<String> getAllItemNames() {
+        return itemRegistry.getAllItemNames();
+    }
+
+    @Override
     public Collection<Item> getItemsOfType(String type) {
         return itemRegistry.getItemsOfType(type);
     }
@@ -955,6 +965,11 @@ public class ItemUIRegistryImpl implements ItemUIRegistry {
     @Override
     public Collection<Item> getItems(String pattern) {
         return itemRegistry.getItems(pattern);
+    }
+
+    @Override
+    public Set<String> getItemNames(String principal) {
+        return itemRegistry.getItemNames(principal);
     }
 
     @Override

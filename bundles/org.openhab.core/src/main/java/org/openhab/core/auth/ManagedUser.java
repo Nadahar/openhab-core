@@ -32,6 +32,8 @@ public class ManagedUser implements AuthenticatedUser {
     private String passwordHash;
     private String passwordSalt;
     private Set<String> roles = new HashSet<>();
+    private Set<String> groups = new HashSet<>();
+
     private @Nullable PendingToken pendingToken = null;
     private List<UserSession> sessions = new ArrayList<>();
     private List<UserApiToken> apiTokens = new ArrayList<>();
@@ -118,6 +120,14 @@ public class ManagedUser implements AuthenticatedUser {
         this.roles = roles;
     }
 
+    public Set<String> getGroups() {
+        return groups;
+    }
+
+    public void setGroups(Set<String> groups) {
+        this.groups = groups;
+    }
+
     @Override
     public @Nullable PendingToken getPendingToken() {
         return pendingToken;
@@ -150,6 +160,23 @@ public class ManagedUser implements AuthenticatedUser {
 
     @Override
     public String toString() {
-        return name + " (" + String.join(", ", roles.stream().toArray(String[]::new)) + ")";
+        if (this.roles != null && this.groups != null) {
+            return name + " role(s): (" + String.join(", ", this.roles.stream().toArray(String[]::new))
+                    + ") group(s): (" + String.join(", ", this.groups.stream().toArray(String[]::new)) + ")";
+        } else if (this.roles == null && this.groups == null) {
+            this.roles = new HashSet<>();
+            this.groups = new HashSet<>();
+            return name + " role(s): (" + String.join(", ", this.roles.stream().toArray(String[]::new))
+                    + ") group(s): (" + String.join(", ", this.groups.stream().toArray(String[]::new)) + ")";
+        } else if (this.roles == null) {
+            this.roles = new HashSet<>();
+            return name + " role(s): (" + String.join(", ", this.roles.stream().toArray(String[]::new))
+                    + ") group(s): (" + String.join(", ", this.groups.stream().toArray(String[]::new)) + ")";
+        } else {
+            this.groups = new HashSet<>();
+            return name + " role(s): (" + String.join(", ", this.roles.stream().toArray(String[]::new))
+                    + ") group(s): (" + String.join(", ", this.groups.stream().toArray(String[]::new)) + ")";
+
+        }
     }
 }

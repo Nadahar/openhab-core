@@ -12,6 +12,7 @@
  */
 package org.openhab.core.io.rest.core.internal.item;
 
+import java.io.IOException;
 import java.security.Principal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -32,6 +33,7 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.security.PermitAll;
 import javax.annotation.security.RolesAllowed;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -68,6 +70,7 @@ import org.openhab.core.io.rest.LocaleService;
 import org.openhab.core.io.rest.RESTConstants;
 import org.openhab.core.io.rest.RESTResource;
 import org.openhab.core.io.rest.Stream2JSONInputStream;
+import org.openhab.core.io.rest.auth.VerifyToken;
 import org.openhab.core.io.rest.core.item.EnrichedGroupItemDTO;
 import org.openhab.core.io.rest.core.item.EnrichedItemDTO;
 import org.openhab.core.io.rest.core.item.EnrichedItemDTOMapper;
@@ -193,6 +196,7 @@ public class ItemResource implements RESTResource {
     private final SemanticTagRegistry semanticTagRegistry;
     private final SemanticsService semanticsService;
     private final TimeZoneProvider timeZoneProvider;
+    private final VerifyToken verifyToken;
 
     private final RegistryChangedRunnableListener<Item> resetLastModifiedItemChangeListener = new RegistryChangedRunnableListener<>(
             () -> lastModified = null);
@@ -213,7 +217,8 @@ public class ItemResource implements RESTResource {
             final @Reference ManagedMetadataProvider managedMetadataProvider,
             final @Reference MetadataSelectorMatcher metadataSelectorMatcher,
             final @Reference SemanticTagRegistry semanticTagRegistry,
-            final @Reference SemanticsService semanticsService, final @Reference TimeZoneProvider timeZoneProvider) {
+            final @Reference SemanticsService semanticsService, final @Reference TimeZoneProvider timeZoneProvider,
+            final @Reference VerifyToken verifyToken) {
         this.dtoMapper = dtoMapper;
         this.eventPublisher = eventPublisher;
         this.itemBuilderFactory = itemBuilderFactory;
@@ -226,6 +231,7 @@ public class ItemResource implements RESTResource {
         this.semanticTagRegistry = semanticTagRegistry;
         this.semanticsService = semanticsService;
         this.timeZoneProvider = timeZoneProvider;
+        this.verifyToken = verifyToken;
 
         this.itemRegistry.addRegistryChangeListener(resetLastModifiedItemChangeListener);
         this.metadataRegistry.addRegistryChangeListener(resetLastModifiedMetadataChangeListener);
@@ -244,7 +250,7 @@ public class ItemResource implements RESTResource {
     }
 
     @GET
-    @RolesAllowed({ Role.USER, Role.ADMIN })
+    @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(operationId = "getItems", summary = "Get all available items.", responses = {
             @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(oneOf = {
@@ -262,6 +268,12 @@ public class ItemResource implements RESTResource {
         final Locale locale = localeService.getLocale(language);
         final ZoneId zoneId = timeZoneProvider.getTimeZone();
         final Set<String> namespaces = splitAndFilterNamespaces(namespaceSelector, locale);
+        Principal principal;
+        try {
+            principal = verifyToken.getPrincipalFromRequestContext(httpHeaders);
+        } catch (IOException io) {
+            principal = verifyToken.anonymousPrincipal;
+        }
 
         final UriBuilder uriBuilder = uriBuilder(uriInfo, httpHeaders);
 
@@ -276,7 +288,7 @@ public class ItemResource implements RESTResource {
                 lastModified = Date.from(Instant.now().truncatedTo(ChronoUnit.SECONDS));
             }
 
-            Stream<EnrichedItemDTO> itemStream = getItems(type, tags).stream() //
+            Stream<EnrichedItemDTO> itemStream = getItems(type, tags, principal.getName()).stream() //
                     .map(item -> EnrichedItemDTOMapper.map(item, false, null, uriBuilder, locale, zoneId)) //
                     .peek(dto -> addMetadata(dto, namespaces, null)) //
                     .peek(dto -> dto.editable = isEditable(dto));
@@ -287,7 +299,7 @@ public class ItemResource implements RESTResource {
                     .cacheControl(RESTConstants.CACHE_CONTROL).build();
         }
 
-        Stream<EnrichedItemDTO> itemStream = getItems(type, tags).stream() //
+        Stream<EnrichedItemDTO> itemStream = getItems(type, tags, principal.getName()).stream() //
                 .map(item -> EnrichedItemDTOMapper.map(item, recursive, null, uriBuilder, locale, zoneId)) //
                 .peek(dto -> {
                     if (parents) {
@@ -1115,11 +1127,15 @@ public class ItemResource implements RESTResource {
         return itemRegistry.get(itemName);
     }
 
-    private Collection<Item> getItems(@Nullable String type, @Nullable String tags) {
+    private Collection<Item> getItems(@Nullable String type, @Nullable String tags, @Nullable String principal) {
         Collection<Item> items;
         if (tags == null) {
             if (type == null) {
-                items = itemRegistry.getItems();
+                if (principal != null) {
+                    items = itemRegistry.getAllItemsWithRoles(principal);
+                } else {
+                    items = itemRegistry.getItems();
+                }
             } else {
                 items = itemRegistry.getItemsOfType(type);
             }
